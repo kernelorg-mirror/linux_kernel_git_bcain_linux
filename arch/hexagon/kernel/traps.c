@@ -261,7 +261,7 @@ static void illegal_instruction(struct pt_regs *regs)
 }
 
 /*
- * Precise bus errors may be recoverable with a a retry,
+ * Precise bus errors may be recoverable with a retry,
  * but for now, treat them as irrecoverable.
  */
 static void precise_bus_error(struct pt_regs *regs)
