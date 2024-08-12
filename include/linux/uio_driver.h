@@ -14,11 +14,23 @@
 #ifndef _UIO_DRIVER_H_
 #define _UIO_DRIVER_H_
 
+#include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
 
 struct module;
-struct uio_map;
+
+struct uio_driver {
+	struct device_driver *driver;
+	int (*new_device)(struct device_driver *, const char *, size_t);
+	int (*del_device)(struct device_driver *);
+	struct klist_node node;
+};
+
+struct uio_map {
+	struct kobject kobj;
+	struct uio_mem *mem;
+};
 
 /**
  * struct uio_mem - description of a UIO memory region
@@ -39,7 +51,10 @@ struct uio_mem {
 	int			memtype;
 	void __iomem		*internal_addr;
 	struct uio_map		*map;
+	struct uio_device	*idev;
 };
+
+extern int uio_find_mem_index(struct vm_area_struct *vma);
 
 #define MAX_UIO_MAPS	5
 
@@ -107,6 +122,13 @@ struct uio_info {
 	int (*irqcontrol)(struct uio_info *info, s32 irq_on);
 };
 
+
+struct map_sysfs_entry {
+	struct attribute attr;
+	ssize_t (*show)(struct uio_mem *, char *);
+	ssize_t (*store)(struct uio_mem *, const char *, size_t);
+};
+
 extern int __must_check
 	__uio_register_device(struct module *owner,
 			      struct device *parent,
@@ -118,6 +140,7 @@ extern int __must_check
 
 extern void uio_unregister_device(struct uio_info *info);
 extern void uio_event_notify(struct uio_info *info);
+extern int uio_register_driver(struct uio_driver *uio_drv);
 
 /* defines for uio_info->irq */
 #define UIO_IRQ_CUSTOM	-1

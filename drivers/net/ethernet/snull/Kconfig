@@ -1,0 +1,4 @@
+config NET_SNULL
+        tristate "SNULL network device"
+	default n
+

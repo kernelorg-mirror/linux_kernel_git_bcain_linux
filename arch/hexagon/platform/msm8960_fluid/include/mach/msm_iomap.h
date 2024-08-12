@@ -1,0 +1,162 @@
+/*
+ * Copyright (C) 2007 Google, Inc.
+ * Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
+ * Author: Brian Swetland <swetland@google.com>
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ *
+ * The MSM peripherals are spread all over across 768MB of physical
+ * space, which makes just having a simple IO_ADDRESS macro to slide
+ * them into the right virtual location rough.  Instead, we will
+ * provide a master phys->virt mapping for peripherals here.
+ *
+ */
+
+#ifndef __ASM_ARCH_MSM_IOMAP_H
+#define __ASM_ARCH_MSM_IOMAP_H
+
+#include <asm/sizes.h>
+
+/* Physical base address and size of peripherals.
+ * Ordered by the virtual base addresses they will be mapped at.
+ *
+ * MSM_VIC_BASE must be an value that can be loaded via a "mov"
+ * instruction, otherwise entry-macro.S will not compile.
+ *
+ * If you add or remove entries here, you'll want to edit the
+ * msm_io_desc array in arch/arm/mach-msm/io.c to reflect your
+ * changes.
+ *
+ */
+
+#define MSM_DEBUG_UART_SIZE	SZ_4K
+
+#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) \
+				|| defined(CONFIG_DEBUG_MSM_UART3)
+#define MSM_DEBUG_UART_BASE	0xFC000000
+#define MSM_DEBUG_UART_PHYS	CONFIG_MSM_DEBUG_UART_PHYS
+#endif
+
+#define MSM8625_WARM_BOOT_PHYS  0x0FD00000
+
+
+#if defined(CONFIG_ARCH_MSM8960) || defined(CONFIG_ARCH_APQ8064) || \
+	defined(CONFIG_ARCH_MSM8930) || defined(CONFIG_ARCH_MSM9615) || \
+	defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM7X27) || \
+	defined(CONFIG_ARCH_MSM7X25) || defined(CONFIG_ARCH_MSM7X01A) || \
+	defined(CONFIG_ARCH_MSM8625) || defined(CONFIG_ARCH_MSM7X30) || \
+	defined(CONFIG_ARCH_MSM9625)
+
+/* Unified iomap */
+//  Pointing all of these to 0x0 to catch errors
+//#define MSM_TMR_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_TMR0_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_QGIC_DIST_BASE	IOMEM(0x0)	/*  4K	*/
+//#define MSM_QGIC_CPU_BASE	IOMEM(0x0)	/*  4K	*/
+#define MSM_TCSR_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_APCS_GCC_BASE	IOMEM(0x0)	/*  4K	*/
+//#define MSM_SAW_L2_BASE	IOMEM(0x0)	/*  4K	*/
+//#define MSM_SAW0_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_SAW1_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_IMEM_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_ACC0_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_ACC1_BASE		IOMEM(0x0)	/*  4K	*/
+#define MSM_ACC2_BASE		IOMEM(0x0)	/*  4K	*/
+#define MSM_ACC3_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_CLK_CTL_BASE	IOMEM(0x0)	/* 16K	*/
+//#define MSM_MMSS_CLK_CTL_BASE	IOMEM(0x0)	/*  4K	*/
+//#define MSM_LPASS_CLK_CTL_BASE	IOMEM(0x0)	/*  4K	*/
+//#define MSM_HFPLL_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_TLMM_BASE		IOMEM(0x0)	/* 16K	*/
+//#define MSM_SHARED_RAM_BASE	IOMEM(0x0)	/*  2M  */
+//#define MSM_SIC_NON_SECURE_BASE	IOMEM(0x0)	/* 64K	*/
+//#define MSM_HDMI_BASE		IOMEM(0x0)	/*  4K  */
+//#define MSM_RPM_BASE		IOMEM(0x0)	/*  4K	*/
+//#define MSM_RPM_MPM_BASE	IOMEM(0x0)	/*  4K	*/
+//#define MSM_QFPROM_BASE		IOMEM(0x0)	/*  4K  */
+#define MSM_L2CC_BASE		IOMEM(0x0)	/*  4K  */
+#define MSM_APCS_GLB_BASE	IOMEM(0x0)	/*  4K  */
+#define MSM_SAW2_BASE		IOMEM(0x0)	/*  4k  */
+#define MSM_SAW3_BASE		IOMEM(0x0)	/*  4k  */
+#define MSM_VIC_BASE		IOMEM(0x0)	/*  4K */
+#define MSM_CSR_BASE		IOMEM(0x0)	/*  4K */
+#define MSM_GPIO1_BASE		IOMEM(0x0)	/*  4K */
+#define MSM_GPIO2_BASE		IOMEM(0x0)	/*  4K */
+#define MSM_SCU_BASE		IOMEM(0x0)	/*  4K */
+#define MSM_CFG_CTL_BASE	IOMEM(0x0)	/*  4K */
+#define MSM_CLK_CTL_SH2_BASE	IOMEM(0x0)	/*  4K */
+#define MSM_MDC_BASE		IOMEM(0x0)	/*  1M */
+#define MSM_AD5_BASE		IOMEM(0x0)	/*  13M (D00000)
+							  0xFB600000 */
+
+#define MSM_STRONGLY_ORDERED_PAGE	0x0
+#define MSM8625_SECONDARY_PHYS		0x0FE00000
+
+
+#if defined(CONFIG_ARCH_MSM9615) || defined(CONFIG_ARCH_MSM7X27) \
+	|| defined(CONFIG_ARCH_MSM7X30)
+#define MSM_SHARED_RAM_SIZE	SZ_1M
+#else
+#define MSM_SHARED_RAM_SIZE	SZ_2M
+#endif
+
+//#include "msm_iomap-7xxx.h"
+//#include "msm_iomap-7x30.h"
+//#include "msm_iomap-8625.h"
+#include "msm_iomap-8960.h"
+//#include "msm_iomap-8930.h"
+//#include "msm_iomap-8064.h"
+//#include "msm_iomap-9615.h"
+//#include "msm_iomap-8974.h"
+//#include "msm_iomap-9625.h"
+
+//#define _K_init_devtbl_base	0xfe000000
+//  Ugh this sucks.
+#define DEVICE_BASE		0xfe000000
+
+#define MSM_TMR_BASE		IOMEM(DEVICE_BASE+0x000000)
+#define MSM_TMR0_BASE		IOMEM(DEVICE_BASE+0x001000)
+#define MSM_QGIC_DIST_BASE	IOMEM(DEVICE_BASE+0x002000)
+#define MSM_QGIC_CPU_BASE	IOMEM(DEVICE_BASE+0x003000)
+#define MSM_APCS_GCC_BASE	IOMEM(DEVICE_BASE+0x006000)
+#define MSM_SAW_L2_BASE		IOMEM(DEVICE_BASE+0x007000)
+#define MSM_SAW0_BASE		IOMEM(DEVICE_BASE+0x008000)
+#define MSM_SAW1_BASE		IOMEM(DEVICE_BASE+0x009000)
+#define MSM_IMEM_BASE		IOMEM(DEVICE_BASE+0x00a000)
+#define MSM_ACC0_BASE		IOMEM(DEVICE_BASE+0x00b000)
+#define MSM_ACC1_BASE		IOMEM(DEVICE_BASE+0x00c000)
+#define MSM_CLK_CTL_BASE	IOMEM(DEVICE_BASE+0x010000)
+#define MSM_MMSS_CLK_CTL_BASE	IOMEM(DEVICE_BASE+0x014000)
+#define MSM_LPASS_CLK_CTL_BASE  IOMEM(DEVICE_BASE+0x015000)
+#define MSM_HFPLL_BASE		IOMEM(DEVICE_BASE+0x016000)
+#define MSM_TLMM_BASE		IOMEM(DEVICE_BASE+0x017000)
+#define MSM_SHARED_RAM_BASE	IOMEM(DEVICE_BASE+0x300000)
+#define MSM_SIC_NON_SECURE_BASE	IOMEM(DEVICE_BASE+0x600000)
+#define MSM_QFPROM_BASE		IOMEM(DEVICE_BASE+0x700000)
+#define MSM_HDMI_BASE		IOMEM(DEVICE_BASE+0x800000)
+#define MSM_RPM_BASE		IOMEM(DEVICE_BASE+0x801000)
+#define MSM_RPM_MPM_BASE	IOMEM(DEVICE_BASE+0x802000)
+
+#else
+/* Legacy single-target iomap */
+#if defined(CONFIG_ARCH_QSD8X50)
+#include "msm_iomap-8x50.h"
+#elif defined(CONFIG_ARCH_MSM8X60)
+#include "msm_iomap-8x60.h"
+#elif defined(CONFIG_ARCH_FSM9XXX)
+#include "msm_iomap-fsm9xxx.h"
+#else
+#error "Target compiled without IO map\n"
+#endif
+
+#endif
+
+#endif

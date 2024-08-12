@@ -155,4 +155,22 @@ config UIO_MF624
 
 	  If you compile this as a module, it will be called uio_mf624.
 
+config UIO_HEXAGON_SHBUF
+	tristate "Hexagon Shared Buffer UIO driver"
+	depends on HEXAGON
+	help
+	  Userspace I/O interface for Hexagon Shared Buffers.
+
+config UIO_HEXAGON_TCM
+	tristate "Hexagon TCM UIO driver"
+	depends on HEXAGON
+	help
+	  Userspace I/O interface for Hexagon TCM.
+
+config UIO_HEXAGON_VTCM
+	tristate "Hexagon VTCM UIO driver"
+	depends on HEXAGON
+	help
+	  Userspace I/O interface for Hexagon VTCM.
+
 endif

@@ -131,7 +131,7 @@ static struct sysrq_key_op sysrq_unraw_op = {
 
 static void sysrq_handle_crash(int key)
 {
-	char *killer = NULL;
+	volatile char *killer = NULL;
 
 	panic_on_oops = 1;	/* force panic */
 	wmb();

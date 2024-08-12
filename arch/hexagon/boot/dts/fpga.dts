@@ -1,0 +1,92 @@
+/dts-v1/;
+
+/*  Bare minimum  */
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	aliases {
+	};
+	memory { device_type = "memory"; reg = <0 0>; };
+
+	/*  note:  framebuffer is currently at 0x8900_0000; 1024*600*3 */
+};
+
+
+/ {
+	chosen {
+		bootargs = "";
+	};
+};
+
+/ {
+        model = "FPGA";
+        compatible = "qcom,fpga";
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "Hexagon,v56";
+			reg = <0>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "Hexagon,v56";
+			reg = <1>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "Hexagon,v56";
+			reg = <2>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+
+	};
+
+	soc: soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges ;
+
+		interrupt-parent = <&PIC0>;
+
+		PIC0: interrupt-controller@0 {
+			compatible = "qcom,h2-pic";
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+
+		gpt@AB000000 {
+			compatible="qcom,h2-timer";
+			interrupts = <12 0>;   /*  interrupts CPU directly; rising edge triggered */
+		};
+
+	};
+};
+
+
+&soc {
+
+};
+

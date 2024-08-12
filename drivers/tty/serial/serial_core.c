@@ -1,3 +1,5 @@
+#pragma clang optimize off
+
 /*
  *  Driver core for serial ports
  *
@@ -359,8 +361,11 @@ uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
 		break;
 	}
 
+// XXX_SM
+//return 38400;
 	for (try = 0; try < 2; try++) {
 		baud = tty_termios_baud_rate(termios);
+		if (baud == 0) baud = 38400; // XXX_SM
 
 		/*
 		 * The spd_hi, spd_vhi, spd_shi, spd_warp kludge...
@@ -387,6 +392,7 @@ uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
 		termios->c_cflag &= ~CBAUD;
 		if (old) {
 			baud = tty_termios_baud_rate(old);
+			if (baud == 0) baud = 9600;
 			if (!hung_up)
 				tty_termios_encode_baud_rate(termios,
 								baud, baud);

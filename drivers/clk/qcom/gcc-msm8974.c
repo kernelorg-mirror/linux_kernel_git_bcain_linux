@@ -63,6 +63,19 @@ static const char *gcc_xo_gpll0_gpll4[] = {
 
 #define F(f, s, h, m, n) { (f), (s), (2 * (h) - 1), (m), (n) }
 
+#ifndef CONFIG_HEXAGON
+#define GPLL_ENA_VOTE_REG		0x1480
+#define CLOCK_BR_EN_VOTE_REG		0x1484
+#else
+#ifdef CONFIG_HEXAGON_MSS
+#define GPLL_ENA_VOTE_REG		0x1500
+#define CLOCK_BR_EN_VOTE_REG		0x1508
+#else
+#define GPLL_ENA_VOTE_REG		0x1540
+#define CLOCK_BR_EN_VOTE_REG		0x1544
+#endif
+#endif
+
 static struct clk_pll gpll0 = {
 	.l_reg = 0x0004,
 	.m_reg = 0x0008,
@@ -80,7 +93,9 @@ static struct clk_pll gpll0 = {
 };
 
 static struct clk_regmap gpll0_vote = {
-	.enable_reg = 0x1480,
+	//  This is just "GPLL" in the SWI
+	//.enable_reg = 0x1480,
+	.enable_reg = GPLL_ENA_VOTE_REG,
 	.enable_mask = BIT(0),
 	.hw.init = &(struct clk_init_data){
 		.name = "gpll0_vote",
@@ -143,7 +158,9 @@ static struct clk_pll gpll1 = {
 };
 
 static struct clk_regmap gpll1_vote = {
-	.enable_reg = 0x1480,
+	//  This is called 'sleep clk' in the SWI
+	//.enable_reg = 0x1480,
+	.enable_reg = GPLL_ENA_VOTE_REG,
 	.enable_mask = BIT(1),
 	.hw.init = &(struct clk_init_data){
 		.name = "gpll1_vote",
@@ -1061,7 +1078,7 @@ static struct clk_branch gcc_bam_dma_ahb_clk = {
 	.halt_reg = 0x0d44,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(12),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_bam_dma_ahb_clk",
@@ -1078,7 +1095,7 @@ static struct clk_branch gcc_blsp1_ahb_clk = {
 	.halt_reg = 0x05c4,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(17),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_blsp1_ahb_clk",
@@ -1401,7 +1418,7 @@ static struct clk_branch gcc_blsp2_ahb_clk = {
 	.halt_reg = 0x0944,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(15),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_blsp2_ahb_clk",
@@ -1724,7 +1741,7 @@ static struct clk_branch gcc_boot_rom_ahb_clk = {
 	.halt_reg = 0x0e04,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(10),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_boot_rom_ahb_clk",
@@ -1741,7 +1758,7 @@ static struct clk_branch gcc_ce1_ahb_clk = {
 	.halt_reg = 0x104c,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(3),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_ce1_ahb_clk",
@@ -1758,7 +1775,7 @@ static struct clk_branch gcc_ce1_axi_clk = {
 	.halt_reg = 0x1048,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(4),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_ce1_axi_clk",
@@ -1775,7 +1792,7 @@ static struct clk_branch gcc_ce1_clk = {
 	.halt_reg = 0x1050,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(5),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_ce1_clk",
@@ -1792,7 +1809,7 @@ static struct clk_branch gcc_ce2_ahb_clk = {
 	.halt_reg = 0x108c,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(0),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_ce2_ahb_clk",
@@ -1809,7 +1826,7 @@ static struct clk_branch gcc_ce2_axi_clk = {
 	.halt_reg = 0x1088,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(1),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_ce2_axi_clk",
@@ -1826,7 +1843,7 @@ static struct clk_branch gcc_ce2_clk = {
 	.halt_reg = 0x1090,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(2),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_ce2_clk",
@@ -2006,7 +2023,7 @@ static struct clk_branch gcc_prng_ahb_clk = {
 	.halt_reg = 0x0d04,
 	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
-		.enable_reg = 0x1484,
+		.enable_reg = CLOCK_BR_EN_VOTE_REG,
 		.enable_mask = BIT(13),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_prng_ahb_clk",

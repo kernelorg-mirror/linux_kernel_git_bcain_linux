@@ -1,0 +1,90 @@
+/dts-v1/;
+
+/*  Bare minimum  */
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	aliases { };
+	memory { device_type = "memory"; reg = <0 0>; };
+};
+
+
+/ {
+	chosen {
+		bootargs = "";
+	};
+};
+
+/ {
+        model = "Qualcomm R3PC board";
+        compatible = "qcom,r3pc";
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "Hexagon,v4";
+			reg = <0>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <16384>;
+                        d-cache-size = <16384>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "Hexagon,v4";
+			reg = <1>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <16384>;
+                        d-cache-size = <16384>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "Hexagon,v4";
+			reg = <2>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <16384>;
+                        d-cache-size = <16384>;
+		};
+
+	};
+
+	//  Add in angel trap as a "device"?
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x20000000>;  //  512MB starting at 0
+	};
+
+	unknown_chipset {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0xab000000 0xab000000 0x1000>;  /*  can change if we pre-map in init_segtable  */
+		interrupt-parent = <&PIC0>;
+
+		//  Virtual machine PIC
+		PIC0: pic0 {
+			#interrupt-cells = <2>;
+			compatible = "Hexagon,vm-pic";
+			interrupt-controller;
+		};
+
+		gpt@AB000000 {
+			compatible="qcom,qsd8650-gpt";
+			reg = <0xab000000 0x1000>;
+			interrupts = <2 0>;   /*  interrupts CPU directly; rising edge triggered; would it be easier just to cram IRQF_TRIGGER_RISING in here? */
+		};
+
+	};
+};
+

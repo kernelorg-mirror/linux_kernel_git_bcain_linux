@@ -28,6 +28,13 @@ do { \
 	INIT_LIST_HEAD(list);         \
 } while (0)
 
+void parse_events_error(YYLTYPE *loc, void *data,
+			void *scanner __maybe_unused,
+			char const *msg __maybe_unused)
+{
+	parse_events_evlist_error(data, loc->last_column, "parser error");
+}
+
 static inc_group_count(struct list_head *list,
 		       struct parse_events_evlist *data)
 {
@@ -524,9 +531,3 @@ sep_slash_dc: '/' | ':' |
 
 %%
 
-void parse_events_error(YYLTYPE *loc, void *data,
-			void *scanner __maybe_unused,
-			char const *msg __maybe_unused)
-{
-	parse_events_evlist_error(data, loc->last_column, "parser error");
-}

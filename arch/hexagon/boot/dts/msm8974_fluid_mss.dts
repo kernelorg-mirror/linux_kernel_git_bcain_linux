@@ -1,0 +1,172 @@
+/dts-v1/;
+
+/*  Bare minimum  */
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	aliases {
+                spi0 = &spi_0;
+	};
+	memory { device_type = "memory"; reg = <0 0>; };
+
+	/*  note:  framebuffer is currently at 0x8900_0000; 1024*600*3 */
+};
+
+
+/ {
+	chosen {
+		bootargs = "";
+	};
+};
+
+/ {
+        model = "Qualcomm MSM8974 FLUID";
+        compatible = "qcom,msm8974_fluid";
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "Hexagon,v5";
+			reg = <0>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "Hexagon,v5";
+			reg = <1>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "Hexagon,v5";
+			reg = <2>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+
+	};
+
+	soc: soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0xab000000 0xab000000 0x1000  /*  uhh... fixme  */
+			  0xfd510000 0xfd510000 0x1000  /*  uhh... fixme  */
+			  0xf9923000 0xf9923000 0x1000  /*  uhh... fixme  */
+			  0xfc400000 0xfc400000 0x4000
+			  0xfc4cf000 0xfc4cf000 0x1000
+			  0xfc4cb000 0xfc4cb000 0x1000
+			  0xfc4ca000 0xfc4ca000 0x1000>;
+
+		interrupt-parent = <&PIC0>;
+
+		PIC0: interrupt-controller@0 {
+			compatible = "qcom,h2-pic";
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+
+		gpt@AB000000 {
+			compatible="qcom,h2-timer";
+			reg = <0xab000000 0x1000>;
+			interrupts = <12 0>;   /*  interrupts CPU directly; rising edge triggered */
+		};
+
+		msmgpio: gpio@fd510000 {
+			compatible = "qcom,msm-gpio";
+			gpio-controller;
+			#gpio-cells = <2>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			reg = <0xfd510000 0x4000>;	/* hrm, prlly need to make sure platform io.c does this right  */
+			ngpio = <146>;
+			interrupt-parent = <&PIC0>;
+			interrupts = <239 0>;		/* 239+32 (-32 for hack) */
+			qcom,direct-connect-irqs = <8>;	/* apparently 8 direct connectable IRQ's  */
+		};
+
+		spmi_bus: qcom,spmi@fc5c0000 {
+			cell-index = <0>;
+			compatible = "qcom,spmi-pmic-arb";
+			reg-names = "core", "intr", "cnfg";
+			reg = <0xfc4cf000 0x1000>,
+			      <0Xfc4cb000 0x1000>,
+			      <0Xfc4ca000 0x1000>;
+			/* 190,ee0_krait_hlos_spmi_periph_irq */
+			/* 187,channel_0_krait_hlos_trans_done_irq */
+			/* This might be 48+32 ee3_lpass_spmi_periph_irq */
+			/* This might be 49+32 channel3_lpass_trans_done_irq */
+			/* EE is "execution environment"?  */
+			/*  interrupts = <0 190 0 0 187 0>;  */
+			interrupt-parent = <&PIC0>;
+			interrupts = <75 0>;  /* 75 + 32; this is spmi_periph (-32 for hack) */
+			qcom,pmic-arb-ee = <2>;      /*  need ifdef for MSS */
+			qcom,pmic-arb-channel = <2>; /*  need ifdef for MSS */
+		};
+
+		gcc: clock-controller@fc400000 {
+			compatible = "qcom,gcc-8974", "qcom,gcc";
+			#clock-cells = <1>;
+			#reset-cells = <1>;
+			/*  This is a real physical address; make sure it's not in map_io or whatever  */
+			reg = <0xfc400000 0x4000>;
+		};
+
+
+	};
+};
+
+
+/include/ "msm-pm8941.dtsi"
+
+&soc {
+	spi_eth_vreg: spi_eth_phy_vreg {
+		compatible = "regulator-fixed";
+		regulator-name = "ethernet_phy";
+		gpio = <&pm8941_mpps 5 0>;
+		enable-active-high;
+	};
+
+	spi_0: spi@f9923000 {
+		compatible = "qcom,spi-qup-v2";
+		reg = <0xf9923000 0x1000>;
+		interrupt-parent = <&PIC0>;
+		interrupts = <245 0>;	/*  245+32 (-32) */
+		spi-max-frequency = <19200000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		qcom,master-id = <86>;
+
+		ethernet-switch@2 {
+			compatible = "micrel,ks8851";
+			reg = <2>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <94 0>;
+			spi-max-frequency = <4800000>;
+			rst-gpio = <&pm8941_mpps 6 0>;
+			vdd-io-supply = <&spi_eth_vreg>;
+			vdd-phy-supply = <&spi_eth_vreg>;
+		};
+
+	};
+
+};
+

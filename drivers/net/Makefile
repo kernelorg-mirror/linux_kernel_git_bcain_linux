@@ -65,5 +65,7 @@ obj-$(CONFIG_XEN_NETDEV_BACKEND) += xen-netback/
 
 obj-$(CONFIG_USB_NET_DRIVERS) += usb/
 
+obj-$(CONFIG_QFEC) += qfec.o
+
 obj-$(CONFIG_HYPERV_NET) += hyperv/
 obj-$(CONFIG_NTB_NETDEV) += ntb_netdev.o

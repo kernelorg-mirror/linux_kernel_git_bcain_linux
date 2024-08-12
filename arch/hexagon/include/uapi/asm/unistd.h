@@ -26,10 +26,26 @@
  *  See also:  syscalltab.c
  */
 
-#define sys_mmap2 sys_mmap_pgoff
+#define __ARCH_WANT_SYSCALL_DEPRECATED
+
+#ifndef __GLIBC__
+/* It seems these are all needed for uClibc...
+ * However, if glibc is compiled w/ these turned on, then it will
+ * will fail (typically with 32/64-bit compat problems). */
+#define __ARCH_WANT_SYSCALL_OFF_T
+#define __ARCH_WANT_SYSCALL_NO_AT
+#define __ARCH_WANT_SYSCALL_NO_FLAGS
+#endif
+
+//#define sys_mmap2 sys_mmap_pgoff
 #define __ARCH_WANT_SYS_EXECVE
 #define __ARCH_WANT_SYS_CLONE
 #define __ARCH_WANT_SYS_VFORK
 #define __ARCH_WANT_SYS_FORK
 
 #include <asm-generic/unistd.h>
+
+//  Prevent uClibc from using this.
+//  Would preferably just not define __ARCH_WANT_SYSCALL_DEPRECATED, but
+//  we're not there yet.
+#undef __NR_vfork

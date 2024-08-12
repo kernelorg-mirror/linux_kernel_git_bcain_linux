@@ -1,0 +1,152 @@
+/dts-v1/;
+
+/*  Bare minimum  */
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	aliases {
+		sirc0 = &sirc0;
+		sirc1 = &sirc1;
+	};
+	memory { device_type = "memory"; reg = <0 0>; };
+};
+
+
+/ {
+	chosen {
+		bootargs = "console=ttyMSM2,115200";
+	};
+};
+
+/ {
+        model = "Qualcomm Comet board";
+        compatible = "qcom,comet";
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "Hexagon,v2";
+			reg = <0>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "Hexagon,v2";
+			reg = <1>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "Hexagon,v2";
+			reg = <2>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			compatible = "Hexagon,v2";
+			reg = <3>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+		cpu@4 {
+			device_type = "cpu";
+			compatible = "Hexagon,v2";
+			reg = <4>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@5 {
+			device_type = "cpu";
+			compatible = "Hexagon,v2";
+			reg = <5>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+	};
+
+	qsd8650 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0xab000000 0xab000000 0x1000>;  /*  can change if we pre-map in init_segtable  */
+		interrupt-parent = <&PIC0>;
+
+		//  Virtual machine PIC
+		PIC0: pic0 {
+			#interrupt-cells = <2>;
+			compatible = "qcom,minivm-pic";
+			interrupt-controller;
+		};
+
+		sirc0: interrupt-controller@AB010000,0 {
+			compatible="qcom,sirc";
+			#interrupt-cells = <2>;
+			interrupt-controller;
+			reg = <0xab010000 0x1000>;
+			interrupts = <23 0>;  /*  SIRC0; rising edge triggered */
+		};
+
+		sirc1: interrupt-controller@AB010000,1 {
+			compatible="qcom,sirc";
+			#interrupt-cells = <2>;
+			interrupt-controller;
+			reg = <0xab010000 0x1000>;
+			interrupts = <24 0>;  /*  SIRC1; rising edge triggered */
+		};
+
+		gpt@AB000000 {
+			compatible="qcom,qsd8650-gpt";
+			reg = <0xab000000 0x1000>;
+			interrupts = <3 0>;   /*  interrupts CPU directly; rising edge triggered */
+		};
+
+		ethernet@84000000 {
+			device_type = "network";
+			compatible = "smsc,911x";
+			reg = <0x84000000 0x1000>;
+			interrupts = <19 1>;  /*  GPIO Group 1 on SIRC0; active low; how to describe binding? */
+			interrupt-parent = <&sirc0>;
+		};
+
+		serial@A9C00000 {
+			/*  UART3, aka ttyMSM2 */
+			device_type = "serial";
+			compatible = "qcom,msm-uart";
+			reg = <0xa9c00000 0x1000>;
+			interrupts = <18 2>;  /*  SIRC1; active high; how to describe binding?  */
+			interrupt-parent = <&sirc1>;
+		};
+
+
+	};
+};
+

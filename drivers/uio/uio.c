@@ -26,12 +26,18 @@
 #include <linux/cdev.h>
 #include <linux/uio_driver.h>
 
+#define UIO_MAJOR		240
 #define UIO_MAX_DEVICES		(1U << MINORBITS)
 
 static int uio_major;
 static struct cdev *uio_cdev;
 static DEFINE_IDR(uio_idr);
 static const struct file_operations uio_fops;
+
+/*  Drivers for which devices can be added/removed  */
+DEFINE_KLIST(uio_drvlist, NULL, NULL);
+
+static struct class uio_class;
 
 /* Protect idr accesses */
 static DEFINE_MUTEX(minor_lock);
@@ -40,10 +46,6 @@ static DEFINE_MUTEX(minor_lock);
  * attributes
  */
 
-struct uio_map {
-	struct kobject kobj;
-	struct uio_mem *mem;
-};
 #define to_map(map) container_of(map, struct uio_map, kobj)
 
 static ssize_t map_name_show(struct uio_mem *mem, char *buf)
@@ -68,12 +70,6 @@ static ssize_t map_offset_show(struct uio_mem *mem, char *buf)
 {
 	return sprintf(buf, "0x%llx\n", (unsigned long long)mem->addr & ~PAGE_MASK);
 }
-
-struct map_sysfs_entry {
-	struct attribute attr;
-	ssize_t (*show)(struct uio_mem *, char *);
-	ssize_t (*store)(struct uio_mem *, const char *, size_t);
-};
 
 static struct map_sysfs_entry name_attribute =
 	__ATTR(name, S_IRUGO, map_name_show, NULL);
@@ -113,8 +109,24 @@ static ssize_t map_type_show(struct kobject *kobj, struct attribute *attr,
 	return entry->show(mem, buf);
 }
 
+static ssize_t map_type_store(struct kobject *kobj, struct attribute *attr,
+			     const char *buf, size_t count)
+{
+	struct uio_map *map = to_map(kobj);
+	struct uio_mem *mem = map->mem;
+	struct map_sysfs_entry *entry;
+
+	entry = container_of(attr, struct map_sysfs_entry, attr);
+
+	if (!entry->store)
+		return -EIO;
+
+	return entry->store(mem, buf, count);
+}
+
 static const struct sysfs_ops map_sysfs_ops = {
 	.show = map_type_show,
+	.store = map_type_store,
 };
 
 static struct kobj_type map_attr_type = {
@@ -243,10 +255,109 @@ static struct attribute *uio_attrs[] = {
 };
 ATTRIBUTE_GROUPS(uio);
 
+#define to_uio_driver(obj) \
+	container_of(obj, struct uio_driver, node);
+
+static ssize_t new_device_store(struct class *class,
+				struct class_attribute *attr,
+				const char *buf, size_t len)
+{
+	struct klist_iter iter;
+	struct klist_node *node;
+	struct uio_driver *uio_drv;
+	char *sep;
+	size_t n;
+
+	sep = strchr(buf, ' ');
+	if (sep) {
+		n = (sep-buf);
+	}
+	else {
+		n = len-1;
+	}
+
+	if (n < 1)
+		return len;
+
+	klist_iter_init(&uio_drvlist, &iter);
+	while (node = klist_next(&iter)) {
+		uio_drv = to_uio_driver(node);
+		if (strncmp(buf,uio_drv->driver->name, n) == 0) {
+			break;
+		}
+		uio_drv = NULL;
+	}
+	klist_iter_exit(&iter);
+
+	if (uio_drv && uio_drv->new_device) {
+		uio_drv->new_device(uio_drv->driver,sep+1,len-n-1);
+	}
+
+	return len;
+}
+
+int del_device_match(struct device *dev, const void *data)
+{
+	if (!strcmp(dev_name(dev), data)) {
+		return 1;
+	}
+	return 0;
+
+}
+
+static ssize_t del_device_store(struct class *class,
+				struct class_attribute *attr,
+				const char *buf, size_t len)
+{
+	struct device *dev;
+	char *devname;
+
+	devname = kstrdup(buf, GFP_KERNEL);
+	devname[len-1] = '\0';
+
+	dev = class_find_device(class, NULL, devname, del_device_match);
+
+	/*  dev is the uio specific device, and then dev->parent is the underlying device  */
+	/*  there has to be a less convoluted way to do this...  recount + callback?  */
+
+	if (dev) {
+		struct klist_iter iter;
+		struct klist_node *node;
+		struct uio_driver *uio_drv;
+		struct uio_device *idev = dev_get_drvdata(dev);
+
+		klist_iter_init(&uio_drvlist, &iter);
+		while (node = klist_next(&iter)) {
+			uio_drv = to_uio_driver(node);
+			if (uio_drv->driver == dev->driver) {
+				break;
+			}
+		}
+		klist_iter_exit(&iter);
+
+		/*  Order may be wrong; probably missing a bunch of kfree's too */
+		uio_unregister_device(idev->info);
+
+		if (uio_drv->driver == dev->parent->driver) {
+			uio_drv->del_device(dev->parent);
+		}
+
+	}
+
+	return len;
+}
+
+static struct class_attribute uio_class_attrs[] = {
+        __ATTR(new_device, 0200, NULL, new_device_store),
+        __ATTR(del_device, 0200, NULL, del_device_store),
+        __ATTR_NULL,
+};
+
 /* UIO class infrastructure */
 static struct class uio_class = {
 	.name = "uio",
 	.dev_groups = uio_groups,
+	.class_attrs = uio_class_attrs
 };
 
 /*
@@ -286,6 +397,7 @@ static int uio_dev_add_attributes(struct uio_device *idev)
 		ret = kobject_uevent(&map->kobj, KOBJ_ADD);
 		if (ret)
 			goto err_map;
+		mem->idev = idev;
 	}
 
 	for (pi = 0; pi < MAX_UIO_PORT_REGIONS; pi++) {
@@ -576,7 +688,7 @@ static ssize_t uio_write(struct file *filep, const char __user *buf,
 	return retval ? retval : sizeof(s32);
 }
 
-static int uio_find_mem_index(struct vm_area_struct *vma)
+int uio_find_mem_index(struct vm_area_struct *vma)
 {
 	struct uio_device *idev = vma->vm_private_data;
 
@@ -587,6 +699,7 @@ static int uio_find_mem_index(struct vm_area_struct *vma)
 	}
 	return -1;
 }
+EXPORT_SYMBOL(uio_find_mem_index);
 
 static int uio_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
@@ -723,7 +836,9 @@ static int uio_major_init(void)
 	dev_t uio_dev = 0;
 	int result;
 
-	result = alloc_chrdev_region(&uio_dev, 0, UIO_MAX_DEVICES, name);
+	uio_dev = MKDEV(UIO_MAJOR, 0);
+	printk("%s: using fixed major: %d\n", __FUNCTION__, UIO_MAJOR);
+	result = register_chrdev_region(uio_dev, UIO_MAX_DEVICES, name);
 	if (result)
 		goto out;
 
@@ -784,6 +899,14 @@ static void release_uio_class(void)
 	class_unregister(&uio_class);
 	uio_major_cleanup();
 }
+
+
+int uio_register_driver(struct uio_driver *uio_drv)
+{
+	klist_add_tail(&uio_drv->node, &uio_drvlist);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(uio_register_driver);
 
 /**
  * uio_register_device - register a new userspace IO device

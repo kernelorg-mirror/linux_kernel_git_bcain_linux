@@ -1,0 +1,88 @@
+/dts-v1/;
+
+/*  Bare minimum  */
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	aliases {
+	};
+	memory { device_type = "memory"; reg = <0 0>; };
+
+};
+
+
+/ {
+	chosen {
+		bootargs = "";
+	};
+};
+
+
+/ {
+        model = "Qualcomm MSM8998";
+        compatible = "qcom,msm8998";
+
+	soc: soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		interrupt-parent = <&PIC0>;
+
+		PIC0: interrupt-controller@0 {
+			compatible = "qcom,h2-pic";
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+		gpt@AB000000 {
+			compatible="qcom,h2-timer";
+			reg = <0xab000000 0x1000>;
+			interrupts = <12 0>;   /*  interrupts CPU directly; rising edge triggered */
+		};
+/*
+		gpt@FE2A0000 {
+			compatible="qcom,qtimer";
+			reg = <0xfe2a0000 0x1000>;
+			interrupts = <35>;
+		};
+*/
+
+		/*
+			Add 32 to l2vic interrupt
+			[0] 18
+			[1] 8
+			[2] 33
+			[3] 46
+		 */
+/*
+		irqtest {
+			compatible = "qcom,hexagon-irqtest";
+			interrupt-parent = <&PIC0>;
+			interrupts = <50 0>, <40 0>, <65 0>, <78 0>;
+		};
+
+		virtio_block@1e000 {
+			compatible = "virtio,mmio";
+			reg = <0x37c00000 0x100>;
+			interrupts = <50 0>;
+		};
+
+*/
+
+		snull_net {
+			compatible = "qcom,snull-eth";
+			interrupt-parent = <&PIC0>;
+			interrupts = <50 0>;
+			reg = <0xd7c00000 0x10000>,
+			      <0xd7c10000 0x10000>,
+			      <0x17385000 0x10000>;
+			qcom,snull-irq-offset = <0x0>;	/* reg + this = address of tx */
+			qcom,snull-irq-bitset = <0x80>;	/* bit in this register to set */
+			qcom,snull-zero-mem = <0x0>;
+		};
+	};
+};
+
+
+

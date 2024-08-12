@@ -67,6 +67,7 @@ __switch_to:
 	/* Stash thread_info pointer in task_struct */
 	memw(R0+#_TASK_THREAD_INFO) = THREADINFO_REG;
 	memw(R0 +#(_TASK_STRUCT_THREAD + _THREAD_STRUCT_SWITCH_SP)) = R29;
+
 	/* Switch to "next" stack and restore callee saves from there */
 	R29 = memw(R1 + #(_TASK_STRUCT_THREAD + _THREAD_STRUCT_SWITCH_SP));
 	{

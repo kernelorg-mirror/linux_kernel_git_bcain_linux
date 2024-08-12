@@ -24,6 +24,7 @@
 /* Supports:
  * Xilinx IIC
  */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -721,6 +722,77 @@ static struct i2c_adapter xiic_adapter = {
 };
 
 
+#if 0
+struct i2c_adapter *dini_i2c_adapter;
+int dini_read_reg(int regnum);
+int dini_write_reg(int regnum, int val)
+#endif
+
+struct i2c_adapter *dini_i2c_adapter;
+
+int dini_read_reg(int regnum)
+{
+	struct i2c_msg msgs[2];
+	u8 buf[32];
+	int ret = 0;
+
+	//  Takes two I2C messages to pull each 8 bits of a register out
+	buf[0] = regnum;
+
+	msgs[0].addr = 0x56;
+	msgs[0].flags = 0;		// this is a write
+	msgs[0].len = 1;
+	msgs[0].buf = buf;
+
+
+	msgs[1].addr = 0x56;
+	msgs[1].flags = I2C_M_RD;	// this is a read
+	msgs[1].len = 1;
+	msgs[1].buf = buf;
+
+	BUG_ON(xiic_xfer(dini_i2c_adapter, msgs, 2) != 2);
+
+	ret = buf[0] << 8;
+
+	//  Look for the PHY data...
+	//  Takes two I2C messages to pull a 16-bit register out
+	buf[0] = regnum;
+	msgs[0].addr = 0x56;
+	msgs[0].flags = 0;		// this is a write
+	msgs[0].len = 1;
+	msgs[0].buf = buf;
+
+	msgs[1].addr = 0x56;
+	msgs[1].flags = I2C_M_RD;	// this is a read
+	msgs[1].len = 1;
+	msgs[1].buf = buf;
+
+	BUG_ON(xiic_xfer(dini_i2c_adapter, msgs, 2) != 2);
+
+	ret |= buf[0];
+
+	return ret;
+}
+
+int dini_write_reg(int regnum, int val)
+{
+	struct i2c_msg msgs[1];
+	u8 buf[32];
+
+	buf[0] = regnum;
+	buf[1] = (val >> 8) & 0xff;
+	buf[2] = (val) & 0xff;
+
+	msgs[0].addr = 0x56;
+	msgs[0].flags = 0;	// this is a write
+	msgs[0].len = 3;
+	msgs[0].buf = buf;
+
+	BUG_ON(xiic_xfer(dini_i2c_adapter, msgs, 1) != 1);
+
+	return 1;
+}
+
 static int xiic_i2c_probe(struct platform_device *pdev)
 {
 	struct xiic_i2c *i2c;
@@ -751,6 +823,10 @@ static int xiic_i2c_probe(struct platform_device *pdev)
 	i2c_set_adapdata(&i2c->adap, i2c);
 	i2c->adap.dev.parent = &pdev->dev;
 	i2c->adap.dev.of_node = pdev->dev.of_node;
+
+	dini_i2c_adapter = &i2c->adap;
+
+	xiic_reinit(i2c);
 
 	spin_lock_init(&i2c->lock);
 	init_waitqueue_head(&i2c->wait);

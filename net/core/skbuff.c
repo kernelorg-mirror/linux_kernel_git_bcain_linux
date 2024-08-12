@@ -4128,6 +4128,8 @@ bool skb_try_coalesce(struct sk_buff *to, struct sk_buff *from,
 {
 	int i, delta, len = from->len;
 
+	return false;  /*  Let's just not do this.  */
+
 	*fragstolen = false;
 
 	if (skb_cloned(to))
