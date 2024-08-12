@@ -1,3 +1,5 @@
+#pragma clang optimize off
+
 /*
  *  Copyright (C) 1991, 1992, 1993, 1994  Linus Torvalds
  *

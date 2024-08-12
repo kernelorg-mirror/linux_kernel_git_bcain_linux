@@ -48,7 +48,7 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
 extern int dma_supported(struct device *dev, u64 mask);
 extern int dma_set_mask(struct device *dev, u64 mask);
 extern int dma_is_consistent(struct device *dev, dma_addr_t dma_handle);
-extern void dma_cache_sync(struct device *dev, void *vaddr, size_t size,
+extern void hexagon_cache_sync(void *vaddr, size_t size,
 			   enum dma_data_direction direction);
 
 #include <asm-generic/dma-mapping-common.h>
@@ -101,6 +101,16 @@ static inline void dma_free_attrs(struct device *dev, size_t size,
 	dma_ops->free(dev, size, cpu_addr, dma_handle, attrs);
 
 	debug_dma_free_coherent(dev, size, cpu_addr, dma_handle);
+}
+
+static inline void dma_coherent_pre_ops(void)
+{
+	barrier();
+}
+
+static inline void dma_coherent_post_ops(void)
+{
+	barrier();
 }
 
 #endif

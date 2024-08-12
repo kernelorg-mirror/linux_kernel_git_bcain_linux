@@ -471,8 +471,10 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 		usb_free_urb(urb);
 		return -ENOLINK;
 	}
-
-	skb = __netdev_alloc_skb_ip_align(dev->net, size, flags);
+	if (dev->driver_info->flags & FLAG_HW_IPALIGN)
+		skb = __netdev_alloc_skb(dev->net, size, flags);
+	else
+		skb = __netdev_alloc_skb_ip_align(dev->net, size, flags);
 	if (!skb) {
 		netif_dbg(dev, rx_err, dev->net, "no rx skb\n");
 		usbnet_defer_kevent (dev, EVENT_RX_MEMORY);

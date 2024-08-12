@@ -1,0 +1,131 @@
+/dts-v1/;
+
+/*  Bare minimum  */
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	aliases { };
+	memory { device_type = "memory"; reg = <0 0>; };
+};
+
+
+/ {
+	chosen {
+		bootargs = "console=ttyMSM2,115200";
+	};
+};
+
+/ {
+        model = "Qualcomm Amazon board";
+        compatible = "qualcomm,amazon";
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "Hexagon,v3";
+			reg = <0>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "Hexagon,v3";
+			reg = <1>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "Hexagon,v3";
+			reg = <2>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			compatible = "Hexagon,v3";
+			reg = <3>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+		cpu@4 {
+			device_type = "cpu";
+			compatible = "Hexagon,v3";
+			reg = <4>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+		cpu@5 {
+			device_type = "cpu";
+			compatible = "Hexagon,v3";
+			reg = <5>;
+			clock-frequency = <100000000>;
+                        i-cache-line-size = <32>;
+                        d-cache-line-size = <32>;
+                        i-cache-size = <32768>;
+                        d-cache-size = <32768>;
+		};
+
+	};
+
+	qsd8650 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x80680000 0x80680000 0x1000>;  /*  can change if we pre-map in init_segtable  */
+		interrupt-parent = <&PIC0>;
+
+		//  Virtual machine PIC
+		PIC0: pic0 {
+			#interrupt-cells = <2>;
+			compatible = "Hexagon,vm-pic";
+			interrupt-controller;
+		};
+
+		sirc0:  interrupt-controller@AB010000,0 {
+			compatible="qualcomm,sirc";
+			#interrupt-cells = <2>;
+			interrupt-controller;
+			reg = <0xab010000 0x1000>;
+			interrupts = <23 0>;  /*  SIRC0; rising edge triggered */
+		};
+
+		sirc1:  interrupt-controller@AB010000,1 {
+			compatible="qualcomm,sirc";
+			#interrupt-cells = <2>;
+			interrupt-controller;
+			reg = <0xab010000 0x1000>;
+			interrupts = <24 0>;  /*  SIRC1; rising edge triggered */
+		};
+
+		gpt@AB000000 {
+			compatible="qcom,qsd8650-gpt";
+			reg = <0x80680000 0x1000>;
+			interrupts = <3 0>;   /*  interrupts CPU directly; rising edge triggered */
+		};
+
+	};
+};
+

@@ -7,8 +7,9 @@ struct xyarray {
 	size_t row_size;
 	size_t entry_size;
 	size_t entries;
+	size_t pad;
 	char contents[];
-};
+} __attribute__ ((aligned (8)));
 
 struct xyarray *xyarray__new(int xlen, int ylen, size_t entry_size);
 void xyarray__delete(struct xyarray *xy);

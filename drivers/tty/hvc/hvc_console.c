@@ -61,7 +61,7 @@
  * future to better deal with backends that want other buffer sizes.
  */
 #define N_OUTBUF	16
-#define N_INBUF		16
+#define N_INBUF		4096
 
 #define __ALIGNED__ __attribute__((__aligned__(sizeof(long))))
 
@@ -598,20 +598,24 @@ static int hvc_chars_in_buffer(struct tty_struct *tty)
  * there has been no input for some time.
  */
 #define MIN_TIMEOUT		(10)
-#define MAX_TIMEOUT		(2000)
+#define MAX_TIMEOUT		(100)
 static u32 timeout = MIN_TIMEOUT;
 
 #define HVC_POLL_READ	0x00000001
 #define HVC_POLL_WRITE	0x00000002
 
+char *buffer_page;
+
 int hvc_poll(struct hvc_struct *hp)
 {
 	struct tty_struct *tty;
 	int i, n, poll_mask = 0;
-	char buf[N_INBUF] __ALIGNED__;
+	//char buf[N_INBUF] __ALIGNED__;
 	unsigned long flags;
 	int read_total = 0;
 	int written_total = 0;
+
+	char *buf = buffer_page;
 
 	spin_lock_irqsave(&hp->lock, flags);
 
@@ -957,6 +961,8 @@ static int hvc_init(void)
 {
 	struct tty_driver *drv;
 	int err;
+
+	buffer_page = __get_free_page(GFP_KERNEL);
 
 	/* We need more than hvc_count adapters due to hotplug additions. */
 	drv = alloc_tty_driver(HVC_ALLOC_TTY_ADAPTERS);

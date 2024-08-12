@@ -1724,18 +1724,18 @@ static int msm_otg_probe(struct platform_device *pdev)
 	ret = msm_hsusb_init_vddcx(motg, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "hsusb vddcx configuration failed\n");
-		goto disable_clks;
+		//goto disable_clks;
 	}
 
 	ret = msm_hsusb_ldo_init(motg, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "hsusb vreg configuration failed\n");
-		goto disable_vddcx;
+		//goto disable_vddcx;
 	}
 	ret = msm_hsusb_ldo_set_mode(motg, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "hsusb vreg enable failed\n");
-		goto disable_ldo;
+		//goto disable_ldo;
 	}
 
 	writel(0, USB_USBINTR);

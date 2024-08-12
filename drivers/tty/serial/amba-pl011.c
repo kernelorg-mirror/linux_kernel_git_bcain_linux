@@ -1815,6 +1815,8 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
+	if (port->uartclk == 0)
+	    port->uartclk = 256000;
 	baud = uart_get_baud_rate(port, termios, old, 0,
 				  port->uartclk / clkdiv);
 #ifdef CONFIG_DMA_ENGINE
@@ -2175,6 +2177,8 @@ static int __init pl011_console_setup(struct console *co, char *options)
 	}
 
 	uap->port.uartclk = clk_get_rate(uap->clk);
+	if (uap->port.uartclk == 0)
+	    uap->port.uartclk = 256000;
 
 	if (uap->vendor->fixed_options) {
 		baud = uap->fixed_baud;

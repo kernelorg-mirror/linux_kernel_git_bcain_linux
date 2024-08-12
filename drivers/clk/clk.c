@@ -224,7 +224,7 @@ unlock_out:
 	clk_enable_unlock(flags);
 }
 
-static bool clk_ignore_unused;
+static bool clk_ignore_unused = true;
 static int __init clk_ignore_unused_setup(char *__unused)
 {
 	clk_ignore_unused = true;
@@ -2371,6 +2371,8 @@ static int __clk_init(struct device *dev, struct clk *clk_user)
 	else
 		rate = 0;
 	core->rate = core->req_rate = rate;
+
+	printk("%s:  %s %d hz\n", __func__, core->name, core->rate);
 
 	/*
 	 * walk the list of orphan clocks and reparent any that are children of

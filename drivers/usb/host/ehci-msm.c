@@ -36,6 +36,23 @@
 
 #include "ehci.h"
 
+static int q6_ehci_port_power(struct ehci_hcd *ehci, int portnum, bool enable)
+{
+	struct usb_hcd *hcd = ehci_to_hcd(ehci);
+	u32 __iomem *status_reg = &ehci->regs->port_status[portnum];
+	u32 temp = ehci_readl(ehci, status_reg) & ~PORT_RWC_BITS;
+
+	if (enable)
+		ehci_writel(ehci, temp | PORT_POWER, status_reg);
+	else
+		ehci_writel(ehci, temp & ~PORT_POWER, status_reg);
+
+	if (hcd->driver->port_power)
+		hcd->driver->port_power(hcd, portnum, enable);
+
+	return 0;
+}
+
 #define MSM_USB_BASE (hcd->regs)
 
 #define DRIVER_DESC "Qualcomm On-Chip EHCI Host Controller"
@@ -61,6 +78,16 @@ static int ehci_msm_reset(struct usb_hcd *hcd)
 	writel(0, USB_AHBMODE);
 	/* Disable streaming mode and select host mode */
 	writel(0x13, USB_USBMODE);
+
+	//  Missing:  some HSIC fix
+	/* Disable ULPI_TX_PKT_EN_CLR_FIX which is valid only for HSIC */
+	//writel_relaxed(readl_relaxed(USB_GENCONFIG2) & ~(1<<19),
+	//			USB_GENCONFIG2);
+
+	//  Missing:  port powerup, hcsparams check
+	unsigned int port = 0;
+	for (port = HCS_N_PORTS (ehci->hcs_params); port > 0; port--)
+		q6_ehci_port_power(ehci, port, 1);
 
 	return 0;
 }

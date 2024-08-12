@@ -512,7 +512,11 @@ int main(int argc, const char **argv)
 
 	/* The page_size is placed in util object. */
 	page_size = sysconf(_SC_PAGE_SIZE);
+#ifndef __hexagon__
 	cacheline_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+#else
+	cacheline_size = 32;
+#endif
 
 	cmd = perf_extract_argv0_path(argv[0]);
 	if (!cmd)

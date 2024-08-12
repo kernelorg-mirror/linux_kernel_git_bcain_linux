@@ -21,12 +21,15 @@
 #include <linux/dma-mapping.h>
 #include <linux/bootmem.h>
 #include <linux/genalloc.h>
+#include <linux/export.h>
 #include <asm/dma-mapping.h>
 #include <linux/module.h>
 #include <asm/page.h>
 
 struct dma_map_ops *dma_ops;
 EXPORT_SYMBOL(dma_ops);
+
+extern u32 sample_u32;
 
 int bad_dma_address;  /*  globals are automatically initialized to zero  */
 
@@ -90,7 +93,6 @@ static void *hexagon_dma_alloc_coherent(struct device *dev, size_t size,
 		*dma_addr = (dma_addr_t) virt_to_phys(ret);
 	} else
 		*dma_addr = ~0;
-
 	return ret;
 }
 
@@ -118,29 +120,42 @@ static int hexagon_map_sg(struct device *hwdev, struct scatterlist *sg,
 			  int nents, enum dma_data_direction dir,
 			  struct dma_attrs *attrs)
 {
+	struct dma_map_ops *ops = get_dma_ops(hwdev);
 	struct scatterlist *s;
 	int i;
 
 	WARN_ON(nents == 0 || sg[0].length == 0);
 
 	for_each_sg(sg, s, nents, i) {
-		s->dma_address = sg_phys(s);
+		s->dma_address = ops->map_page(hwdev, sg_page(s), s->offset, s->length, dir, attrs);
+
 		if (!check_addr("map_sg", hwdev, s->dma_address, s->length))
 			return 0;
 
 		s->dma_length = s->length;
-
-		flush_dcache_range(dma_addr_to_virt(s->dma_address),
-				   dma_addr_to_virt(s->dma_address + s->length));
 	}
-
 	return nents;
 }
+
+void hexagon_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+                enum dma_data_direction dir, struct dma_attrs *attrs)
+{
+	struct dma_map_ops *ops = get_dma_ops(dev);
+	struct scatterlist *s;
+	int i;
+
+	if (ops->unmap_page)
+		for_each_sg(sg, s, nents, i) {
+			       ops->unmap_page(dev, s->dma_address, s->dma_length, dir, attrs);
+		}
+}
+
+
 
 /*
  * address is virtual
  */
-static inline void dma_sync(void *addr, size_t size,
+void hexagon_cache_sync(void *addr, size_t size,
 			    enum dma_data_direction dir)
 {
 	switch (dir) {
@@ -160,6 +175,7 @@ static inline void dma_sync(void *addr, size_t size,
 		BUG();
 	}
 }
+EXPORT_SYMBOL(hexagon_cache_sync);
 
 /**
  * hexagon_map_page() - maps an address for device DMA
@@ -191,30 +207,48 @@ static dma_addr_t hexagon_map_page(struct device *dev, struct page *page,
 	if (!check_addr("map_single", dev, bus, size))
 		return bad_dma_address;
 
-	dma_sync(dma_addr_to_virt(bus), size, dir);
+	//  Do a first invalidate so nothing gets flushed.
+
+	hexagon_cache_sync(dma_addr_to_virt(bus), size, dir);
 
 	return bus;
+}
+
+static void hexagon_unmap_page(struct device *dev, dma_addr_t handle,
+                size_t size, enum dma_data_direction dir,
+                struct dma_attrs *attrs)
+{
+
+	if (dir == DMA_TO_DEVICE) {
+		return;
+	}
+
+	//  Second invalidate in case something was prefetched?
+	hexagon_cache_sync(dma_addr_to_virt(handle), size, dir);
+
 }
 
 static void hexagon_sync_single_for_cpu(struct device *dev,
 					dma_addr_t dma_handle, size_t size,
 					enum dma_data_direction dir)
 {
-	dma_sync(dma_addr_to_virt(dma_handle), size, dir);
+	hexagon_cache_sync(dma_addr_to_virt(dma_handle), size, dir);
 }
 
 static void hexagon_sync_single_for_device(struct device *dev,
 					dma_addr_t dma_handle, size_t size,
 					enum dma_data_direction dir)
 {
-	dma_sync(dma_addr_to_virt(dma_handle), size, dir);
+	hexagon_cache_sync(dma_addr_to_virt(dma_handle), size, dir);
 }
 
 struct dma_map_ops hexagon_dma_ops = {
 	.alloc		= hexagon_dma_alloc_coherent,
 	.free		= hexagon_free_coherent,
 	.map_sg		= hexagon_map_sg,
+	.unmap_sg	= hexagon_unmap_sg,
 	.map_page	= hexagon_map_page,
+	.unmap_page	= hexagon_unmap_page,
 	.sync_single_for_cpu = hexagon_sync_single_for_cpu,
 	.sync_single_for_device = hexagon_sync_single_for_device,
 	.is_phys	= 1,

@@ -1358,7 +1358,7 @@ ax88179_rx_checksum(struct sk_buff *skb, u32 *pkt_hdr)
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 }
 
-static int ax88179_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
+int ax88179_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 {
 	struct sk_buff *ax_skb;
 	int pkt_cnt;
@@ -1377,7 +1377,7 @@ static int ax88179_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 	pkt_cnt = (u16)rx_hdr;
 	hdr_off = (u16)(rx_hdr >> 16);
 	pkt_hdr = (u32 *)(skb->data + hdr_off);
-
+	//  should bug_on pkt_hdr not aligned
 	while (pkt_cnt--) {
 		u16 pkt_len;
 
@@ -1638,7 +1638,7 @@ static const struct driver_info ax88179_info = {
 	.link_reset = ax88179_link_reset,
 	.reset = ax88179_reset,
 	.stop = ax88179_stop,
-	.flags = FLAG_ETHER | FLAG_FRAMING_AX,
+	.flags = FLAG_ETHER | FLAG_FRAMING_AX | FLAG_HW_IPALIGN,
 	.rx_fixup = ax88179_rx_fixup,
 	.tx_fixup = ax88179_tx_fixup,
 };
@@ -1651,7 +1651,7 @@ static const struct driver_info ax88178a_info = {
 	.link_reset = ax88179_link_reset,
 	.reset = ax88179_reset,
 	.stop = ax88179_stop,
-	.flags = FLAG_ETHER | FLAG_FRAMING_AX,
+	.flags = FLAG_ETHER | FLAG_FRAMING_AX | FLAG_HW_IPALIGN,
 	.rx_fixup = ax88179_rx_fixup,
 	.tx_fixup = ax88179_tx_fixup,
 };
@@ -1677,7 +1677,7 @@ static const struct driver_info sitecom_info = {
 	.link_reset = ax88179_link_reset,
 	.reset = ax88179_reset,
 	.stop = ax88179_stop,
-	.flags = FLAG_ETHER | FLAG_FRAMING_AX,
+	.flags = FLAG_ETHER | FLAG_FRAMING_AX | FLAG_HW_IPALIGN,
 	.rx_fixup = ax88179_rx_fixup,
 	.tx_fixup = ax88179_tx_fixup,
 };
@@ -1690,7 +1690,7 @@ static const struct driver_info samsung_info = {
 	.link_reset = ax88179_link_reset,
 	.reset = ax88179_reset,
 	.stop = ax88179_stop,
-	.flags = FLAG_ETHER | FLAG_FRAMING_AX,
+	.flags = FLAG_ETHER | FLAG_FRAMING_AX | FLAG_HW_IPALIGN,
 	.rx_fixup = ax88179_rx_fixup,
 	.tx_fixup = ax88179_tx_fixup,
 };
