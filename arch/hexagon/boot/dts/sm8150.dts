@@ -151,6 +151,12 @@
 			qcom,snull-irq-bitset = <0x20>;/* bit in this register to set */
 			qcom,snull-zero-mem = <0x0>;
 		};
+
+		hvx {
+			compatible = "qcom,hexagon-hvx";
+			qcom,hvx-max-ctxts = <4>;
+			qcom,hvx-vlength = <7>;
+		};
 	};
 };
 
