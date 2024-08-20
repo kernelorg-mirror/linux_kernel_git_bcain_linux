@@ -398,6 +398,7 @@ void do_genex(struct pt_regs *regs)
 		misaligned_data_store(regs);
 		break;
 	case HVM_GE_C_INVI:
+	case HVM_GE_C_PRIVGI:
 	case HVM_GE_C_PRIVI:
 		illegal_instruction(regs);
 		break;
