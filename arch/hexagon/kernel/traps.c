@@ -402,6 +402,9 @@ void do_genex(struct pt_regs *regs)
 	case HVM_GE_C_COPROC:
 		coproc_fault(regs);
 		break;
+	case HVM_GE_C_VMEM:
+		precise_bus_error(regs);
+		break;
 	default:
 		/* Halt and catch fire */
 		panic("Unrecognized exception 0x%lx\n", pt_cause(regs));

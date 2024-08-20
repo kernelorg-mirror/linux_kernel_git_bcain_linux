@@ -459,7 +459,7 @@ static inline long __vmintop_clear(long i)
 #define HVM_GE_C_XPROT	0x11
 #define HVM_GE_C_XUSER	0x12
 #define HVM_GE_C_INVI	0x15
-#define HVM_GE_C_COPROC 0x16
+#define HVM_GE_C_COPROC	0x16
 #define HVM_GE_C_PRIVI	0x1B
 #define HVM_GE_C_XMAL	0x1C
 #define HVM_GE_C_WREG	0x1D
@@ -470,6 +470,7 @@ static inline long __vmintop_clear(long i)
 #define HVM_GE_C_WPROT	0x23
 #define HVM_GE_C_RUSER	0x24
 #define HVM_GE_C_WUSER	0x25
+#define HVM_GE_C_VMEM	0x26
 #define HVM_GE_C_CACHE	0x28
 
 /* Extended TLB miss cause codes; earlier ones might be deprecated */
