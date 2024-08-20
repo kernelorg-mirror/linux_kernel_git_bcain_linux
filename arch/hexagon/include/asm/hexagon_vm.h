@@ -471,6 +471,7 @@ static inline long __vmintop_clear(long i)
 #define HVM_GE_C_RUSER	0x24
 #define HVM_GE_C_WUSER	0x25
 #define HVM_GE_C_VMEM	0x26
+#define HVM_GE_C_STACK	0x27
 #define HVM_GE_C_CACHE	0x28
 
 /* Extended TLB miss cause codes; earlier ones might be deprecated */

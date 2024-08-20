@@ -350,6 +350,14 @@ static void coproc_fault(struct pt_regs *regs)
 	}
 }
 
+static void precise_stack_error(struct pt_regs *regs)
+{
+	die_if_kernel("Precise Stack Overflow", regs, 0);
+	if (sig_debug)
+		dump_sig_debug(regs);
+	force_sig(SIGSEGV, current);
+}
+
 /*
  * General exception handler
  */
@@ -404,6 +412,9 @@ void do_genex(struct pt_regs *regs)
 		break;
 	case HVM_GE_C_VMEM:
 		precise_bus_error(regs);
+		break;
+	case HVM_GE_C_STACK:
+		precise_stack_error(regs);
 		break;
 	default:
 		/* Halt and catch fire */
