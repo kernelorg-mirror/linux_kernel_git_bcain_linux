@@ -25,7 +25,7 @@ static int valid_mem_address(struct uio_mem *mem, void *addr, size_t size)
 	struct vm_area_struct *vma;
 	struct uio_device *idev;
 
-	vma = find_vma(current->mm, addr);
+	vma = find_vma(current->mm, (unsigned long)addr);
 	if (!vma) {
 		pr_debug("fail vma\n");
 		return 0;
@@ -183,7 +183,7 @@ static const struct platform_driver hexagon_shbuf_driver = {
 	.remove = hexagon_shbuf_remove,
 };
 
-static int del_device(struct device *dev)
+static int del_device(struct device_driver *dev)
 {
 	platform_device_unregister(to_platform_device(dev));
 	return 0;

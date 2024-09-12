@@ -29,6 +29,18 @@ struct pmu_regs {
 
 struct pmu_regs regs;
 
+enum {
+    PCYCLE_CPU = 0,
+    PCYCLE_HW = 1,
+};
+
+enum {
+    PMUCNT0 = 0,
+    PMUCNT1,
+    PMUCNT2,
+    PMUCNT3
+};
+
 int filecnt;
 
 #define VMTRAP_GET_PCYCLES	"0xe"
@@ -160,7 +172,7 @@ static ssize_t pcycle_read_file(struct file *file, char __user *userbuf,
 	ssize_t ret = 0;
 	u64 cpu_cycles;
 	u64 hw_cycles;
-	int reg = file->private_data;
+	int reg = (int)file->private_data;
 	int len;
 
 	//  Uh, already had a trap for this.  The HW_CYCLES is kind of an...  unofficial feature?
@@ -297,7 +309,7 @@ static ssize_t pmucnt_read_file(struct file *file, char __user *userbuf,
 {
 	char *mybuf = kzalloc(BUFLEN, GFP_KERNEL);
 	ssize_t ret = 0;
-	int reg = file->private_data;
+	int reg = (int)file->private_data;
 	int len;
 
 	len = snprintf(mybuf, BUFLEN, "%lu\n", pmu_reg_read(reg));
@@ -350,13 +362,13 @@ static int __init debugpmu_module_init(void)
 	file[filecnt++] = debugfs_create_file("debug", 0644, dir, NULL, &debug_fops);
 	file[filecnt++] = debugfs_create_file("enable", 0666, dir, NULL, &enable_fops);
 	file[filecnt++] = debugfs_create_file("pmuevtcfg", 0666, dir, NULL, &pmuevtcfg_fops);
-	file[filecnt++] = debugfs_create_file("pcycle_cpu", 0644, dir, 0, &pcycle_fops);
-	file[filecnt++] = debugfs_create_file("pcycle_hw", 0644, dir, 1, &pcycle_fops);
+	file[filecnt++] = debugfs_create_file("pcycle_cpu", 0644, dir, (void *)PCYCLE_CPU, &pcycle_fops);
+	file[filecnt++] = debugfs_create_file("pcycle_hw", 0644, dir, (void *)PCYCLE_HW, &pcycle_fops);
 
-	file[filecnt++] = debugfs_create_file("pmucnt0", 0644, dir, 0, &pmucnt_fops);
-	file[filecnt++] = debugfs_create_file("pmucnt1", 0644, dir, 1, &pmucnt_fops);
-	file[filecnt++] = debugfs_create_file("pmucnt2", 0644, dir, 2, &pmucnt_fops);
-	file[filecnt++] = debugfs_create_file("pmucnt3", 0644, dir, 3, &pmucnt_fops);
+	file[filecnt++] = debugfs_create_file("pmucnt0", 0644, dir, (void *)PMUCNT0, &pmucnt_fops);
+	file[filecnt++] = debugfs_create_file("pmucnt1", 0644, dir, (void *)PMUCNT1, &pmucnt_fops);
+	file[filecnt++] = debugfs_create_file("pmucnt2", 0644, dir, (void *)PMUCNT2, &pmucnt_fops);
+	file[filecnt++] = debugfs_create_file("pmucnt3", 0644, dir, (void *)PMUCNT3, &pmucnt_fops);
 
 	//  todo:  add TLB info
 	//  todo:  remove
