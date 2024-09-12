@@ -204,7 +204,7 @@ static int fpregs_active(struct task_struct *target,
 {
 	struct thread_info *thread = task_thread_info(target);
 
-	return thread->hvx;
+	return (int)thread->hvx;
 }
 
 enum hexagon_regset {
