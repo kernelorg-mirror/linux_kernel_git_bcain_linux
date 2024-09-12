@@ -95,7 +95,7 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
 
 	gfp_t flags =  GFP_KERNEL | __GFP_REPEAT;
 
-	pte = __get_free_page(flags);
+	pte = (pte_t *)__get_free_page(flags);
 
 	//  need to initialize to _NULL_PTE
 	start = pte;
