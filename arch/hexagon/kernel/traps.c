@@ -314,7 +314,7 @@ static void illegal_instruction(struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLOPC;
-	info.si_addr = pt_elr(regs);
+	info.si_addr = (void __user *)pt_elr(regs);
 
 	force_sig_info(info.si_signo, &info, current);
 }
