@@ -78,8 +78,22 @@ static inline struct page *pte_alloc_one(struct mm_struct *mm,
 static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
 					  unsigned long address)
 {
-	gfp_t flags =  GFP_KERNEL | __GFP_ZERO;
-	return (pte_t *) __get_free_page(flags);
+	pte_t *pte;
+	pte_t *start;
+	int i;
+
+	gfp_t flags =  GFP_KERNEL | __GFP_REPEAT;
+
+	pte = (pte_t *)__get_free_page(flags);
+
+	//  need to initialize to _NULL_PTE
+	start = pte;
+	for (i=0; i < PTRS_PER_PTE; i++) {
+		// feels weird to use pte_clear
+		pte_val(*start++) = _NULL_PTE;
+	}
+
+	return pte;
 }
 
 static inline void pte_free(struct mm_struct *mm, struct page *pte)
