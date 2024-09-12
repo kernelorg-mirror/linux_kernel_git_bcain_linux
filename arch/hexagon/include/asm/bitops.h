@@ -112,6 +112,10 @@ static inline void set_bit(int nr, volatile void *addr)
 {
 	test_and_set_bit(nr, addr);
 }
+static inline void __set_bit(int nr, volatile void *addr)
+{
+	test_and_set_bit(nr, addr);
+}
 
 static inline void change_bit(int nr, volatile void *addr)
 {
@@ -127,38 +131,45 @@ static inline void change_bit(int nr, volatile void *addr)
  * be atomic, particularly for things like slab_lock and slab_unlock.
  *
  */
-static inline void __clear_bit(int nr, volatile unsigned long *addr)
+static __always_inline void
+__clear_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	test_and_clear_bit(nr, addr);
 }
 
-static inline void __set_bit(int nr, volatile unsigned long *addr)
+static __always_inline void
+___set_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	test_and_set_bit(nr, addr);
 }
 
-static inline void __change_bit(int nr, volatile unsigned long *addr)
+static __always_inline void
+__change_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	test_and_change_bit(nr, addr);
 }
 
 /*  Apparently, at least some of these are allowed to be non-atomic  */
-static inline int __test_and_clear_bit(int nr, volatile unsigned long *addr)
+static __always_inline bool
+__test_and_clear_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	return test_and_clear_bit(nr, addr);
 }
 
-static inline int __test_and_set_bit(int nr, volatile unsigned long *addr)
+static __always_inline bool
+__test_and_set_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	return test_and_set_bit(nr, addr);
 }
 
-static inline int __test_and_change_bit(int nr, volatile unsigned long *addr)
+static __always_inline bool
+__test_and_change_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	return test_and_change_bit(nr, addr);
 }
 
-static inline int __test_bit(int nr, const volatile unsigned long *addr)
+static __always_inline bool
+arch_test_bit(unsigned long nr, const volatile unsigned long *addr)
 {
 	int retval;
 
@@ -171,8 +182,26 @@ static inline int __test_bit(int nr, const volatile unsigned long *addr)
 
 	return retval;
 }
+static __always_inline bool
+test_bit(unsigned long nr, const volatile unsigned long *addr)
+{
+	return arch_test_bit(nr, addr);
+}
 
-#define test_bit(nr, addr) __test_bit(nr, addr)
+static __always_inline bool
+arch_test_bit_acquire(unsigned long nr, const volatile unsigned long *addr)
+{
+	int retval;
+
+	asm volatile(
+	"{P0 = tstbit(%1,%2); if (P0.new) %0 = #1; if (!P0.new) %0 = #0;}\n"
+	: "=&r" (retval)
+	: "r" (addr[BIT_WORD(nr)]), "r" (nr % BITS_PER_LONG)
+	: "p0", "memory"
+	);
+
+	return retval;
+}
 
 /*
  * ffz - find first zero in word.
@@ -271,12 +300,13 @@ static inline unsigned long __fls(unsigned long word)
 }
 
 #include <asm-generic/bitops/lock.h>
-#include <asm-generic/bitops/find.h>
+#include <asm-generic/bitops/non-instrumented-non-atomic.h>
 
 #include <asm-generic/bitops/fls64.h>
 #include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/hweight.h>
 
+#include <asm-generic/bitops/find.h>
 #include <asm-generic/bitops/le.h>
 #include <asm-generic/bitops/ext2-atomic.h>
 
