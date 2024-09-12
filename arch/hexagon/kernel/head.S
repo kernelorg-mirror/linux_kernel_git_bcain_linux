@@ -160,7 +160,7 @@ ENTRY(stext)
 	/*  Hopefully we don't need this any earlier than here  */
 	r0.l = #LO(0x00000800);
 	r0.h = #HI(0x00000800);
-	call	__vmversion;
+	call	##__vmversion;
 
 	{
 		r1.l = #LO(PAGE_OFFSET);
@@ -184,7 +184,7 @@ ENTRY(stext)
 	 */
 	r1 = #VM_TRANS_TYPE_TABLE
 	r2 = #VM_TLB_INVALIDATE_TRUE
-	call	__vmnewmap;
+	call	##__vmnewmap;
 
 	/*  Jump into virtual address range.  */
 
@@ -220,12 +220,12 @@ __head_s_vaddr_target:
 	r0 = r24
 	r1 = #VM_TRANS_TYPE_TABLE
 	r2 = #VM_TLB_INVALIDATE_TRUE
-	call __vmnewmap
+	call ##__vmnewmap
 
 	/*  Go ahead and install the trap0 return so angel calls work  */
 	r0.h = #hi(_K_provisional_vec)
 	r0.l = #lo(_K_provisional_vec)
-	call __vmsetvec
+	call ##__vmsetvec
 
 	/*
 	 * OK, at this point we should start to be much more careful,
@@ -260,7 +260,7 @@ __head_s_vaddr_target:
 	{ r0.H = #HI(__bss_start);           r2.h = #HI(__bss_stop); }
 
 	r2 = sub(r2,r0);
-	call memset;
+	call ##memset;
 
 	R0.H = #HI(boot_info);
 	R0.L = #LO(boot_info);
@@ -274,7 +274,7 @@ __head_s_vaddr_target:
 #endif
 
 	/* Time to make the doughnuts.   */
-	call start_kernel
+	call ##start_kernel
 
 	/*
 	 * Should not reach here.
