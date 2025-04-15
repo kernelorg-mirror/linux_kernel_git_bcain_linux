@@ -71,8 +71,8 @@ core-$(CONFIG_HEXAGON_MSM8998)		+= arch/hexagon/platform/msm8998/
 core-$(CONFIG_HEXAGON_SDM845)		+= arch/hexagon/platform/sdm845/
 core-$(CONFIG_HEXAGON_SM8150)		+= arch/hexagon/platform/sm8150/
 
-vmlinux.bin:
-	$(OBJCOPY) -O binary vmlinux vmlinux.bin
+vmlinux.bin: vmlinux
+	$(OBJCOPY) -O binary $^ $@
 
 #  Devtree blob targets
 boot := arch/hexagon/boot
