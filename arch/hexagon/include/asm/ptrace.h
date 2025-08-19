@@ -18,7 +18,7 @@ extern const char *regs_query_register_name(unsigned int offset);
 	((struct pt_regs *) \
 	 ((unsigned long)current_thread_info() + THREAD_SIZE) - 1)
 
-#if CONFIG_HEXAGON_ARCH_VERSION >= 4
+#if defined(CONFIG_HEXAGON_ARCH_VERSION) && CONFIG_HEXAGON_ARCH_VERSION >= 4
 #define arch_has_single_step()	(1)
 #endif
 
