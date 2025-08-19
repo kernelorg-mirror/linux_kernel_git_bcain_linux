@@ -1,0 +1,8 @@
+
+
+config HEXAGON_HVX
+	tristate "Hexagon HVX Module"
+	---help---
+		Modular support for Hexagon HVX coprocessor
+
+
