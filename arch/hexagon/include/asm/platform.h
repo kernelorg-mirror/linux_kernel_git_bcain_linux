@@ -26,6 +26,4 @@
 extern unsigned long bootmem_lastpg;
 extern u32 dt_blob_start;
 
-extern void early_memtest(unsigned long start, unsigned long end);
-
 #endif

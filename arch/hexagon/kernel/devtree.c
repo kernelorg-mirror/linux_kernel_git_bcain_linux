@@ -2,7 +2,7 @@
 #include <linux/libfdt.h>
 #include <linux/of.h>
 #include <linux/of_fdt.h>
-#include <linux/bootmem.h>
+#include <linux/memblock.h>
 #include <linux/initrd.h>
 #include <asm/platform.h>
 #include <asm/prom.h>
@@ -10,7 +10,7 @@
 /*  Apparently called to "allocate" memory for the devicetree itself?  */
 static void * __init __maybe_unused early_init_dt_alloc_memory_arch(u64 size, u64 align)
 {
-	return alloc_bootmem_align(size, align);
+	return memblock_alloc(size, align);
 }
 
 /*  called via early_init_dt_scan_memory?  */
