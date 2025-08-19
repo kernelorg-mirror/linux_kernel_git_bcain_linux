@@ -80,7 +80,7 @@ config HEXAGON_SPLIT_2GB
 	help
 	  Kernel/user split is at 2GB instead of 3GB (0xc0000000)
 
-config SYS_SUPPORTS_HUGETLBFS
+config ARCH_SUPPORTS_HUGETLBFS
 	def_bool y
 
 # requires H2
