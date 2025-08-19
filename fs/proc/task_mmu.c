@@ -267,7 +267,7 @@ static pid_t pid_of_stack(struct proc_maps_private *priv,
 	return ret;
 }
 
-static void
+void
 show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 {
 	struct mm_struct *mm = vma->vm_mm;
@@ -324,7 +324,7 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 
 	name = arch_vma_name(vma);
 	if (!name) {
-		pid_t tid;
+		pid_t tid = 0;
 
 		if (!mm) {
 			name = "[vdso]";
@@ -336,8 +336,13 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 			name = "[heap]";
 			goto done;
 		}
-
-		tid = pid_of_stack(priv, vma, is_pid);
+		//  argh, so annoying
+		if (priv) {
+			tid = pid_of_stack(priv, vma, is_pid);
+		}
+		else {
+			tid = current->pid;
+		}
 		if (tid != 0) {
 			/*
 			 * Thread stack in /proc/PID/task/TID/maps or

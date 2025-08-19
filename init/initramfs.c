@@ -457,8 +457,9 @@ static char * __init unpack_to_rootfs(char *buf, unsigned long len)
 	symlink_buf = kmalloc(PATH_MAX + N_ALIGN(PATH_MAX) + 1, GFP_KERNEL);
 	name_buf = kmalloc(N_ALIGN(PATH_MAX), GFP_KERNEL);
 
-	if (!header_buf || !symlink_buf || !name_buf)
+	if (!header_buf || !symlink_buf || !name_buf) {
 		panic("can't allocate buffers");
+        }
 
 	state = Start;
 	this_header = 0;

@@ -111,7 +111,8 @@ static void __spin_lock_debug(raw_spinlock_t *lock)
 	for (i = 0; i < loops; i++) {
 		if (arch_spin_trylock(&lock->raw_lock))
 			return;
-		__delay(1);
+		//__delay(1);
+		cpu_relax();
 	}
 	/* lockup suspected: */
 	spin_dump(lock, "lockup suspected");

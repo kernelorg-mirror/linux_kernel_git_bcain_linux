@@ -3275,6 +3275,7 @@ static int handle_pte_fault(struct mm_struct *mm,
 {
 	pte_t entry;
 	spinlock_t *ptl;
+	int ret = 0;
 
 	/*
 	 * some architectures can have larger ptes than wordsize,
@@ -3312,6 +3313,15 @@ static int handle_pte_fault(struct mm_struct *mm,
 					pte, pmd, ptl, entry);
 		entry = pte_mkdirty(entry);
 	}
+
+	//  was this page already young?  return some "do the next guy" flag.
+	if (flags & FAULT_FLAG_INSTRUCTION) {
+		if (pte_young(entry)) {
+			ret = VM_FAULT_NEXTPAGE;
+			//printk("%s nextpage pte 0x%08x\n", __func__, pte_val(entry));
+		}  //  or do we do some sort of retry?
+	}
+
 	entry = pte_mkyoung(entry);
 	if (ptep_set_access_flags(vma, address, pte, entry, flags & FAULT_FLAG_WRITE)) {
 		update_mmu_cache(vma, address, pte);
@@ -3327,7 +3337,7 @@ static int handle_pte_fault(struct mm_struct *mm,
 	}
 unlock:
 	pte_unmap_unlock(pte, ptl);
-	return 0;
+	return ret;
 }
 
 /*
