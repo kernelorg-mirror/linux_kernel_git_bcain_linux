@@ -78,7 +78,7 @@ int __init hexagon_pic_of_init(struct device_node *node,
 		return -ENOMEM;
 	}
 
-	irq_set_default_host(hexagon_irq_domain);
+	irq_set_default_domain(hexagon_irq_domain);
 
 	/**
 	 * The first-level interrupt controller is wrapped by the VM, which
