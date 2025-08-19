@@ -7,13 +7,7 @@ config HEXAGON
 	select ARCH_32BIT_OFF_T
 	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
 	select ARCH_NO_PREEMPT
-	select ARCH_WANT_FRAME_POINTERS
 	select DMA_GLOBAL_POOL
-	select HAVE_PAGE_SIZE_4KB
-	select HAVE_PAGE_SIZE_16KB
-	select HAVE_PAGE_SIZE_64KB
-	select HAVE_PAGE_SIZE_256KB
-	select FRAME_POINTER
 	# Other pending projects/to-do items.
 	# select HAVE_REGS_AND_STACK_ACCESS_API
 	# select HAVE_HW_BREAKPOINT if PERF_EVENTS
@@ -22,9 +16,9 @@ config HEXAGON
 	# select HAVE_CLK
 	select GENERIC_ATOMIC64
 	select HAVE_PERF_EVENTS
+	select PERF_EVENTS
 	# GENERIC_ALLOCATOR is used by dma_alloc_coherent()
 	select GENERIC_ALLOCATOR
-	select GENERIC_IRQ_PROBE
 	select GENERIC_IRQ_SHOW
 	select HAVE_ARCH_KGDB
 	select HAVE_ARCH_TRACEHOOK
@@ -38,6 +32,14 @@ config HEXAGON
 	select GENERIC_CPU_DEVICES
 	select ARCH_WANT_LD_ORPHAN_WARN
 	select TRACE_IRQFLAGS_SUPPORT
+	select IRQ_DOMAIN
+	select ARM_AMBA
+	select OF
+	select OF_EARLY_FLATTREE
+	select HAVE_PAGE_SIZE_4KB
+	select HAVE_PAGE_SIZE_16KB
+	select HAVE_PAGE_SIZE_64KB
+	select HAVE_PAGE_SIZE_256KB
 	help
 	  Qualcomm Hexagon is a processor architecture designed for high
 	  performance and low power across a wide variety of applications.
@@ -46,6 +48,9 @@ config HEXAGON_PHYS_OFFSET
 	def_bool y
 	help
 	  Platforms that don't load the kernel at zero set this.
+
+config FRAME_POINTER
+	def_bool y
 
 config LOCKDEP_SUPPORT
 	def_bool y
@@ -62,6 +67,28 @@ config NO_IOPORT_MAP
 config GENERIC_CSUM
 	def_bool y
 
+config GENERIC_CALIBRATE_DELAY
+	def_bool y
+
+config HEXAGON_NOCACHESYNC
+	def_bool n
+	help
+	  Mostly for simulation which doesn't need to sync cache
+
+config HEXAGON_SPLIT_2GB
+	def_bool n
+	help
+	  Kernel/user split is at 2GB instead of 3GB (0xc0000000)
+
+config SYS_SUPPORTS_HUGETLBFS
+	def_bool y
+
+config HEXAGON_PMUCONTROL
+	def_bool y
+
+config GENERIC_IRQ_PROBE
+	def_bool y
+
 config GENERIC_HWEIGHT
 	def_bool y
 
@@ -73,22 +100,62 @@ config GENERIC_BUG
 	def_bool y
 	depends on BUG
 
+config HVC_QCOM_ANGEL
+	bool "HVC Angel Driver"
+	default y
+	select HVC_DRIVER
+	depends on HEXAGON_ANGEL_TRAPS
+	help
+	  Enable the HVC (Hypervisor Virtual Console) driver that uses
+	  Angel semihosting traps for console I/O.  This provides a
+	  terminal interface via the QEMU semihosting mechanism.
+	  If unsure, say Y.
+
+config ARCH_QCOM
+	def_bool y
+
 menu "Machine selection"
 
 choice
 	prompt "System type"
-	default HEXAGON_COMET
+	default HEXAGON_QEMU
 
 config HEXAGON_COMET
 	bool "Comet Board"
+	select HEXAGON_PHYS_OFFSET
 	help
 	  Support for the Comet platform.
 
 endchoice
 
-config HEXAGON_ARCH_VERSION
-	int "Architecture version"
-	default 2
+config HEXAGON_MSS
+	bool "Hexagon MSS"
+	help
+	  Select this if running on the Modem Subsystem (MSS).
+	  This adjusts interrupt counts and platform configuration
+	  for the MSS environment.  If running on LPASS or QEMU,
+	  leave this unselected.
+
+config HEXAGON_FORCE_USR
+	bool "Force USR bit for both kernel and user"
+	help
+	  Force a specific value into the USR (User Status Register) for
+	  both kernel and user mode threads at thread start.  This is
+	  useful for enabling specific hardware features (e.g. HVX, HMX)
+	  that require particular USR bits to be set.
+
+config HEXAGON_USR_VAL
+	hex "USR value to force"
+	default 0x56000
+	depends on HEXAGON_FORCE_USR
+
+config HEXAGON_VM
+	def_bool y
+
+config DTB_BUILTIN
+	def_bool y
+	help
+	  Build device tree blob into kernel image.
 
 config CMDLINE
 	string "Default kernel command string"
@@ -99,6 +166,22 @@ config CMDLINE
 	  command-line options at build time by entering them here.  At a
 	  minimum, you should specify the memory size and the root device
 	  (e.g., mem=64M root=/dev/nfs).
+
+config H2
+	bool "H2 VM"
+	help
+	  Enable the H2 hypervisor interface.  H2 is the Hexagon
+	  Type-1 hypervisor that provides virtualized interrupt control,
+	  timer services, and TLB management via trap1 hypercalls.
+	  Required for all platforms that run under the H2 hypervisor.
+
+config HEXAGON_ANGEL_TRAPS
+	bool "Use Angel Traps"
+	help
+	  Enable Angel semihosting traps for early console output.
+	  Angel is a debug monitor protocol (originally from ARM) that
+	  uses trap0(#0) instructions to request I/O services from the
+	  host environment (QEMU or hardware debugger).
 
 config SMP
 	bool "Multi-Processing support"
@@ -117,6 +200,12 @@ config NR_CPUS
 
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
+
+config BASE_IPI_IRQ
+	int "Base IPI IRQ" if SMP
+	default 8
+	help
+	  The base IRQ used for IPI calls.  Each CPU increments by one.
 
 source "kernel/Kconfig.hz"
 

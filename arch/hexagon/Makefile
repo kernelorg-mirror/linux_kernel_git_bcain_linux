@@ -3,9 +3,22 @@
 
 KBUILD_DEFCONFIG = comet_defconfig
 
+# Hexagon clang doesn't support -gcc-toolchain flag
+CLANG_GCC_TC :=
+
 # Do not use GP-relative jumps
 KBUILD_CFLAGS += -G0
 LDFLAGS_vmlinux += -G0
+
+# Override arch version only if explicitly set in Kconfig
+ifneq ($(CONFIG_HEXAGON_ARCH_VERSION),)
+  KBUILD_CFLAGS += -mv$(CONFIG_HEXAGON_ARCH_VERSION)
+  LDFLAGS_vmlinux += -mv$(CONFIG_HEXAGON_ARCH_VERSION)
+endif
+
+# Workaround for packetizer generating invalid instructions
+# https://github.com/llvm/llvm-project/issues/178338
+KBUILD_CFLAGS += -mllvm --disable-packetizer -mllvm -disable-nvjump
 
 # Do not use single-byte enums; these will overflow.
 KBUILD_CFLAGS += -fno-short-enums
@@ -19,13 +32,12 @@ KBUILD_CFLAGS += -mlong-calls
 # KBUILD_LDFLAGS_MODULE += -shared
 KBUILD_CFLAGS_MODULE += -mlong-calls
 
-cflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
-aflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
-ldflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
-
-KBUILD_CFLAGS += $(cflags-y)
+KBUILD_CFLAGS += $(cflags-y) -fno-pic
 KBUILD_AFLAGS += $(aflags-y)
 KBUILD_LDFLAGS += $(ldflags-y)
+
+# Set linker emulation for hexagon (needed for empty archive linking)
+LDFLAGS += -m hexagonelf
 
 # Thread-info register will be r19.  This value is not configureable;
 # it is hard-coded in several files.
@@ -38,3 +50,22 @@ KBUILD_AFLAGS += -DTHREADINFO_REG=$(TIR_NAME)
 ifneq ($(call clang-min-version, 190100),y)
 KBUILD_CFLAGS += -mllvm -hexagon-cext=false
 endif
+
+LIBGCC := $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name 2>/dev/null)
+libs-y += $(LIBGCC)
+
+head-y := arch/hexagon/kernel/head.o
+
+core-y += arch/hexagon/platform/common/
+
+
+vmlinux.bin:
+	$(OBJCOPY) -O binary vmlinux vmlinux.bin
+
+#  Devtree blob targets
+boot := arch/hexagon/boot
+core-$(CONFIG_DTB_BUILTIN) += arch/hexagon/boot/dts/
+
+PHONY += dtbs
+dtbs: scripts
+	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
