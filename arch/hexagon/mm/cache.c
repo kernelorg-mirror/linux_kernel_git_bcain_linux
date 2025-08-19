@@ -137,3 +137,11 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 		(unsigned long) dst + len);
 	}
 }
+
+void update_mmu_cache(struct vm_area_struct *vma,
+					unsigned long address, pte_t *ptep)
+{
+	if (vma->vm_flags & VM_EXEC) {
+		sync_icache_dcache(*ptep);
+	}
+}

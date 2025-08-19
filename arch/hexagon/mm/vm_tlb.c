@@ -48,7 +48,7 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
  */
 void flush_tlb_one(unsigned long vaddr)
 {
-	__vmclrmap((void *)vaddr, PAGE_SIZE);
+	__vmclrmap((void *)(vaddr & ~(PAGE_SIZE - 1)), PAGE_SIZE);
 }
 
 /*
@@ -80,7 +80,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long vaddr)
 	struct mm_struct *mm = vma->vm_mm;
 
 	if (mm->context.ptbase  == current->active_mm->context.ptbase)
-		__vmclrmap((void *)vaddr, PAGE_SIZE);
+		__vmclrmap((void *)(vaddr & ~(PAGE_SIZE - 1)), PAGE_SIZE);
 }
 
 /*
