@@ -7,13 +7,7 @@ config HEXAGON
 	select ARCH_32BIT_OFF_T
 	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
 	select ARCH_NO_PREEMPT
-	select ARCH_WANT_FRAME_POINTERS
 	select DMA_GLOBAL_POOL
-	select HAVE_PAGE_SIZE_4KB
-	select HAVE_PAGE_SIZE_16KB
-	select HAVE_PAGE_SIZE_64KB
-	select HAVE_PAGE_SIZE_256KB
-	select FRAME_POINTER
 	# Other pending projects/to-do items.
 	# select HAVE_REGS_AND_STACK_ACCESS_API
 	# select HAVE_HW_BREAKPOINT if PERF_EVENTS
@@ -22,9 +16,10 @@ config HEXAGON
 	# select HAVE_CLK
 	select GENERIC_ATOMIC64
 	select HAVE_PERF_EVENTS
+	select PERF_EVENTS
+	select HAVE_GENERIC_HARDIRQS
 	# GENERIC_ALLOCATOR is used by dma_alloc_coherent()
 	select GENERIC_ALLOCATOR
-	select GENERIC_IRQ_PROBE
 	select GENERIC_IRQ_SHOW
 	select HAVE_ARCH_KGDB
 	select HAVE_ARCH_TRACEHOOK
@@ -38,6 +33,12 @@ config HEXAGON
 	select GENERIC_CPU_DEVICES
 	select ARCH_WANT_LD_ORPHAN_WARN
 	select TRACE_IRQFLAGS_SUPPORT
+	select IRQ_DOMAIN
+	select ARM_AMBA
+	select HAVE_PAGE_SIZE_4KB
+	select HAVE_PAGE_SIZE_16KB
+	select HAVE_PAGE_SIZE_64KB
+	select HAVE_PAGE_SIZE_256KB
 	help
 	  Qualcomm Hexagon is a processor architecture designed for high
 	  performance and low power across a wide variety of applications.
@@ -46,6 +47,9 @@ config HEXAGON_PHYS_OFFSET
 	def_bool y
 	help
 	  Platforms that don't load the kernel at zero set this.
+
+config FRAME_POINTER
+	def_bool y
 
 config LOCKDEP_SUPPORT
 	def_bool y
@@ -62,6 +66,32 @@ config NO_IOPORT_MAP
 config GENERIC_CSUM
 	def_bool y
 
+config GENERIC_CALIBRATE_DELAY
+	def_bool y
+
+config HEXAGON_NOCACHESYNC
+	def_bool n
+	help
+	  Mostly for simulation which doesn't need to sync cache
+
+config HEXAGON_SPLIT_2GB
+	def_bool n
+	help
+	  Kernel/user split is at 2GB instead of 3GB (0xc0000000)
+
+config SYS_SUPPORTS_HUGETLBFS
+	def_bool y
+
+# requires H2
+config HEXAGON_PMUCONTROL
+	def_bool y
+
+#
+# Use the generic interrupt handling code in kernel/irq/:
+#
+config GENERIC_IRQ_PROBE
+	def_bool y
+
 config GENERIC_HWEIGHT
 	def_bool y
 
@@ -73,22 +103,196 @@ config GENERIC_BUG
 	def_bool y
 	depends on BUG
 
+config HVC_QCOM_ANGEL
+        select HVC_DRIVER
+        def_bool y
+	depends on HEXAGON_ANGEL_TRAPS
+
+config ARCH_MSM8960
+	def_bool n
+
+config ARCH_MSM8974
+	def_bool n
+
+config ARCH_MSM
+	def_bool n
+
+config MSM_RPM
+	def_bool n
+
+config MSM_RPM_REGULATOR
+	def_bool n
+
+config MSM_GPIOMUX
+	def_bool n
+
+config ARCH_QCOM
+	def_bool y
+
 menu "Machine selection"
 
 choice
 	prompt "System type"
 	default HEXAGON_COMET
 
+config HEXAGON_MSM8960_FLUID
+	bool "MSM8960 FLUID"
+	select HEXAGON_PHYS_OFFSET
+	select HAVE_DMA_ATTRS
+	select ARCH_MSM8960
+	select HAVE_CLK_PREPARE
+	select CLKDEV_LOOKUP
+	select MSM_RPM
+	select MSM_RPM_REGULATOR
+	select MSM_GPIOMUX
+	select ARCH_REQUIRE_GPIOLIB
+	select GPIOLIB
+	select DEBUG_GPIO
+	select GPIO_SYSFS
+	select GPIO_MSM_V2
+	select GPIOLIB
+	select ARCH_MSM
+	select ARCH_HAVE_CUSTOM_GPIO_H
+	help
+	  Support MSM8960 FLUID
+
+config HEXAGON_MSM8974_FLUID
+	bool "MSM8974 FLUID"
+	select HEXAGON_PHYS_OFFSET
+	select HAVE_DMA_ATTRS
+	select ARCH_MSM8974
+#	select MSM_GPIOMUX
+	select ARCH_REQUIRE_GPIOLIB
+	select GENERIC_GPIO
+#	select GPIO_MSM_V3
+	select ARCH_MSM
+#	select ARCH_HAVE_CUSTOM_GPIO_H
+	select MAY_HAVE_SPARSE_IRQ
+	select HEXAGON_SPLIT_2GB
+	select COMMON_CLK
+	select HEXAGON_H2_PIC
+	help
+	  Support MSM8974 FLUID
+
+config HEXAGON_SIMULATOR
+	bool "Software Simulator"
+#	select HEXAGON_OLDPLAT
+	select HEXAGON_NOCACHESYNC
+	select HEXAGON_PHYS_OFFSET
+	select COMMON_CLK
+	select HEXAGON_H2_PIC
+	help
+	  Support for the software simulator
+
+config HEXAGON_FPGA
+	bool "FPGA"
+	select HEXAGON_PHYS_OFFSET
+	select HEXAGON_H2_PIC
+	select HAVE_DMA_ATTRS
+	select HEXAGON_SPLIT_2GB
+	help
+	  Support for the FPGA emulation
+
+
+config HEXAGON_MSM8996
+	bool "MSM8996"
+	select HEXAGON_PHYS_OFFSET
+	select HEXAGON_H2_PIC
+	select HAVE_DMA_ATTRS
+	help
+	  Support for MSM8996
+
+config HEXAGON_MSM8998
+	bool "MSM8998"
+	select HEXAGON_PHYS_OFFSET
+	select HEXAGON_H2_PIC
+	select HAVE_DMA_ATTRS
+	help
+	  Support for MSM8998
+
+config HEXAGON_SDM845
+	bool "SDM845"
+	select HEXAGON_PHYS_OFFSET
+	select HEXAGON_H2_PIC
+	select HAVE_DMA_ATTRS
+	help
+	  Support for SDM845
+
+config HEXAGON_SM8150
+	bool "SM8150"
+	select HEXAGON_PHYS_OFFSET
+	select HEXAGON_H2_PIC
+	select HAVE_DMA_ATTRS
+	help
+	  Support for SM8150
+
 config HEXAGON_COMET
 	bool "Comet Board"
+	select HEXAGON_OLDPLAT
+	select HEXAGON_PHYS_OFFSET
 	help
 	  Support for the Comet platform.
 
+config HEXAGON_AMAZON
+	bool "Amazon Board"
+	select GENERIC_GPIO
+	select ARCH_WANT_OPTIONAL_GPIOLIB
+	select HEXAGON_OLDPLAT
+	select HEXAGON_PHYS_OFFSET
+	select HAVE_DMA_ATTRS
+	select ARCH_HAVE_CUSTOM_GPIO_H
+	help
+	  Amazon board
+
+config HEXAGON_ARCHSIM
+	bool "Archsim"
+	select HEXAGON_PHYS_OFFSET
+	help
+	  Archsim platform; has QFEC, UART, and a timer.
+
+
+
 endchoice
 
-config HEXAGON_ARCH_VERSION
-	int "Architecture version"
-	default 2
+config HEXAGON_LLVM
+	bool "LLVM"
+	default n
+	help
+	  Convenience thing for makefile switches
+
+#config HEXAGON_ARCH_VERSION
+#	int "Architecture version (1 - 66)"
+#	range 1 66
+#	default 60
+
+config HEXAGON_MSS
+	bool "Hexagon MSS"
+	default n
+	help
+	  Select if you are running on MSS, otherwise LPASS
+
+config HEXAGON_FORCE_USR
+	bool "Force USR bit for both kernel and user"
+	default y
+
+config HEXAGON_USR_VAL
+	hex "USR value to force"
+	default 0x56000
+	depends on HEXAGON_FORCE_USR
+
+config HEXAGON_VM
+	def_bool y
+
+config USE_OF
+	default n
+	bool "Device Tree support"
+	select OF
+	select OF_EARLY_FLATTREE
+
+config DTB_BUILTIN
+	def_bool y
+	help
+	  Temporary bringup option; assumes DTB is built into kernel somewhere.
 
 config CMDLINE
 	string "Default kernel command string"
@@ -99,6 +303,38 @@ config CMDLINE
 	  command-line options at build time by entering them here.  At a
 	  minimum, you should specify the memory size and the root device
 	  (e.g., mem=64M root=/dev/nfs).
+
+#  This is really just for temporary MINI-VM bringup.
+config MINIVM
+	bool "Mini VM"
+	default n
+	depends on HEXAGON_VM
+	help
+	  Choose if we should package Mini VM in the kernel, or if it's
+	  outside the kernel
+
+config H2
+	bool "H2 VM"
+	default n
+	help
+	  Transitional config switch for the new H2 interface
+
+config HEXAGON_ANGEL_TRAPS
+	bool "Use Angel Traps"
+	default n
+	help
+	  Enable angel debug traps (for printk's).
+
+config HVC_UART_DM
+	bool "HVC UART DM Driver"
+	default n
+	select HVC_DRIVER
+
+config HVC_QCOM_ANGEL
+	bool "HVC Angel Driver"
+	default y
+        select HVC_DRIVER
+	depends on HEXAGON_ANGEL_TRAPS
 
 config SMP
 	bool "Multi-Processing support"
@@ -117,6 +353,28 @@ config NR_CPUS
 
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
+
+config BASE_IPI_IRQ
+	int "Base IPI IRQ" if SMP
+	default 8
+	help
+	  The base IRQ used for IPI calls.  Each CPU increments by one,
+	  although the newer hypervisor API specifies the lower range of
+	  interrupts to be percpu anyways.
+
+	  Todo:  Maybe make this a devtree thing instead?
+
+config MEMTEST
+	bool "Memtest"
+	help
+	  Enable the memtest module for hexagon; add memtest=? to have it...
+	  do something.
+
+config HEXAGON_FASTBOOT
+	bool "Hexagon Fastboot Module"
+	help
+	  Build the Hexagon fastboot module
+
 
 source "kernel/Kconfig.hz"
 
