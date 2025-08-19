@@ -10,8 +10,6 @@ obj-y += vdso.o notify.o
 
 obj-y += irq-hexagon-h2.o
 
-obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
-
 ifeq ($(CONFIG_H2),y)
 obj-y += time-h2.o
 else
