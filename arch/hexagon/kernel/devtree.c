@@ -9,7 +9,7 @@
 #include <linux/libfdt.h>
 #include <linux/of.h>
 #include <linux/of_fdt.h>
-#include <linux/bootmem.h>
+#include <linux/memblock.h>
 #include <linux/initrd.h>
 #include <asm/platform.h>
 #include <asm/prom.h>

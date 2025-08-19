@@ -8,10 +8,12 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/memblock.h>
+#include <linux/sizes.h>
 #include <asm/atomic.h>
 #include <linux/highmem.h>
 #include <asm/tlb.h>
 #include <asm/sections.h>
+#include <asm/platform.h>
 #include <asm/setup.h>
 #include <asm/vm_mmu.h>
 
@@ -21,7 +23,6 @@
  */
 #define bootmem_startpg (PFN_UP(((unsigned long) _end) - PAGE_OFFSET + PHYS_OFFSET))
 
-unsigned long bootmem_lastpg;	/*  Should be set by platform code  */
 unsigned long __phys_offset;	/*  physical kernel offset >> 12  */
 
 /*  Set as variable to limit PMD copies  */
@@ -42,6 +43,20 @@ DEFINE_SPINLOCK(kmap_gen_lock);
 
 /*  checkpatch says don't init this to 0.  */
 unsigned long long kmap_generation;
+
+/*
+ * free_initmem - frees memory used by stuff declared with __init
+ *
+ * The generic free_initmem_default() poisons freed pages with a
+ * debug pattern before releasing them.  On Hexagon, the H2 hypervisor
+ * autonomously walks kernel page tables for TLB refill.  If it encounters
+ * a poisoned PTE during refill for a now-freed init page, the resulting
+ * fault leads to a panic.  Leave init pages in place until a proper
+ * unmap-and-flush sequence is implemented.
+ */
+void __ref free_initmem(void)
+{
+}
 
 void sync_icache_dcache(pte_t pte)
 {
@@ -75,11 +90,9 @@ static void __init paging_init(void)
 	init_mm.context.ptbase = __pa(init_mm.pgd);
 }
 
-#ifndef DMA_RESERVE
-#define DMA_RESERVE		(4)
-#endif
+#define DMA_RESERVE		0
 
-#define DMA_CHUNKSIZE		(1<<22)
+#define DMA_CHUNKSIZE		SZ_4M
 #define DMA_RESERVED_BYTES	(DMA_RESERVE * DMA_CHUNKSIZE)
 
 /*
@@ -92,7 +105,6 @@ static int __init early_mem(char *p)
 	char *endp;
 
 	size = memparse(p, &endp);
-
 	bootmem_lastpg = PFN_DOWN(size);
 
 	return 0;
@@ -103,7 +115,6 @@ size_t hexagon_coherent_pool_size = (size_t) (DMA_RESERVE << 22);
 
 void __init setup_arch_memory(void)
 {
-	/*  XXX Todo: this probably should be cleaned up  */
 	u32 *segtable = (u32 *) &swapper_pg_dir[0];
 	u32 *segtable_end;
 
@@ -114,12 +125,14 @@ void __init setup_arch_memory(void)
 	 * This needs to change for highmem setups.
 	 */
 
-	/*  Prior to this, bootmem_lastpg is actually mem size  */
+	/* Prior to this, bootmem_lastpg is actually mem size */
 	bootmem_lastpg += ARCH_PFN_OFFSET;
 
+#if DMA_RESERVE > 0
 	/* Memory size needs to be a multiple of 16M */
 	bootmem_lastpg = PFN_DOWN((bootmem_lastpg << PAGE_SHIFT) &
 		~((BIG_KERNEL_PAGE_SIZE) - 1));
+#endif
 
 	memblock_add(PHYS_OFFSET,
 		     (bootmem_lastpg - ARCH_PFN_OFFSET) << PAGE_SHIFT);
@@ -135,10 +148,10 @@ void __init setup_arch_memory(void)
 	min_low_pfn = ARCH_PFN_OFFSET;
 	memblock_reserve(PFN_PHYS(max_low_pfn), DMA_RESERVED_BYTES);
 
-	printk(KERN_INFO "bootmem_startpg:  0x%08lx\n", bootmem_startpg);
-	printk(KERN_INFO "bootmem_lastpg:  0x%08lx\n", bootmem_lastpg);
-	printk(KERN_INFO "min_low_pfn:  0x%08lx\n", min_low_pfn);
-	printk(KERN_INFO "max_low_pfn:  0x%08lx\n", max_low_pfn);
+	pr_info("bootmem_startpg:  0x%08lx\n", bootmem_startpg);
+	pr_info("bootmem_lastpg:  0x%08lx\n", bootmem_lastpg);
+	pr_info("min_low_pfn:  0x%08lx\n", min_low_pfn);
+	pr_info("max_low_pfn:  0x%08lx\n", max_low_pfn);
 
 	/*
 	 * The default VM page tables (will be) populated with
@@ -146,11 +159,15 @@ void __init setup_arch_memory(void)
 	 * higher than what we have memory for.
 	 */
 
-	/*  this is pointer arithmetic; each entry covers 4MB  */
+	/* This is pointer arithmetic; each entry covers 4MB */
 	segtable = segtable + (PAGE_OFFSET >> 22);
+#ifdef CONFIG_HEXAGON_SPLIT_2GB
+#define KERNEL_BIGPAGES_GB (2)
+#else
+#define KERNEL_BIGPAGES_GB (1)
+#endif
 
-	/*  this actually only goes to the end of the first gig  */
-	segtable_end = segtable + (1<<(30-22));
+	segtable_end = segtable + (KERNEL_BIGPAGES_GB<<(30-22));
 
 	/*
 	 * Move forward to the start of empty pages; take into account
@@ -160,7 +177,6 @@ void __init setup_arch_memory(void)
 	segtable += (bootmem_lastpg-ARCH_PFN_OFFSET)>>(22-PAGE_SHIFT);
 	{
 		int i;
-
 		for (i = 1 ; i <= DMA_RESERVE ; i++)
 			segtable[-i] = ((segtable[-i] & __HVM_PTE_PGMASK_4MB)
 				| __HVM_PTE_R | __HVM_PTE_W | __HVM_PTE_X
@@ -168,30 +184,25 @@ void __init setup_arch_memory(void)
 				| __HVM_PDE_S_4MB);
 	}
 
-	printk(KERN_INFO "clearing segtable from %p to %p\n", segtable,
+	pr_info("clearing segtable from %p to %p\n", segtable,
 		segtable_end);
 	while (segtable < (segtable_end-8))
 		*(segtable++) = __HVM_PDE_S_INVALID;
 	/* stop the pointer at the device I/O 4MB page  */
 
-	printk(KERN_INFO "segtable = %p (should be equal to _K_io_map)\n",
-		segtable);
+	pr_info("segtable = %p (should be equal to _K_io_map; %p)\n",
+		segtable, &_K_io_map);
 
-#if 0
-	/*  Other half of the early device table from vm_init_segtable. */
-	printk(KERN_INFO "&_K_init_devicetable = 0x%08x\n",
-		(unsigned long) _K_init_devicetable-PAGE_OFFSET);
-	*segtable = ((u32) (unsigned long) _K_init_devicetable-PAGE_OFFSET) |
-		__HVM_PDE_S_4KB;
-	printk(KERN_INFO "*segtable = 0x%08x\n", *segtable);
-#endif
+	/* Device I/O page table; fixed 4K entries regardless of kernel page size */
+	*segtable = __pa(&_K_init_devicetable) | __HVM_PDE_S_4KB;
 
 	/*
 	 *  The bootmem allocator seemingly just lives to feed memory
 	 *  to the paging system
 	 */
-	printk(KERN_INFO "PAGE_SIZE=%lu\n", PAGE_SIZE);
-	paging_init();  /*  See Gorman Book, 2.3  */
+	pr_info("PAGE_SIZE=%lu\n", PAGE_SIZE);
+
+	paging_init();
 
 	/*
 	 *  At this point, the page allocator is kind of initialized, but
@@ -202,43 +213,34 @@ void __init setup_arch_memory(void)
 }
 
 static const pgprot_t protection_map[16] = {
-	[VM_NONE]					= __pgprot(_PAGE_PRESENT | _PAGE_USER |
+	[VM_NONE]					= __pgprot(_NO_PERM | CACHEDEF),
+	[VM_READ]					= __pgprot(_PAGE_USER | _PAGE_READ |
 								   CACHEDEF),
-	[VM_READ]					= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | CACHEDEF),
-	[VM_WRITE]					= __pgprot(_PAGE_PRESENT | _PAGE_USER |
+	[VM_WRITE]					= __pgprot(_NO_PERM | CACHEDEF),
+	[VM_WRITE | VM_READ]				= __pgprot(_PAGE_USER | _PAGE_READ |
 								   CACHEDEF),
-	[VM_WRITE | VM_READ]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | CACHEDEF),
-	[VM_EXEC]					= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | CACHEDEF),
-	[VM_EXEC | VM_READ]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | _PAGE_READ |
+	[VM_EXEC]					= __pgprot(_PAGE_USER | _PAGE_READ |
 								   CACHEDEF),
-	[VM_EXEC | VM_WRITE]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | CACHEDEF),
-	[VM_EXEC | VM_WRITE | VM_READ]			= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | _PAGE_READ |
+	[VM_EXEC | VM_READ]				= __pgprot(_PAGE_USER | _PAGE_READ |
 								   CACHEDEF),
-	[VM_SHARED]                                     = __pgprot(_PAGE_PRESENT | _PAGE_USER |
+	[VM_EXEC | VM_WRITE]				= __pgprot(_PAGE_USER | _PAGE_READ |
 								   CACHEDEF),
-	[VM_SHARED | VM_READ]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | CACHEDEF),
-	[VM_SHARED | VM_WRITE]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
+	[VM_EXEC | VM_WRITE | VM_READ]			= __pgprot(_PAGE_USER | _PAGE_READ |
+								   CACHEDEF),
+	[VM_SHARED]					= __pgprot(_NO_PERM | CACHEDEF),
+	[VM_SHARED | VM_READ]				= __pgprot(_PAGE_USER | _PAGE_READ |
+								   CACHEDEF),
+	[VM_SHARED | VM_WRITE]				= __pgprot(_PAGE_USER | _PAGE_WRITE |
+								   CACHEDEF),
+	[VM_SHARED | VM_WRITE | VM_READ]		= __pgprot(_PAGE_USER | _PAGE_READ |
 								   _PAGE_WRITE | CACHEDEF),
-	[VM_SHARED | VM_WRITE | VM_READ]		= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | _PAGE_WRITE |
+	[VM_SHARED | VM_EXEC]				= __pgprot(_PAGE_USER | _PAGE_READ |
 								   CACHEDEF),
-	[VM_SHARED | VM_EXEC]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | CACHEDEF),
-	[VM_SHARED | VM_EXEC | VM_READ]			= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | _PAGE_READ |
+	[VM_SHARED | VM_EXEC | VM_READ]			= __pgprot(_PAGE_USER | _PAGE_READ |
 								   CACHEDEF),
-	[VM_SHARED | VM_EXEC | VM_WRITE]		= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | _PAGE_WRITE |
+	[VM_SHARED | VM_EXEC | VM_WRITE]		= __pgprot(_PAGE_USER | _PAGE_WRITE |
 								   CACHEDEF),
-	[VM_SHARED | VM_EXEC | VM_WRITE | VM_READ]	= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | _PAGE_EXECUTE |
+	[VM_SHARED | VM_EXEC | VM_WRITE | VM_READ]	= __pgprot(_PAGE_USER | _PAGE_READ |
 								   _PAGE_WRITE | CACHEDEF)
 };
 DECLARE_VM_GET_PAGE_PROT
