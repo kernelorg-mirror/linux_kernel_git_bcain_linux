@@ -727,6 +727,9 @@ include/config/auto.conf:
 endif # may-sync-config
 endif # need-config
 
+ifdef CONFIG_HEXAGON_LLVM
+KBUILD_CFLAGS	+= -Wno-gnu-folding-constant
+else
 KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
 KBUILD_CFLAGS	+= $(call cc-disable-warning,frame-address,)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, format-truncation)
@@ -815,7 +818,11 @@ DEBUG_CFLAGS	+= -gsplit-dwarf
 else
 DEBUG_CFLAGS	+= -g
 endif
+ifdef CONFIG_HEXAGON_LLVM
+KBUILD_CFLAGS	+= -Wno-gnu-folding-constant
+else
 KBUILD_AFLAGS	+= -Wa,-gdwarf-2
+endif
 endif
 ifdef CONFIG_DEBUG_INFO_DWARF4
 DEBUG_CFLAGS	+= -gdwarf-4

@@ -7,6 +7,14 @@ KBUILD_DEFCONFIG = comet_defconfig
 KBUILD_CFLAGS += -G0
 LDFLAGS_vmlinux += -G0
 
+#HEXAGON_TOOLS_VERSION := $(shell $(CC) --version | grep "Clang" | sed -e 's/.*clang-\([0-9][0-9]\).*/\1/')
+
+#  Only use these if forced; use the compiler default, whatever it is
+ifneq ($(CONFIG_HEXAGON_ARCH_VERSION),)
+  KBUILD_CFLAGS += -mv$(CONFIG_HEXAGON_ARCH_VERSION)
+  LDFLAGS_vmlinux += -mv$(CONFIG_HEXAGON_ARCH_VERSION)
+endif
+
 # Do not use single-byte enums; these will overflow.
 KBUILD_CFLAGS += -fno-short-enums
 
@@ -16,11 +24,7 @@ KBUILD_CFLAGS += -fno-short-enums
 # KBUILD_LDFLAGS_MODULE += -shared
 KBUILD_CFLAGS_MODULE += -mlong-calls
 
-cflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
-aflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
-ldflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
-
-KBUILD_CFLAGS += $(cflags-y)
+KBUILD_CFLAGS += $(cflags-y) -fno-pic
 KBUILD_AFLAGS += $(aflags-y)
 KBUILD_LDFLAGS += $(ldflags-y)
 
@@ -37,4 +41,42 @@ head-y := arch/hexagon/kernel/head.o
 
 core-y += arch/hexagon/kernel/ \
 	arch/hexagon/mm/ \
-	arch/hexagon/lib/
+	arch/hexagon/lib/ \
+	arch/hexagon/platform/common/
+
+drivers-$(CONFIG_OPROFILE)	+= arch/hexagon/oprofile/
+
+core-$(CONFIG_HEXAGON_COMET)		+= arch/hexagon/platform/comet/
+machine-$(CONFIG_HEXAGON_COMET)		:= comet
+
+core-$(CONFIG_HEXAGON_SIMULATOR)	+= arch/hexagon/platform/simulator/
+machine-$(CONFIG_HEXAGON_SIMULATOR)	:= simulator
+
+core-$(CONFIG_HEXAGON_FPGA)	+= arch/hexagon/platform/fpga/
+machine-$(CONFIG_HEXAGON_FPGA)	:= fpga
+
+core-$(CONFIG_HEXAGON_AMAZON)		+= arch/hexagon/platform/amazon/
+machine-$(CONFIG_HEXAGON_AMAZON)	:= amazon
+
+core-$(CONFIG_HEXAGON_ARCHSIM)		+= arch/hexagon/platform/archsim/
+machine-$(CONFIG_HEXAGON_ARCHSIM)	:= archsim
+
+core-$(CONFIG_HEXAGON_MSM8960_FLUID)	+= arch/hexagon/platform/msm8960_fluid/
+machine-$(CONFIG_HEXAGON_MSM8960_FLUID)	:= msm8960_fluid
+
+core-$(CONFIG_HEXAGON_MSM8974_FLUID)	+= arch/hexagon/platform/msm8974_fluid/
+core-$(CONFIG_HEXAGON_MSM8996)		+= arch/hexagon/platform/msm8996/
+core-$(CONFIG_HEXAGON_MSM8998)		+= arch/hexagon/platform/msm8998/
+core-$(CONFIG_HEXAGON_SDM845)		+= arch/hexagon/platform/sdm845/
+core-$(CONFIG_HEXAGON_SM8150)		+= arch/hexagon/platform/sm8150/
+
+vmlinux.bin:
+	$(OBJCOPY) -O binary vmlinux vmlinux.bin
+
+#  Devtree blob targets
+boot := arch/hexagon/boot
+core-$(CONFIG_DTB_BUILTIN) += arch/hexagon/boot/dts/
+
+PHONY += dtbs
+dtbs: scripts
+	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
