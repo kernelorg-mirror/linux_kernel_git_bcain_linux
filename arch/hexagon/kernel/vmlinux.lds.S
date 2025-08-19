@@ -42,7 +42,6 @@ SECTIONS
 	__init_begin = .;
 	HEAD_TEXT_SECTION
 	INIT_TEXT_SECTION(PAGE_SIZE)
-	PERCPU_SECTION(L1_CACHE_BYTES)
 
 	. = ALIGN(4);
 	.arch.info.init : AT(ADDR(.arch.info.init) - LOAD_OFFSET) {
@@ -66,6 +65,18 @@ SECTIONS
 		*(.fixup)
 	}
 	_etext = .;
+
+	/*
+	 * Capture orphan data sections before PERCPU to ensure
+	 * PERCPU starts at a page-aligned address.
+	 * The .modinfo section is normally discarded but needs explicit handling.
+	 */
+	.modinfo : AT(ADDR(.modinfo) - LOAD_OFFSET) {
+		*(.modinfo)
+	}
+
+	/* PERCPU must be page-aligned for v5.2+ kernel */
+	PERCPU_SECTION(PAGE_SIZE)
 
 	INIT_DATA_SECTION(PAGE_SIZE)
 
