@@ -8,10 +8,12 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/memblock.h>
+#include <linux/sizes.h>
 #include <asm/atomic.h>
 #include <linux/highmem.h>
 #include <asm/tlb.h>
 #include <asm/sections.h>
+#include <asm/platform.h>
 #include <asm/vm_mmu.h>
 
 /*
@@ -20,7 +22,6 @@
  */
 #define bootmem_startpg (PFN_UP(((unsigned long) _end) - PAGE_OFFSET + PHYS_OFFSET))
 
-unsigned long bootmem_lastpg;	/*  Should be set by platform code  */
 unsigned long __phys_offset;	/*  physical kernel offset >> 12  */
 
 /*  Set as variable to limit PMD copies  */
@@ -70,6 +71,20 @@ void __init mem_init(void)
 	init_mm.context.ptbase = __pa(init_mm.pgd);
 }
 
+/*
+ * free_initrd_mem - frees...  initrd memory.
+ * @start - start of init memory
+ * @end - end of init memory
+ *
+ * Apparently has to be passed the address of the initrd memory.
+ *
+ * Wrapped by #ifdef CONFIG_BLKDEV_INITRD
+ */
+void free_initrd_mem(unsigned long start, unsigned long end)
+{
+}
+
+/*  Todo:  fix for huge pages  */
 void sync_icache_dcache(pte_t pte)
 {
 	unsigned long addr;
@@ -111,11 +126,17 @@ void __init paging_init(void)
 	high_memory = (void *)((bootmem_lastpg + 1) << PAGE_SHIFT);
 }
 
-#ifndef DMA_RESERVE
-#define DMA_RESERVE		(4)
+
+//  FIXME:  just fix me.
+#ifdef CONFIG_HEXAGON_MSM8974_FLUID
+#define DMA_RESERVE		4
 #endif
 
-#define DMA_CHUNKSIZE		(1<<22)
+#ifndef DMA_RESERVE
+#define DMA_RESERVE		0
+#endif
+
+#define DMA_CHUNKSIZE		SZ_4M
 #define DMA_RESERVED_BYTES	(DMA_RESERVE * DMA_CHUNKSIZE)
 
 /*
@@ -129,6 +150,18 @@ static int __init early_mem(char *p)
 
 	size = memparse(p, &endp);
 
+#ifdef CONFIG_HEXAGON_AMAZON
+	/*
+	 * For some Amazon platforms, there is a hole at the top 1GB of
+	 * RAM, so we need to back it off by one "big kernel page" (16MB).
+	 *
+	 * see also mem-layout.h, where we use FIXADDR_TOP to back off
+	 * of the virtual address
+	 */
+	if (size > 0x3f000000)
+		size = 0x3f000000 - 1;
+#endif
+
 	bootmem_lastpg = PFN_DOWN(size);
 
 	return 0;
@@ -136,6 +169,38 @@ static int __init early_mem(char *p)
 early_param("mem", early_mem);
 
 size_t hexagon_coherent_pool_size = (size_t) (DMA_RESERVE << 22);
+
+#ifdef CONFIG_HEXAGON_DINI
+//  Move this over to a DINI platform file or something...
+#define BAD_BIT		28
+#define BAD_SZ		(1<<BAD_BIT)
+#define BAD_MASK	(BAD_SZ-1)
+
+void dini_reserve_bad_mem(void)
+{
+	unsigned long start = min_low_pfn << PAGE_SHIFT;
+	unsigned long end = max_low_pfn << PAGE_SHIFT;
+	unsigned long reserve_sz;
+
+	printk("%s\n", __func__);
+
+	if (test_bit(BAD_BIT,&start))
+		BUG();
+
+	start += BAD_SZ;
+	start &= ~BAD_MASK;
+
+	while (start < end) {
+		if (test_bit(BAD_BIT, &start)) {
+			reserve_sz = (end - start) >= BAD_SZ ? BAD_SZ : end - start;
+			printk("reserving 0x%08x sz %d\n", start, reserve_sz);
+			BUG_ON(reserve_bootmem(start, reserve_sz, BOOTMEM_EXCLUSIVE) != 0);
+		}
+		start += BAD_SZ;
+	}
+
+}
+#endif
 
 void __init setup_arch_memory(void)
 {
@@ -153,9 +218,11 @@ void __init setup_arch_memory(void)
 	/*  Prior to this, bootmem_lastpg is actually mem size  */
 	bootmem_lastpg += ARCH_PFN_OFFSET;
 
+#if DMA_RESERVE > 0
 	/* Memory size needs to be a multiple of 16M */
 	bootmem_lastpg = PFN_DOWN((bootmem_lastpg << PAGE_SHIFT) &
 		~((BIG_KERNEL_PAGE_SIZE) - 1));
+#endif
 
 	memblock_add(PHYS_OFFSET,
 		     (bootmem_lastpg - ARCH_PFN_OFFSET) << PAGE_SHIFT);
@@ -184,9 +251,14 @@ void __init setup_arch_memory(void)
 
 	/*  this is pointer arithmetic; each entry covers 4MB  */
 	segtable = segtable + (PAGE_OFFSET >> 22);
+	//  probably should do something more graceful than this
+#ifdef CONFIG_HEXAGON_SPLIT_2GB
+#define KERNEL_BIGPAGES_GB (2)
+#else
+#define KERNEL_BIGPAGES_GB (1)
+#endif
 
-	/*  this actually only goes to the end of the first gig  */
-	segtable_end = segtable + (1<<(30-22));
+	segtable_end = segtable + (KERNEL_BIGPAGES_GB<<(30-22));
 
 	/*
 	 * Move forward to the start of empty pages; take into account
@@ -196,7 +268,6 @@ void __init setup_arch_memory(void)
 	segtable += (bootmem_lastpg-ARCH_PFN_OFFSET)>>(22-PAGE_SHIFT);
 	{
 		int i;
-
 		for (i = 1 ; i <= DMA_RESERVE ; i++)
 			segtable[-i] = ((segtable[-i] & __HVM_PTE_PGMASK_4MB)
 				| __HVM_PTE_R | __HVM_PTE_W | __HVM_PTE_X
@@ -210,16 +281,17 @@ void __init setup_arch_memory(void)
 		*(segtable++) = __HVM_PDE_S_INVALID;
 	/* stop the pointer at the device I/O 4MB page  */
 
-	printk(KERN_INFO "segtable = %p (should be equal to _K_io_map)\n",
-		segtable);
+	printk(KERN_INFO "segtable = %p (should be equal to _K_io_map; %p)\n",
+		segtable, &_K_io_map);
 
-#if 0
-	/*  Other half of the early device table from vm_init_segtable. */
-	printk(KERN_INFO "&_K_init_devicetable = 0x%08x\n",
-		(unsigned long) _K_init_devicetable-PAGE_OFFSET);
-	*segtable = ((u32) (unsigned long) _K_init_devicetable-PAGE_OFFSET) |
-		__HVM_PDE_S_4KB;
-	printk(KERN_INFO "*segtable = 0x%08x\n", *segtable);
+	//  Should use set_pmd or whatever, but whatevs
+	//  these are fixed 4k regardless of what the kernel is using for everything else
+	*segtable = __pa(&_K_init_devicetable) | __HVM_PDE_S_4KB;
+
+#ifdef CONFIG_HEXAGON_MSM8974_FLUID
+	//  TODO:  only do this if this memory is even in the map in the first place...
+	printk("reserving LK memory\n");
+	memblock_reserve(0x0f900000, 96 * (1<<16));
 #endif
 
 	/*
@@ -227,6 +299,10 @@ void __init setup_arch_memory(void)
 	 *  to the paging system
 	 */
 	printk(KERN_INFO "PAGE_SIZE=%lu\n", PAGE_SIZE);
+
+	//  Seems like a good place to touch teh memory
+	//early_memtest(PFN_PHYS(bootmem_startpg) + bootmap_size, max_low_pfn << PAGE_SHIFT);
+
 	paging_init();  /*  See Gorman Book, 2.3  */
 
 	/*
