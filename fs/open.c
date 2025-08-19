@@ -1,3 +1,4 @@
+#pragma clang optimize off
 /*
  *  linux/fs/open.c
  *
@@ -1009,7 +1010,6 @@ long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 	struct open_flags op;
 	int fd = build_open_flags(flags, mode, &op);
 	struct filename *tmp;
-
 	if (fd)
 		return fd;
 

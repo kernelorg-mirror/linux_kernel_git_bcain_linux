@@ -104,6 +104,15 @@ static char nfs_export_path[NFS_MAXPATHLEN + 1] __initdata = "";
 /* server:export path string passed to super.c */
 static char nfs_root_device[NFS_MAXPATHLEN + 1] __initdata = "";
 
+static char eth_name[IFNAMSIZ] __initdata = "";
+
+static int __init get_nfseth(char *line)
+{
+	strlcpy(eth_name, line, sizeof(eth_name));
+}
+__setup("nfseth=", get_nfseth);
+
+
 #ifdef NFS_DEBUG
 /*
  * When the "nfsrootdebug" kernel command line option is specified,
@@ -206,6 +215,28 @@ static int __init root_nfs_parse_options(char *incoming, char *exppath,
 	return 0;
 }
 
+struct net_device *get_ndev_mac(void)
+{
+	struct net_device *ndev;
+	void *ret = NULL;
+
+	if (!strncmp(eth_name, "", IFNAMSIZ))
+		return ret;
+
+	read_lock(&dev_base_lock);
+	ndev = first_net_device(&init_net);
+	while (ndev) {
+		if (strncmp(ndev->name, eth_name, IFNAMSIZ) == 0) {
+			ret = ndev;
+			goto found;
+		}
+		ndev = next_net_device(ndev);
+	}
+found:
+	read_unlock(&dev_base_lock);
+	return ret;
+}
+
 /*
  *  Decode the export directory path name and NFS options from
  *  the kernel command line.  This has to be done late in order to
@@ -220,6 +251,7 @@ static int __init root_nfs_data(char *cmdline)
 	int len, retval = -1;
 	char *tmp = NULL;
 	const size_t tmplen = sizeof(nfs_export_path);
+	struct net_device *ndev = get_ndev_mac();  /*  minor-league danger of the device disappearing before we use it  */
 
 	tmp = kzalloc(tmplen, GFP_KERNEL);
 	if (tmp == NULL)
@@ -263,8 +295,13 @@ static int __init root_nfs_data(char *cmdline)
 				tmp, utsname()->nodename);
 	if (len >= (int)sizeof(nfs_export_path))
 		goto out_devnametoolong;
-	len = snprintf(nfs_root_device, sizeof(nfs_root_device),
+	if (ndev) {
+		len = snprintf(nfs_root_device, sizeof(nfs_root_device),
+				"%pI4:%s/%pM", &servaddr, nfs_export_path, ndev->dev_addr);
+	} else {
+		len = snprintf(nfs_root_device, sizeof(nfs_root_device),
 				"%pI4:%s", &servaddr, nfs_export_path);
+	}
 	if (len >= (int)sizeof(nfs_root_device))
 		goto out_devnametoolong;
 

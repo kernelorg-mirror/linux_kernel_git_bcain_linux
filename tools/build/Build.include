@@ -89,4 +89,4 @@ if_changed = $(if $(strip $(any-prereq) $(arg-check)),             \
 # - per target C flags
 # - per object C flags
 # - BUILD_STR macro to allow '-D"$(variable)"' constructs
-c_flags = -Wp,-MD,$(depfile),-MT,$@ $(CFLAGS) -D"BUILD_STR(s)=\#s" $(CFLAGS_$(basetarget).o) $(CFLAGS_$(obj))
+c_flags = -Wp,-MD,$(depfile) -MT,$@ $(CFLAGS) -D"BUILD_STR(s)=\#s" $(CFLAGS_$(basetarget).o) $(CFLAGS_$(obj))
