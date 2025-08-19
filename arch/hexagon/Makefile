@@ -38,6 +38,11 @@ KBUILD_AFLAGS += -DTHREADINFO_REG=$(TIR_NAME)
 LIBGCC := $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
 libs-y += $(LIBGCC)
 
+# For bcmp dependency:
+LIBC_ARCHIVE := $(shell $(CC) $(KBUILD_CFLAGS) -print-file-name=libc.a)
+libs-y += $(LIBC_ARCHIVE)
+
+
 head-y := arch/hexagon/kernel/head.o
 
 core-y += arch/hexagon/kernel/ \
