@@ -13,12 +13,15 @@
 
 #include <asm/pgtable.h>
 #include <asm/traps.h>
+#include <asm/hexagon_debug.h>
 #include <linux/uaccess.h>
 #include <linux/mm.h>
 #include <linux/sched/signal.h>
 #include <linux/signal.h>
 #include <linux/extable.h>
 #include <linux/hardirq.h>
+#include <linux/seq_file.h>
+#include <linux/slab.h>
 
 /*
  * Decode of hardware exception sends us to one of several
@@ -29,6 +32,39 @@
 #define FLT_LOAD        0
 #define FLT_STORE       1
 
+
+extern void show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid);
+
+void show_vma_map(void)
+{
+	struct seq_file m;  /*  no idea why they called it 'm'  */
+	int is_pid = 1;
+	struct vm_area_struct *vma = current->mm->mmap;
+
+	char *wtf;
+
+	//  increment the mm users?
+
+	memset(&m, 0, sizeof(m));
+
+	//  prepare the seq_file
+	m.buf = kmalloc(PAGE_SIZE, GFP_KERNEL | __GFP_NORETRY | __GFP_NOWARN);
+	BUG_ON(!m.buf);
+	m.size = PAGE_SIZE;
+
+	//  walk the mmap and dump everything
+	while (vma) {
+		show_map_vma(&m, vma, is_pid);
+		vma = vma->vm_next;
+	}
+	//  dump the seq_file buffer
+	wtf = m.buf;
+	while (wtf != (m.buf + m.count)) {
+		printk("%c", *wtf);
+		wtf++;
+	}
+	kfree(m.buf);
+}
 
 /*
  * Canonical page fault handler
@@ -42,6 +78,7 @@ void do_page_fault(unsigned long address, long cause, struct pt_regs *regs)
 	vm_fault_t fault;
 	const struct exception_table_entry *fixup;
 	unsigned int flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
+	unsigned long next_addr;
 
 	/*
 	 * If we're in an interrupt or have no user context,
@@ -75,8 +112,7 @@ good_area:
 
 	switch (cause) {
 	case FLT_IFETCH:
-		if (!(vma->vm_flags & VM_EXEC))
-			goto bad_area;
+		flags |= FAULT_FLAG_INSTRUCTION;
 		break;
 	case FLT_LOAD:
 		if (!(vma->vm_flags & VM_READ))
@@ -90,6 +126,15 @@ good_area:
 	}
 
 	fault = handle_mm_fault(vma, address, flags);
+
+	if (fault & VM_FAULT_NEXTPAGE) {
+		next_addr = address + 16;
+		next_addr &= PAGE_MASK;
+
+		if (next_addr != (address & PAGE_MASK)) {
+			fault = handle_mm_fault(mm, vma, next_addr, flags);
+		}
+	}
 
 	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
 		return;
@@ -135,6 +180,13 @@ good_area:
 		si_signo = SIGSEGV;
 		si_code  = SEGV_ACCERR;
 	}
+
+	if (sig_debug) {
+		printk("segfault detected\n");
+		show_regs(regs);
+		show_vma_map();
+	}
+
 	force_sig_fault(si_signo, si_code, (void __user *)address, current);
 	return;
 
@@ -142,6 +194,12 @@ bad_area:
 	up_read(&mm->mmap_sem);
 
 	if (user_mode(regs)) {
+		if (sig_debug) {
+			printk("segfault detected\n");
+			show_regs(regs);
+			show_vma_map();
+		}
+
 		force_sig_fault(SIGSEGV, si_code, (void __user *)address, current);
 		return;
 	}
@@ -178,7 +236,7 @@ void write_protection_fault(struct pt_regs *regs)
 
 void execute_protection_fault(struct pt_regs *regs)
 {
-	unsigned long badvadr = pt_badva(regs);
+	unsigned long addr = pt_elr(regs);
 
-	do_page_fault(badvadr, FLT_IFETCH, regs);
+	do_page_fault(addr, FLT_IFETCH, regs);
 }

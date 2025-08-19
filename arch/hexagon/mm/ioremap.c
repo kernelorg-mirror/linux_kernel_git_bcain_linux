@@ -15,7 +15,7 @@ void __iomem *ioremap_nocache(unsigned long phys_addr, unsigned long size)
 	unsigned long offset = phys_addr & ~PAGE_MASK;
 	struct vm_struct *area;
 
-	pgprot_t prot = __pgprot(_PAGE_PRESENT|_PAGE_READ|_PAGE_WRITE
+	pgprot_t prot = __pgprot(_PAGE_READ|_PAGE_WRITE
 					|(__HEXAGON_C_DEV << 6));
 
 	last_addr = phys_addr + size - 1;
