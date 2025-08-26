@@ -21,7 +21,8 @@ int pmd_huge(pmd_t pmd)
  * of the page tables.
  */
 
-pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr,
+		       unsigned long sz)
 {
 	pgd_t *pgd;
 
