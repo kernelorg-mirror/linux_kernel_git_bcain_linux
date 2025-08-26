@@ -1,0 +1,167 @@
+/dts-v1/;
+
+/*  Bare minimum  */
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	aliases {
+		serial0 = &uart0;
+	};
+	memory { device_type = "memory"; reg = <0 0>; };
+
+};
+
+
+/ {
+	chosen {
+                bootargs = "earlycon=pl011,0x10000000 console=ttyAMA0";
+		stdout-path = &uart0;
+		rng-seed = <0xc0de1234 0xabcdef01 0x23456789 0x0fedcba9
+			    0x87654321 0x12345678 0x9abcdef0 0x01234567
+			    0xdeadbeef 0xcafebabe 0xfeedface 0xc001d00d
+			    0xbaadf00d 0xabad1dea 0xfee1dead 0x8badf00d>;
+	};
+};
+
+
+/ {
+        model = "Qualcomm QQVP Lemans";
+        compatible = "qcom,sm8150";
+
+	xtal24mhz: xtal24mhz@24M {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <24000000>;
+	};
+	pclk: pclk@24M {
+		#clock-cells = <0>;
+		compatible = "fixed-factor-clock";
+		clock-div = <1>;
+		clock-mult = <1>;
+		clocks = <&xtal24mhz>;
+	};
+
+
+	soc: soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		interrupt-parent = <&PIC0>;
+
+		PIC0: interrupt-controller@0 {
+			compatible = "qcom,h2-pic";
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+
+		gpt@AB000000 {
+			compatible="qcom,h2-timer";
+			reg = <0xab000000 0x1000>;
+			interrupts = <12 0>;   /*  interrupts CPU directly; rising edge triggered */
+		};
+/*
+		gpt@FE2A0000 {
+			compatible="qcom,qtimer";
+			reg = <0xfe2a0000 0x1000>;
+			interrupts = <35>;
+		};
+*/
+
+		/*
+			Add 32 to l2vic interrupt
+			[0] 18
+			[1] 8
+			[2] 33
+			[3] 46
+		 */
+/*
+		irqtest {
+			compatible = "qcom,hexagon-irqtest";
+			interrupt-parent = <&PIC0>;
+			interrupts = <50 0>, <40 0>, <65 0>, <78 0>;
+		};
+
+		virtio_block@1e000 {
+			compatible = "virtio,mmio";
+			reg = <0x37c00000 0x100>;
+			interrupts = <50 0>;
+		};
+
+*/
+
+		/*  0x8400000 + 0x200000  */
+		vtcm {
+			compatible = "qcom,hexagon_vtcm";
+			reg = <0x8600000 0x40000>;
+		};
+
+/*
+        pl011@10000000 {
+		interrupt-parent = <&PIC0>;
+                interrupts = <0x00 0x17b 0x04>;
+                reg = <0x00 0x10000000 0x00 0x1000>;
+                compatible = "qcom,pl011\0arm,primecell";
+        };
+*/
+		eth0: virtio_net@11000000 {
+			compatible = "virtio,mmio";
+			interrupt-parent = <&PIC0>;
+			reg = <0x11000000 0x100>;
+			interrupts = <50 0>;
+		};
+
+		vda: virtio_block@12000000 {
+			compatible = "virtio,mmio";
+			interrupt-parent = <&PIC0>;
+			reg = <0x12000000 0x100>;
+			interrupts = <51 0>;
+		};
+
+/* Subtract 32 to get the VIC bit, here 47 is 15 
+ * if we log trace:l2vic_reg_write in the qemu monitor we expect to
+ * see: "l2vic_reg_write addr: 200 value: 00008000"
+ * each time we hit a key.
+*/
+		uart0: uart@10000000 {
+			compatible = "arm,pl011", "arm,primecell";
+		        interrupt-parent = <&PIC0>;
+                	interrupts = <47 0>;
+			clocks = <&xtal24mhz>, <&pclk>;
+			clock-names = "uartclk", "apb_pclk";
+			reg = <0x10000000 0x1000>;
+		};
+/* See:
+   https://ipcatalog.qualcomm.com/swi/chip/102/version/3816/module/2876327#TURING_QDSP6SS_IPC
+*/
+		snull_net {
+			compatible = "qcom,snull-eth";
+			interrupt-parent = <&PIC0>;
+			interrupts = <91 0>; /* XXX_SM: Matches the reset value found in:
+                                                        h2/linux/loadlinux.c, IPC_INT */
+
+/*
+ * XXX_SM: 0x08380000 Sorta lines up with 0x263A0000 on Lemans
+ * The snull driver may need to be updated.
+ * See: Hana: https://ipcatalog.qualcomm.com/swi/chip/102/version/3816/module/2876326
+ * VS Lemans: https://ipcatalog.qualcomm.com/swi/chip/434/version/11766/module/24917580
+ */
+			reg = <0xd7c00000 0x10000>,
+			      <0xd7c10000 0x10000>,
+			      <0x08380000 0x10000>; /* TURING_QDSP6V66SS_PRIVATE */
+			qcom,snull-irq-offset = <0x8000>;/* TURING_QDSP6SS_IPC */
+			qcom,snull-irq-bitset = <0x20>;/* bit in this register to set */
+			qcom,snull-zero-mem = <0x0>;
+		};
+
+		hvx {
+			compatible = "qcom,hexagon-hvx";
+			qcom,hvx-max-ctxts = <4>;
+			qcom,hvx-vlength = <7>;
+		};
+	};
+};
+
+
+
