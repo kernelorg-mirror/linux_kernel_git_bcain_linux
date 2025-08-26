@@ -17,11 +17,15 @@
 #include <linux/spinlock.h>
 #include <linux/cpu.h>
 #include <linux/mm_types.h>
+#include <linux/irqdomain.h>
 
 #include <asm/time.h>    /*  timer_interrupt  */
 #include <asm/hexagon_vm.h>
 
-#define BASE_IPI_IRQ 26
+DEFINE_PER_CPU(u32, ipi_irq);
+
+/*  Virtual Processor ID storage  */
+DEFINE_PER_CPU(u32, vpid);
 
 /*
  * cpu_possible_mask needs to be filled out prior to setup_per_cpu_areas
@@ -56,7 +60,7 @@ static inline void __handle_ipi(unsigned long *ops, struct ipi_data *ipi,
 			/*
 			 * call vmstop()
 			 */
-			__vmstop();
+			__vmstop(0);
 			break;
 
 		case IPI_RESCHEDULE:
@@ -103,11 +107,14 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
 
 		set_bit(msg, &ipi->bits);
 		/*  Possible barrier here  */
-		retval = __vmintop_post(BASE_IPI_IRQ+cpu);
+
+		/*  This is somewhat unsafe, but VPID's pretty much don't change  */
+		/*  Also, what's passed is the hardware IRQ.  */
+		retval = __vmintop_post(CONFIG_BASE_IPI_IRQ+cpu, per_cpu(vpid, cpu));
 
 		if (retval != 0) {
 			printk(KERN_ERR "interrupt %ld not configured?\n",
-				BASE_IPI_IRQ+cpu);
+				CONFIG_BASE_IPI_IRQ+cpu);
 		}
 	}
 
@@ -139,13 +146,27 @@ static void start_secondary(void)
 		: "r" (thread_ptr)
 	);
 
+	cpu = smp_processor_id();
+
+#ifdef CONFIG_H2
+	per_cpu(vpid, cpu) = __vmvpid();
+#else
+	per_cpu(vpid, cpu) = cpu;
+#endif
+
 	/*  Set the memory struct  */
 	mmgrab(&init_mm);
 	current->active_mm = &init_mm;
 
 	cpu = smp_processor_id();
 
-	irq = BASE_IPI_IRQ + cpu;
+	/* Disable all local interrupts first */
+	for (irq = 0; irq < HEXAGON_CPUINTS; irq++)
+		__vmintop_locdis(irq);
+
+	/* Enable and register IPI interrupt */
+	irq = CONFIG_BASE_IPI_IRQ + cpu;
+	__vmintop_globen(irq);
 	if (request_irq(irq, handle_ipi, IRQF_TRIGGER_RISING, "ipi_handler",
 			NULL))
 		pr_err("Failed to request irq %u (ipi_handler)\n", irq);
@@ -158,6 +179,8 @@ static void start_secondary(void)
 	notify_cpu_starting(cpu);
 
 	set_cpu_online(cpu, true);
+
+	load_ie_cache();
 
 	local_irq_enable();
 
@@ -180,7 +203,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 
 	/*  Boot to the head.  */
 	stack_start =  ((void *) thread) + THREAD_SIZE;
-	__vmstart(start_secondary, stack_start);
+	__vmstart(start_secondary, stack_start, 0);
 
 	while (!cpu_online(cpu))
 		barrier();
@@ -194,7 +217,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int i, irq = BASE_IPI_IRQ;
+	int i, irq = CONFIG_BASE_IPI_IRQ;
 
 	/*
 	 * should eventually have some sort of machine
@@ -207,10 +230,17 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 	/*  Also need to register the interrupts for IPI  */
 	if (max_cpus > 1) {
+		__vmintop_globen(irq);
 		if (request_irq(irq, handle_ipi, IRQF_TRIGGER_RISING,
 				"ipi_handler", NULL))
 			pr_err("Failed to request irq %d (ipi_handler)\n", irq);
 	}
+
+#ifdef CONFIG_H2
+	per_cpu(vpid, smp_processor_id()) = __vmvpid();
+#else
+	per_cpu(vpid, smp_processor_id()) = smp_processor_id();
+#endif
 }
 
 void arch_smp_send_reschedule(int cpu)
