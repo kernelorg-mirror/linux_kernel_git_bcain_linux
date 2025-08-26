@@ -5,7 +5,8 @@ obj-y += head.o
 obj-$(CONFIG_SMP) += smp.o
 
 obj-y += setup.o irq_cpu.o traps.o syscalltab.o signal.o
-obj-y += process.o syscall.o trampoline.o reset.o ptrace.o vdso.o
+obj-y += process.o syscall.o trampoline.o reset.o ptrace.o
+obj-y += vdso.o notify.o
 
 obj-y += irq-hexagon-h2.o
 
