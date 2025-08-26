@@ -2,6 +2,8 @@
 #ifndef HEXAGON_ASM_USER_H
 #define HEXAGON_ASM_USER_H
 
+#include <asm/registers.h>
+
 /*
  * Layout for registers passed in elf core dumps to userspace.
  *
