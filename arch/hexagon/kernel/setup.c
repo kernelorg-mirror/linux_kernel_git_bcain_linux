@@ -23,6 +23,7 @@
 #include <asm/prom.h>
 #include <asm/time.h>
 #include <asm/angel_console.h>
+#include <asm/hwcap.h>
 #include <linux/percpu.h>
 
 #ifdef CONFIG_SMP
@@ -32,7 +33,10 @@ DEFINE_PER_CPU(u32, vpid);
 #endif
 
 unsigned long vmversion;
+unsigned long elf_hwcap __read_mostly;
 u64 boot_dtb_phys;
+
+EXPORT_SYMBOL_GPL(elf_hwcap);
 
 char cmd_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
@@ -40,6 +44,91 @@ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 void *boot_info;
 
 const struct machine_desc *mdesc;
+
+/*
+ * populate hardware capabilities using vmgetinfo
+ */
+static void __init setup_hwcap(void)
+{
+	struct vm_rev rev;
+	unsigned long hvx_vlength;
+
+	elf_hwcap = 0;
+
+	/* Get revision information for ISA version */
+	rev.raw = __vmgetinfo(vm_info_rev);
+
+	/* Set ISA version using enumeration values in 7-bit field (bits 0-6) */
+	switch (rev.isa) {
+	case 0x79:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V79;
+		break;
+	case 0x73:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V73;
+		break;
+	case 0x71:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V71;
+		break;
+	case 0x69:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V69;
+		break;
+	case 0x68:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V68;
+		break;
+	case 0x67:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V67;
+		break;
+	case 0x66:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V66;
+		break;
+	case 0x65:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V65;
+		break;
+	case 0x62:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V62;
+		break;
+	case 0x60:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V60;
+		break;
+	case 0x55:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V55;
+		break;
+	case 5:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V5;
+		break;
+	case 4:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V4;
+		break;
+	case 3:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V3;
+		break;
+	case 2:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V2;
+		break;
+	default:
+		/* Unknown ISA version - leave ISA field as 0 */
+		break;
+	}
+
+	/* Check for HVX support */
+	hvx_vlength = __vmgetinfo(vm_info_hvx_vlength);
+	if (hvx_vlength) {
+		elf_hwcap |= HWCAP_HEXAGON_HVX;
+
+		if (hvx_vlength >= 128)
+			elf_hwcap |= HWCAP_HEXAGON_HVX_LENGTH_128B;
+	}
+
+	printk(KERN_INFO "Hexagon hwcap: 0x%08lx (ISA enum %lu = v%lx%s%s%s%s%s)\n",
+		elf_hwcap,
+		elf_hwcap & HWCAP_HEXAGON_ISA_MASK,
+		rev.isa,
+		(elf_hwcap & HWCAP_HEXAGON_HVX) ? ", HVX" : "",
+		(elf_hwcap & HWCAP_HEXAGON_HVX_LENGTH_128B) ? ", HVX-128B" : "",
+		(elf_hwcap & HWCAP_HEXAGON_HVX_IEEE_FP) ? ", HVX-IEEE-FP" : "",
+		(elf_hwcap & HWCAP_HEXAGON_AUDIO) ? ", Audio" : "",
+		(elf_hwcap & HWCAP_HEXAGON_CABAC) ? ", CABAC" : "");
+}
 
 /*
  * setup_arch -  high level architectural setup routine
@@ -71,7 +160,11 @@ void __init setup_arch(char **cmdline_p)
 
 	printk("vmversion=0x%08lx\n", vmversion);
 	printk("vm build id=0x%08lx\n", __vmgetinfo(vm_info_build_id));
-	printk("boot_info=%p\n", boot_info);
+	printk("boot_dtb_phys=0x%llx\n", boot_dtb_phys);
+
+	/* Setup hardware capabilities */
+	setup_hwcap();
+
 	/*
 	 * Will need to work on boot specification.
 	 */
