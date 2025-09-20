@@ -11,6 +11,7 @@
 #include <asm/ptrace.h>
 #include <asm/user.h>
 #include <linux/elf-em.h>
+#include <asm/hwcap.h>
 
 struct elf32_hdr;
 
@@ -231,7 +232,7 @@ do {					\
  * This yields a mask that user programs can use to figure out what
  * instruction set this cpu supports.
  */
-#define ELF_HWCAP	(0)
+#define ELF_HWCAP	(elf_hwcap)
 
 /*
  * This yields a string that ld.so will use to load implementation
