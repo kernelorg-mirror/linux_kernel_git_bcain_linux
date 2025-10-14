@@ -10,7 +10,6 @@
  */
 
 #include <asm/vm_mmu.h>
-/*  #include <asm/iomap.h>  */
 
 /*
  * Start with mapping PA=0 to both VA=0x0 and VA=0xc000000 as 16MB large pages.
@@ -34,10 +33,281 @@
 			| __HVM_PTE_R | __HVM_PTE_W | __HVM_PTE_X \
 			| __HEXAGON_C_DEV << 6 )
 
+#define FOURK_MEM(pa) (((pa) & __HVM_PTE_PGMASK_4KB) \
+			| __HVM_PTE_R | __HVM_PTE_W | __HVM_PTE_X \
+			| __HEXAGON_C_WB_L2 << 6 )
+
 #define L2_PTR(pa) (((pa) & __HVM_PTE_PGMASK_4KB) \
 			| __HVM_PDE_S_4KB  )
 
 #define X __HVM_PDE_S_INVALID
+
+//  Need to move elsewhere, or turn into actual code.  Or use kmap.  Whatevs.
+//  32k of memory;  don't map the first 4k as that's used for coherent memory
+#define DINI_BRAM_BASE	0xd0080000
+#define	SZ_4K		4096
+
+	.p2align 12
+	.globl _K_io_map
+	.globl _K_init_devicetable
+_K_init_devicetable:  /*  Should be 4MB worth of entries  */
+	.word FOURK_IO(DINI_BRAM_BASE+SZ_4K*0),FOURK_MEM(DINI_BRAM_BASE+SZ_4K*1),FOURK_MEM(DINI_BRAM_BASE+SZ_4K*2),FOURK_MEM(DINI_BRAM_BASE+SZ_4K*3)
+	.word FOURK_MEM(DINI_BRAM_BASE+SZ_4K*4),FOURK_MEM(DINI_BRAM_BASE+SZ_4K*5),FOURK_MEM(DINI_BRAM_BASE+SZ_4K*6),FOURK_MEM(DINI_BRAM_BASE+SZ_4K*7)
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+	.word X,X,X,X
+
 
 	.p2align 12
 	.globl swapper_pg_dir
@@ -72,12 +342,7 @@ swapper_pg_dir:
 	.word X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X
 	.word X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X
 /*0xa8*/.word X,X,X,X
-#ifdef CONFIG_COMET_EARLY_UART_DEBUG
-UART_PTE_ENTRY:
-/*0xa9*/.word BKPG_IO(0xa9000000),BKPG_IO(0xa9000000),BKPG_IO(0xa9000000),BKPG_IO(0xa9000000)
-#else
 /*0xa9*/.word X,X,X,X
-#endif
 /*0xaa*/.word X,X,X,X
 /*0xab*/.word X,X,X,X
 /*0xac*/.word X,X,X,X
@@ -86,7 +351,14 @@ UART_PTE_ENTRY:
 /*0xaf*/.word X,X,X,X
 /*0xb0*/.word X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X
 	.word X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X
+
 _K_init_segtable:
+
+/*
+ * There are actually not necessarily valid anymore as they are
+ * rewritten at boot time to reflect PHYS_OFFSET.
+ */
+
 /* VA 0xC0000000 */
 	.word BKP(0x00000000), BKP(0x00400000), BKP(0x00800000), BKP(0x00c00000)
 	.word BKP(0x01000000), BKP(0x01400000), BKP(0x01800000), BKP(0x01c00000)
@@ -161,269 +433,4 @@ _K_io_map:
 	.word X,X,X,X /* 0x3e000000 - device IO early remap */
 	.word X,X,X,X /* 0x3f000000 - hypervisor space*/
 
-#if 0
-/*
- * This is in here as an example for devices which need to be mapped really
- * early.
- */
-	.p2align 12
-	.globl _K_io_kmap
-	.globl _K_init_devicetable
-_K_init_devicetable:  /*  Should be 4MB worth of entries  */
-	.word FOURK_IO(MSM_GPIO1_PHYS),FOURK_IO(MSM_GPIO2_PHYS),FOURK_IO(MSM_SIRC_PHYS),X
-	.word FOURK_IO(TLMM_GPIO1_PHYS),X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-	.word X,X,X,X
-#endif
+
