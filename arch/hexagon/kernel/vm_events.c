@@ -8,8 +8,22 @@
 #include <linux/kernel.h>
 #include <linux/sched/debug.h>
 #include <asm/registers.h>
+#include <asm/notify.h>
 #include <linux/irq.h>
 #include <linux/hardirq.h>
+#include <linux/irqdomain.h>
+
+static void __maybe_unused print_hvx_vector(char *str, HVX_Vector *v)
+
+{
+	char buf[sizeof(HVX_Vector) * 2 + 1];
+	unsigned char *ptr = (unsigned char *)v;
+	unsigned int i;
+
+	for (i=0; i<sizeof(HVX_Vector); i++)
+		snprintf(&buf[i * 2], 3, "%02x", ptr[i] & 0xFF);
+	printk(KERN_EMERG "%s: 0x%s\n", str, buf);
+}
 
 /*
  * show_regs - print pt_regs structure
@@ -76,10 +90,16 @@ void show_regs(struct pt_regs *regs)
 void arch_do_IRQ(struct pt_regs *regs)
 {
 	int irq = pt_cause(regs);
+	int virq;
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
+	clear_ie_cached();
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
+
 	irq_enter();
-	generic_handle_irq(irq);
+	/*  return of zero here is an error btw  */
+	virq = irq_find_mapping(NULL, irq);
+	generic_handle_irq(virq);
 	irq_exit();
 	set_irq_regs(old_regs);
 }
