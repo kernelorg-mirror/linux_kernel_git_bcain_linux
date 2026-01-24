@@ -35,7 +35,7 @@ extern struct irq_domain *hexagon_irq_domain;
 #include <linux/of.h>
 
 /*  Provided by platform  */
-extern const struct of_device_id platform_of_irq_matches[] __initdata;
+extern const struct of_device_id platform_of_irq_matches[];
 
 /*  H2 "pic" initialization at init_IRQ time  */
 int __init hexagon_pic_of_init(struct device_node *node,
