@@ -19,7 +19,7 @@ struct machine_desc {
 /*
  * Current machine - only accessible during boot.
  */
-extern struct machine_desc *mdesc;
+extern const struct machine_desc *mdesc;
 
 /*
  * Machine type table - also only accessible during boot
