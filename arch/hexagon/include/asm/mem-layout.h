@@ -16,7 +16,15 @@
  * assign it to the location counter.
  */
 
+#ifdef CONFIG_HEXAGON_SPLIT_2GB
+#define PAGE_OFFSET			_AC(0x80000000, UL)
+#else
 #define PAGE_OFFSET			_AC(0xc0000000, UL)
+#endif
+
+#ifndef ELF_LOAD_ADDRESS
+#define ELF_LOAD_ADDRESS			_AC(0x00000000, UL)
+#endif
 
 /*
  * Compiling for a platform that needs a crazy physical offset
@@ -40,7 +48,6 @@ extern unsigned long	__phys_offset;
 
 #define TASK_SIZE			(PAGE_OFFSET)
 
-/*  not sure how these are used yet  */
 #define STACK_TOP			TASK_SIZE
 #define STACK_TOP_MAX			TASK_SIZE
 
@@ -59,7 +66,7 @@ extern int max_kernel_seg;
  * supposed to be based on the amount of physical memory available
  */
 
-#define VMALLOC_START ((unsigned long) __va(high_memory + VMALLOC_OFFSET))
+#define VMALLOC_START ((unsigned long) high_memory + VMALLOC_OFFSET)
 
 /* Gap between physical ram and vmalloc space for guard purposes. */
 #define VMALLOC_OFFSET PAGE_SIZE
@@ -102,6 +109,5 @@ extern int max_kernel_seg;
  */
 #define VMALLOC_END (PKMAP_BASE-PAGE_SIZE*2)
 #endif /*  !__ASSEMBLY__  */
-
 
 #endif /* _ASM_HEXAGON_MEM_LAYOUT_H */
