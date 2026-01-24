@@ -268,6 +268,10 @@ __head_s_vaddr_target:
 	memw(R0) = R27;     //  save DTB phys addr low
 	memw(R0+#4) = R28;  //  save DTB phys addr high
 
+	R0.H = #HI(boot_info);
+	R0.L = #LO(boot_info);
+	memw(R0) = R27;  //  save the boot info pointer
+
 	/*  Set PHYS_OFFSET; should be in R25 */
 #ifdef CONFIG_HEXAGON_PHYS_OFFSET
 	r0.l = #LO(__phys_offset);

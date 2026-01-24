@@ -45,6 +45,8 @@ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 
 u64 boot_dtb_phys;  /* DTB physical address, set by head.S from R1:0 */
 
+void *boot_info;
+
 const struct machine_desc *mdesc;
 
 /*
@@ -192,7 +194,6 @@ void __init setup_arch(char **cmdline_p)
 	printk(KERN_INFO "PHYS_OFFSET=0x%08lx\n", PHYS_OFFSET);
 	/*  initial machine setup from flattened device tree  */
 	mdesc = setup_machine_fdt(dtb);
-
 	if (!mdesc)
 		panic("setup_machine_fdt returned NULL\n");
 
@@ -206,6 +207,15 @@ void __init setup_arch(char **cmdline_p)
 	/* Setup hardware capabilities */
 	setup_hwcap();
 
+	if (!mdesc)
+		panic("setup_machine_fdt returned NULL\n");
+
+	if (mdesc->setup_arch_platform) {
+		mdesc->setup_arch_platform();
+	}
+
+	printk("vmversion=0x%08lx\n", vmversion);
+	printk("vm build id=0x%08lx\n", __vmgetinfo(vm_info_build_id));
 	/*
 	 * Command line precedence:
 	 * - External DTB (boot_dtb_phys != 0): DTB /chosen/bootargs takes
@@ -217,7 +227,6 @@ void __init setup_arch(char **cmdline_p)
 	if (!boot_dtb_phys || !boot_command_line[0])
 		strscpy(boot_command_line, default_command_line,
 			COMMAND_LINE_SIZE);
-
 	strscpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
@@ -228,7 +237,6 @@ void __init setup_arch(char **cmdline_p)
 	setup_arch_memory();
 
 	reserve_initrd_mem();
-
 	/*  Now is time we unflatten devicetree  */
 	unflatten_device_tree();
 

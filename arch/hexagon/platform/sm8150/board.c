@@ -29,7 +29,7 @@
 #include "board.h"
 #include <linux/module.h>
 
-static const char *sm8150_dt_compat[] __initconst = {
+static const char * const sm8150_dt_compat[] __initconst = {
 	"qcom,sm8150",
 	NULL
 };
