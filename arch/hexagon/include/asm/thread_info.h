@@ -10,13 +10,18 @@
 
 #ifdef __KERNEL__
 
+#include <asm/page.h>
+
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #include <asm/registers.h>
-#include <asm/page.h>
+#include <asm/extensions.h>
 #endif
 
-#define THREAD_SHIFT		12
+/*  If the shift is less than the kernel page size, use the page size.  */
+
+#define ARCH_THREAD_SHIFT	13
+#define THREAD_SHIFT		(ARCH_THREAD_SHIFT < PAGE_SHIFT ? PAGE_SHIFT : ARCH_THREAD_SHIFT)
 #define THREAD_SIZE		(1<<THREAD_SHIFT)
 #define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
 
@@ -39,6 +44,8 @@ struct thread_info {
 	 */
 	/* Points to the current pt_regs frame  */
 	struct pt_regs		*regs;
+	struct hvx_threadinfo	*hvx;
+	struct extinfo		extensions;
 	/*
 	 * saved kernel sp at switch_to time;
 	 * not sure if this is used (it's not in the VM model it seems;
@@ -62,6 +69,7 @@ struct thread_info {
 	.cpu            = 0,                    \
 	.preempt_count  = 1,                    \
 	.sp = 0,				\
+	.hvx = NULL,				\
 	.regs = NULL,			\
 }
 
@@ -70,8 +78,12 @@ struct thread_info {
 #define qstr(s) #s
 #define QUOTED_THREADINFO_REG qqstr(THREADINFO_REG)
 
-register struct thread_info *__current_thread_info asm(QUOTED_THREADINFO_REG);
-#define current_thread_info()  __current_thread_info
+static inline struct thread_info *current_thread_info(void)
+{
+	struct thread_info *x;
+	asm("%0 = " QUOTED_THREADINFO_REG : "=r"(x));
+	return x;
+}
 
 #endif /* __ASSEMBLY__ */
 
@@ -101,7 +113,7 @@ register struct thread_info *__current_thread_info asm(QUOTED_THREADINFO_REG);
 #define _TIF_NOTIFY_SIGNAL	(1 << TIF_NOTIFY_SIGNAL)
 
 /* work to do on interrupt/exception return - All but TIF_SYSCALL_TRACE */
-#define _TIF_WORK_MASK          (0x0000FFFF & ~_TIF_SYSCALL_TRACE)
+#define _TIF_WORK_MASK          (0x0000FFFF & ~_TIF_SYSCALL_TRACE & ~_TIF_SINGLESTEP)
 
 /* work to do on any return to u-space */
 #define _TIF_ALLWORK_MASK       0x0000FFFF
