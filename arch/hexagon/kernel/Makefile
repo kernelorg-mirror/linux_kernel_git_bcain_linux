@@ -34,4 +34,3 @@ obj-$(CONFIG_OF) += devtree.o
 obj-y += hexagon_debug.o
 
 obj-y += hvx/
-
