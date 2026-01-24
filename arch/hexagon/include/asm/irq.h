@@ -6,15 +6,20 @@
 #ifndef _ASM_IRQ_H_
 #define _ASM_IRQ_H_
 
-/* Number of first-level interrupts associated with the CPU core. */
+#ifdef CONFIG_H2
+#ifdef CONFIG_HEXAGON_MSS
+//  FIXME:  This seems to freak the 8960 build out.  Need to debug.  Might be H2 related.  Might not.
+#define HEXAGON_CPUINTS 480
+#else
+#define HEXAGON_CPUINTS 160
+#endif
+#else
 #define HEXAGON_CPUINTS 32
+#endif
 
 /*
  * Must define NR_IRQS before including <asm-generic/irq.h>
- * 64 == the two SIRC's, 176 == the two gpio's
- *
- * IRQ configuration is still in flux; defining this to a comfortably
- * large number.
+ * On old platform (?) 64 == the two SIRC's, 176 == the two gpio's
  */
 #define NR_IRQS 512
 
@@ -22,5 +27,14 @@
 
 struct pt_regs;
 void arch_do_IRQ(struct pt_regs *);
+
+#include <linux/of.h>
+
+/*  Provided by platform  */
+extern struct of_device_id platform_of_irq_matches[] __initdata;
+
+/*  H2 "pic" initialization at init_IRQ time  */
+int __init hexagon_pic_of_init(struct device_node *node,
+                          struct device_node *parent);
 
 #endif
