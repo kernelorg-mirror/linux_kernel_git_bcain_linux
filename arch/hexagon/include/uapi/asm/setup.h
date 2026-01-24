@@ -27,7 +27,7 @@
 
 #include <asm-generic/setup.h>
 
-extern char external_cmdline_buffer;
+extern char external_buffer;
 
 void __init setup_arch_memory(void);
 
