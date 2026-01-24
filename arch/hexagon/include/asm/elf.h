@@ -21,56 +21,105 @@ struct elf32_hdr;
 /*  should have stuff like "CPU type" and maybe "ABI version", etc  */
 
 /* Hexagon relocations */
-  /* V2 */
-#define R_HEXAGON_NONE           0
-#define R_HEXAGON_B22_PCREL      1
-#define R_HEXAGON_B15_PCREL      2
-#define R_HEXAGON_B7_PCREL       3
-#define R_HEXAGON_LO16           4
-#define R_HEXAGON_HI16           5
-#define R_HEXAGON_32             6
-#define R_HEXAGON_16             7
-#define R_HEXAGON_8              8
-#define R_HEXAGON_GPREL16_0      9
-#define R_HEXAGON_GPREL16_1     10
-#define R_HEXAGON_GPREL16_2     11
-#define R_HEXAGON_GPREL16_3     12
-#define R_HEXAGON_HL16          13
-  /* V3 */
-#define R_HEXAGON_B13_PCREL     14
-  /* V4 */
-#define R_HEXAGON_B9_PCREL      15
-  /* V4 (extenders) */
-#define R_HEXAGON_B32_PCREL_X   16
-#define R_HEXAGON_32_6_X        17
-  /* V4 (extended) */
-#define R_HEXAGON_B22_PCREL_X   18
-#define R_HEXAGON_B15_PCREL_X   19
-#define R_HEXAGON_B13_PCREL_X   20
-#define R_HEXAGON_B9_PCREL_X    21
-#define R_HEXAGON_B7_PCREL_X    22
-#define R_HEXAGON_16_X          23
-#define R_HEXAGON_12_X          24
-#define R_HEXAGON_11_X          25
-#define R_HEXAGON_10_X          26
-#define R_HEXAGON_9_X           27
-#define R_HEXAGON_8_X           28
-#define R_HEXAGON_7_X           29
-#define R_HEXAGON_6_X           30
-  /* V2 PIC */
-#define R_HEXAGON_32_PCREL      31
-#define R_HEXAGON_COPY          32
-#define R_HEXAGON_GLOB_DAT      33
-#define R_HEXAGON_JMP_SLOT      34
-#define R_HEXAGON_RELATIVE      35
-#define R_HEXAGON_PLT_B22_PCREL 36
-#define R_HEXAGON_GOTOFF_LO16   37
-#define R_HEXAGON_GOTOFF_HI16   38
-#define R_HEXAGON_GOTOFF_32     39
-#define R_HEXAGON_GOT_LO16      40
-#define R_HEXAGON_GOT_HI16      41
-#define R_HEXAGON_GOT_32        42
-#define R_HEXAGON_GOT_16        43
+#define R_HEX_NONE                0
+#define R_HEX_B22_PCREL           1
+#define R_HEX_B15_PCREL           2
+#define R_HEX_B7_PCREL            3
+#define R_HEX_LO16                4
+#define R_HEX_HI16                5
+#define R_HEX_32                  6
+#define R_HEX_16                  7
+#define R_HEX_8                   8
+#define R_HEX_GPREL16_0           9
+#define R_HEX_GPREL16_1           10
+#define R_HEX_GPREL16_2           11
+#define R_HEX_GPREL16_3           12
+#define R_HEX_HL16                13
+#define R_HEX_B13_PCREL           14
+#define R_HEX_B9_PCREL            15
+#define R_HEX_B32_PCREL_X         16
+#define R_HEX_32_6_X              17
+#define R_HEX_B22_PCREL_X         18
+#define R_HEX_B15_PCREL_X         19
+#define R_HEX_B13_PCREL_X         20
+#define R_HEX_B9_PCREL_X          21
+#define R_HEX_B7_PCREL_X          22
+#define R_HEX_16_X                23
+#define R_HEX_12_X                24
+#define R_HEX_11_X                25
+#define R_HEX_10_X                26
+#define R_HEX_9_X                 27
+#define R_HEX_8_X                 28
+#define R_HEX_7_X                 29
+#define R_HEX_6_X                 30
+#define R_HEX_32_PCREL            31
+#define R_HEX_COPY                32
+#define R_HEX_GLOB_DAT            33
+#define R_HEX_JMP_SLOT            34
+#define R_HEX_RELATIVE            35
+#define R_HEX_PLT_B22_PCREL       36
+#define R_HEX_GOTREL_LO16         37
+#define R_HEX_GOTREL_HI16         38
+#define R_HEX_GOTREL_32           39
+#define R_HEX_GOT_LO16            40
+#define R_HEX_GOT_HI16            41
+#define R_HEX_GOT_32              42
+#define R_HEX_GOT_16              43
+#define R_HEX_DTPMOD_32           44
+#define R_HEX_DTPREL_LO16         45
+#define R_HEX_DTPREL_HI16         46
+#define R_HEX_DTPREL_32           47
+#define R_HEX_DTPREL_16           48
+#define R_HEX_GD_PLT_B22_PCREL    49
+#define R_HEX_GD_GOT_LO16         50
+#define R_HEX_GD_GOT_HI16         51
+#define R_HEX_GD_GOT_32           52
+#define R_HEX_GD_GOT_16           53
+#define R_HEX_IE_LO16             54
+#define R_HEX_IE_HI16             55
+#define R_HEX_IE_32               56
+#define R_HEX_IE_GOT_LO16         57
+#define R_HEX_IE_GOT_HI16         58
+#define R_HEX_IE_GOT_32           59
+#define R_HEX_IE_GOT_16           60
+#define R_HEX_TPREL_LO16          61
+#define R_HEX_TPREL_HI16          62
+#define R_HEX_TPREL_32            63
+#define R_HEX_TPREL_16            64
+#define R_HEX_6_PCREL_X           65
+#define R_HEX_GOTREL_32_6_X       66
+#define R_HEX_GOTREL_16_X         67
+#define R_HEX_GOTREL_11_X         68
+#define R_HEX_GOT_32_6_X          69
+#define R_HEX_GOT_16_X            70
+#define R_HEX_GOT_11_X            71
+#define R_HEX_DTPREL_32_6_X       72
+#define R_HEX_DTPREL_16_X         73
+#define R_HEX_DTPREL_11_X         74
+#define R_HEX_GD_GOT_32_6_X       75
+#define R_HEX_GD_GOT_16_X         76
+#define R_HEX_GD_GOT_11_X         77
+#define R_HEX_IE_32_6_X           78
+#define R_HEX_IE_16_X             79
+#define R_HEX_IE_GOT_32_6_X       80
+#define R_HEX_IE_GOT_16_X         81
+#define R_HEX_IE_GOT_11_X         82
+#define R_HEX_TPREL_32_6_X        83
+#define R_HEX_TPREL_16_X          84
+#define R_HEX_TPREL_11_X          85
+#define R_HEX_LD_PLT_B22_PCREL    86
+#define R_HEX_LD_GOT_LO16         87
+#define R_HEX_LD_GOT_HI16         88
+#define R_HEX_LD_GOT_32           89
+#define R_HEX_LD_GOT_16           90
+#define R_HEX_LD_GOT_32_6_X       91
+#define R_HEX_LD_GOT_16_X         92
+#define R_HEX_LD_GOT_11_X         93
+#define R_HEX_23_REG              94
+#define R_HEX_GD_PLT_B22_PCREL_X  95
+#define R_HEX_GD_PLT_B32_PCREL_X  96
+#define R_HEX_LD_PLT_B22_PCREL_X  97
+#define R_HEX_LD_PLT_B32_PCREL_X  98
 
 /*
  * ELF register definitions..
@@ -87,15 +136,11 @@ typedef unsigned long elf_fpregset_t;
  * Bypass the whole "regsets" thing for now and use the define.
  */
 
-#if CONFIG_HEXAGON_ARCH_VERSION >= 4
 #define CS_COPYREGS(DEST,REGS) \
 do {\
 	DEST.cs0 = REGS->cs0;\
 	DEST.cs1 = REGS->cs1;\
 } while (0)
-#else
-#define CS_COPYREGS(DEST,REGS)
-#endif
 
 #define ELF_CORE_COPY_REGS(DEST, REGS)	\
 do {					\
@@ -159,18 +204,6 @@ do {					\
 #define ELF_CLASS	ELFCLASS32
 #define ELF_DATA	ELFDATA2LSB
 #define ELF_ARCH	EM_HEXAGON
-
-#if CONFIG_HEXAGON_ARCH_VERSION == 2
-#define ELF_CORE_EFLAGS 0x1
-#endif
-
-#if CONFIG_HEXAGON_ARCH_VERSION == 3
-#define ELF_CORE_EFLAGS 0x2
-#endif
-
-#if CONFIG_HEXAGON_ARCH_VERSION == 4
-#define ELF_CORE_EFLAGS 0x3
-#endif
 
 /*
  * Some architectures have ld.so set up a pointer to a function
