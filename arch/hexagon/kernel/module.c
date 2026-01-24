@@ -11,6 +11,16 @@
 #include <linux/moduleloader.h>
 #include <linux/vmalloc.h>
 
+/* Hexagon ELF relocation types (Release 5 ABI) */
+#define R_HEXAGON_B22_PCREL      1
+#define R_HEXAGON_LO16           4
+#define R_HEXAGON_HI16           5
+#define R_HEXAGON_32             6
+#define R_HEXAGON_32_PCREL      31
+#define R_HEXAGON_PLT_B22_PCREL 36
+#define R_HEXAGON_GOTOFF_LO16  37
+#define R_HEXAGON_GOTOFF_HI16  38
+
 #if 0
 #define DEBUGP printk
 #else
