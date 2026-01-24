@@ -32,17 +32,12 @@
 #define HEXAGON_L1_PTE_SIZE __HVM_PDE_S_1MB
 #endif
 
-/*
- *  These should be defined in hugetlb.h, but apparently not.
- *  "Huge" for us should be 4MB or 16MB, which are both represented
- *  in L1 PTE's.  Right now, it's set up for 4MB.
- */
 #ifdef CONFIG_HUGETLB_PAGE
-#define HPAGE_SHIFT 22
+#define HPAGE_SHIFT 24
 #define HPAGE_SIZE (1UL << HPAGE_SHIFT)
 #define HPAGE_MASK (~(HPAGE_SIZE-1))
 #define HUGETLB_PAGE_ORDER (HPAGE_SHIFT-PAGE_SHIFT)
-#define HVM_HUGEPAGE_SIZE 0x5
+#define HVM_HUGEPAGE_SIZE 0x6
 #endif
 
 #include <vdso/page.h>
