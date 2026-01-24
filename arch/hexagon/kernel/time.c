@@ -15,9 +15,10 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
-#include <linux/module.h>
+#include <linux/export.h>
 
 #include <asm/timer-regs.h>
+#include <asm/platform.h>
 #include <asm/hexagon_vm.h>
 
 /*
@@ -33,6 +34,8 @@ cycles_t	pcycle_freq_mhz;
 cycles_t	thread_freq_mhz;
 cycles_t	sleep_clk_freq;
 
+
+#ifndef CONFIG_OF_DEVICE
 static struct resource rtos_timer_resources[] = {
 	{
 		.start	= RTOS_TIMER_REGS_ADDR,
@@ -47,6 +50,7 @@ static struct platform_device rtos_timer_device = {
 	.num_resources	= ARRAY_SIZE(rtos_timer_resources),
 	.resource	= rtos_timer_resources,
 };
+#endif
 
 /*  A lot of this stuff should move into a platform specific section.  */
 struct adsp_hw_timer_struct {
@@ -97,7 +101,9 @@ static struct clock_event_device hexagon_clockevent_dev = {
 	.name		= "clockevent",
 	.features	= CLOCK_EVT_FEAT_ONESHOT,
 	.rating		= 400,
+#ifndef CONFIG_OF
 	.irq		= RTOS_TIMER_INT,
+#endif
 	.set_next_event = set_next_event,
 #ifdef CONFIG_SMP
 	.broadcast	= broadcast,
@@ -160,8 +166,28 @@ void __init time_init_deferred(void)
 
 	ce_dev->cpumask = cpu_all_mask;
 
+#ifdef CONFIG_OF_DEVICE
+	/*  Probably should search for a device type...  */
+	dn = of_find_compatible_node(NULL, NULL, "qcom,qsd8650-gpt");
+	if (dn) {
+		int err = of_address_to_resource(dn, 0, &r);
+		if (!err) {
+			resource = &r;
+			ce_dev->irq = irq_of_parse_and_map(dn,0); // index?
+			printk(KERN_INFO "Timer res picked from devtree; IRQ=%d\n", ce_dev->irq);
+		}
+		else {
+			panic("%s could not convert address to resource\n", __func__);
+		}
+	}
+	else {
+		panic("%s could not find device\n", __func__);
+	}
+
+#else
 	if (!resource)
 		resource = rtos_timer_device.resource;
+#endif
 
 	/*  ioremap here means this has to run later, after paging init  */
 	rtos_timer = ioremap(resource->start, resource_size(resource));
