@@ -24,7 +24,6 @@
 #include <asm/clock.h>
 #include <asm/platform.h>
 #include <asm/platform/sirc.h>
-#include <asm/platform/comet/comet_iomap.h>
 #include <asm/angel_console.h>
 #include <asm/hexagon_vm.h>
 #include "board.h"
