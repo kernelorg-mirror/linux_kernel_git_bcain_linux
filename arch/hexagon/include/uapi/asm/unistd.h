@@ -35,3 +35,8 @@
 #define __ARCH_WANT_SYS_FORK
 
 #include <asm-generic/unistd.h>
+
+//  Prevent uClibc from using this.
+//  Would preferably just not define __ARCH_WANT_SYSCALL_DEPRECATED, but
+//  we're not there yet.
+#undef __NR_vfork
