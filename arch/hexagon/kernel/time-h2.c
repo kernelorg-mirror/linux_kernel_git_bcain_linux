@@ -92,17 +92,12 @@ static int set_next_event(unsigned long delta, struct clock_event_device *evt)
 }
 
 /*
- * Sets the mode (periodic, shutdown, oneshot, etc) of a timer.
+ * Sets the state (shutdown) of a timer.
  */
-static void set_mode(enum clock_event_mode mode,
-	struct clock_event_device *evt)
+static int set_state_shutdown(struct clock_event_device *evt)
 {
-	switch (mode) {
-	case CLOCK_EVT_MODE_SHUTDOWN:
-		/* XXX implement me */
-	default:
-		break;
-	}
+	/* XXX implement me */
+	return 0;
 }
 
 #ifdef CONFIG_SMP
@@ -118,7 +113,7 @@ static struct clock_event_device hexagon_clockevent_dev = {
 	.features	= CLOCK_EVT_FEAT_ONESHOT,
 	.rating		= 400,
 	.set_next_event = set_next_event,
-	.set_mode	= set_mode,
+	.set_state_shutdown = set_state_shutdown,
 #ifdef CONFIG_SMP
 	.broadcast	= broadcast,
 #endif
@@ -139,7 +134,6 @@ void setup_percpu_clockdev(void)
 
 	dummy_clock_dev->features = CLOCK_EVT_FEAT_DUMMY;
 	dummy_clock_dev->cpumask = cpumask_of(cpu);
-	dummy_clock_dev->mode = CLOCK_EVT_MODE_UNUSED;
 
 	clockevents_register_device(dummy_clock_dev);
 }
