@@ -11,11 +11,17 @@
 #include <linux/moduleloader.h>
 #include <linux/vmalloc.h>
 
-#if 0
-#define DEBUGP printk
-#else
-#define DEBUGP(fmt , ...)
-#endif
+/* Hexagon ELF relocation types (Release 5 ABI) */
+#define R_HEXAGON_B22_PCREL      1
+#define R_HEXAGON_LO16           4
+#define R_HEXAGON_HI16           5
+#define R_HEXAGON_32             6
+#define R_HEXAGON_32_PCREL      31
+#define R_HEXAGON_PLT_B22_PCREL 36
+#define R_HEXAGON_GOTOFF_LO16  37
+#define R_HEXAGON_GOTOFF_HI16  38
+
+#define DEBUGP(fmt, ...)
 
 /*
  * module_frob_arch_sections - tweak got/plt sections.
@@ -45,8 +51,7 @@ int module_frob_arch_sections(Elf_Ehdr *hdr, Elf_Shdr *sechdrs,
 
 	/* At this time, we don't support modules comiled with -shared */
 	if (found) {
-		printk(KERN_WARNING
-			"Module '%s' contains unexpected .plt/.got sections.\n",
+		pr_warn("Module '%s' contains unexpected .plt/.got sections.\n",
 			mod->name);
 		/*  return -ENOEXEC;  */
 	}
@@ -102,8 +107,7 @@ int apply_relocate_add(Elf_Shdr *sechdrs, const char *strtab,
 			int dist = (int)(value - (uint32_t)location);
 			if ((dist < -0x00800000) ||
 			    (dist >= 0x00800000)) {
-				printk(KERN_ERR
-				       "%s: %s: %08x=%08x-%08x %s\n",
+				pr_err("%s: %s: %08x=%08x-%08x %s\n",
 				       module->name,
 				       "R_HEXAGON_B22_PCREL reloc out of range",
 				       dist, value, (uint32_t)location,
@@ -135,11 +139,11 @@ int apply_relocate_add(Elf_Shdr *sechdrs, const char *strtab,
 		case R_HEXAGON_PLT_B22_PCREL:
 		case R_HEXAGON_GOTOFF_LO16:
 		case R_HEXAGON_GOTOFF_HI16:
-			printk(KERN_ERR "%s: GOT/PLT relocations unsupported\n",
+			pr_err("%s: GOT/PLT relocations unsupported\n",
 			       module->name);
 			return -ENOEXEC;
 		default:
-			printk(KERN_ERR "%s: unknown relocation: %u\n",
+			pr_err("%s: unknown relocation: %u\n",
 			       module->name,
 			       ELF32_R_TYPE(rela[i].r_info));
 			return -ENOEXEC;
