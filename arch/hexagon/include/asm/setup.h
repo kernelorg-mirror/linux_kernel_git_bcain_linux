@@ -18,4 +18,6 @@ extern u64 boot_dtb_phys;
 
 void __init setup_arch_memory(void);
 
+extern unsigned long external_buffer;
+
 #endif
