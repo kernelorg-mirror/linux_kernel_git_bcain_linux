@@ -26,4 +26,7 @@
 
 extern size_t hexagon_coherent_pool_size;
 
+void __init hexagon_dma_init(void);
+
+
 #endif
