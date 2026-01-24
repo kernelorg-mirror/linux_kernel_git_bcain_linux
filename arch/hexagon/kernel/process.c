@@ -15,6 +15,8 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/tracehook.h>
+#include <asm/hexagon_vm.h>
+#include <asm/notify.h>
 
 /*
  * Program thread launch.  Often defined as a macro in processor.h,
@@ -32,7 +34,20 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
 	/* We might want to also zero all Processor registers here */
 	pt_set_usermode(regs);
 	pt_set_elr(regs, pc);
+	/*
+	 * set user visible sp in case ptrace stops and frisks the process
+	 * before it can issue the first return-to-userspace
+	 */
+	regs->r29 = sp;
+	/*
+	 * need to revisit all these pt_set_ret_sp's; might do away with them
+	 * and just pull from r29 for vmrte in vm_entry.S
+	 */
 	pt_set_rte_sp(regs, sp);
+
+#ifdef CONFIG_HEXAGON_FORCE_USR
+	regs->usr = CONFIG_HEXAGON_USR_VAL;
+#endif
 }
 
 /*
@@ -102,9 +117,13 @@ int copy_thread(unsigned long clone_flags, unsigned long usp, unsigned long arg,
 	if (clone_flags & CLONE_SETTLS)
 		childregs->ugp = tls;
 
+	ti->hvx = NULL;
+	//  TODO:   pull hvx into extensions
+	memset(&ti->extensions, 0, sizeof(struct extinfo));
+
+	atomic_thread_notify(ti, THREAD_EVENT_COPY);
+
 	/*
-	 * Parent sees new pid -- not necessary, not even possible at
-	 * this point in the fork process
 	 * Might also want to set things like ti->addr_limit
 	 */
 
@@ -112,17 +131,27 @@ int copy_thread(unsigned long clone_flags, unsigned long usp, unsigned long arg,
 }
 
 /*
- * Release any architecture-specific resources locked by thread
+ * Called from flush_old_exec and set_new_exec.
  */
-void release_thread(struct task_struct *dead_task)
+void flush_thread(void)
 {
 }
 
 /*
- * Some archs flush debug and FPU info here
+ * Called midway through cleanup in do_exit
  */
-void flush_thread(void)
+void exit_thread(void)
 {
+}
+
+/*
+ * Seems like the latest arch hook for a task that's going away
+ */
+void release_thread(struct task_struct *dead_task)
+{
+	struct thread_info *thread = task_thread_info(dead_task);
+
+	atomic_thread_notify(thread, THREAD_EVENT_RELEASE);
 }
 
 /*
@@ -153,6 +182,11 @@ unsigned long get_wchan(struct task_struct *p)
 	return 0;
 }
 
+void prepare_arch_switch(struct task_struct *next)
+{
+	atomic_thread_notify(next, THREAD_EVENT_SWITCH);
+}
+
 /*
  * Called on the exit path of event entry; see vm_entry.S
  *
@@ -163,11 +197,9 @@ unsigned long get_wchan(struct task_struct *p)
 
 int do_work_pending(struct pt_regs *regs, u32 thread_info_flags)
 {
-	if (!(thread_info_flags & _TIF_WORK_MASK)) {
-		return 0;
-	}  /* shortcut -- no work to be done */
-
 	local_irq_enable();
+
+	blocking_thread_notify(current_thread_info(), THREAD_EVENT_DOWORK);
 
 	if (thread_info_flags & _TIF_NEED_RESCHED) {
 		schedule();
@@ -185,7 +217,6 @@ int do_work_pending(struct pt_regs *regs, u32 thread_info_flags)
 		return 1;
 	}
 
-	/* Should not even reach here */
-	panic("%s: bad thread_info flags 0x%08x\n", __func__,
-		thread_info_flags);
+	return 0;
+
 }
