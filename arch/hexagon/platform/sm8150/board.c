@@ -29,7 +29,7 @@
 #include "board.h"
 #include <linux/module.h>
 
-static const char * const sm8150_dt_compat[] __initconst = {
+static const char *sm8150_dt_compat[] __initconst = {
 	"qcom,sm8150",
 	NULL
 };
@@ -37,7 +37,7 @@ static const char * const sm8150_dt_compat[] __initconst = {
 static struct platform_device *devices[] __initdata = {
 };
 
-const struct of_device_id platform_of_irq_matches[] __initconst = {
+const struct of_device_id platform_of_irq_matches[] __initdata = {
         { .compatible = "qcom,h2-pic", .data = hexagon_pic_of_init, },
 	{},
 };
