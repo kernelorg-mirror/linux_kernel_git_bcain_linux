@@ -13,10 +13,36 @@
 #include <asm/page.h>
 #include <asm/hexagon_vm.h>
 
+#ifdef CONFIG_HEXAGON_SPLIT_2GB
+//  2GB split has more kernel entries
+#define SEGTABLE_ENTRIES #0x1e0
+#else
 #define SEGTABLE_ENTRIES #0x0e0
-
+#endif
 	__INIT
 ENTRY(stext)
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	R27 = R0  /*  Bootloader hands us one value in R0  */
+#ifdef CONFIG_MINIVM
+	/* Virtual machine startup doesn't require lowest level setup */
+	/*  Need to add PHYS_OFFSET very, very early on.  */
+	r1 = PC;
+	//  allow 4MB aligned start offset
+	R2.H = #0xffc0;
+	R24.H = #HI(vm_bootup);
+	R2.L = #0x0000;
+	R24.L = #LO(vm_bootup);
+	r25 = and(r1,r2);
+	//  TODO:  Need an ifdef to only do this when ELF_LOAD_ADDRESS == 0?
+	r24 = add(r25,r24);
+	callr R24;
+#endif
 	/*
 	 * VMM will already have set up true vector page, MMU, etc.
 	 * To set up initial kernel identity map, we have to pass
@@ -90,6 +116,13 @@ ENTRY(stext)
 	memw(r0 ++ #4) = r1
 	{ r1 = add(r1, r2); } :endloop0
 
+
+#define PTE_BITS_16MB ( __HVM_PTE_R | __HVM_PTE_W | __HVM_PTE_X	\
+		  | __HEXAGON_C_WB_L2 << 6			\
+		  | __HVM_PDE_S_16MB)
+
+
+
 	/*  Also need to overwrite the initial 0xc0000000 entries  */
 	/*  PAGE_OFFSET >> (4MB shift - 4 bytes per entry shift)  */
 	R1.H = #HI(PAGE_OFFSET >> (22 - 2))
@@ -100,15 +133,46 @@ ENTRY(stext)
 	r2.h = #0xffc0;
 	r2.l = #0x0000;		/* round back down to 4MB boundary  */
 	r1 = and(r1,r2);	/* for huge page */
-	r2 = #PTE_BITS
+	r2 = #PTE_BITS_16MB
 	r1 = add(r1,r2);
 	r2.h = #0x0040
-	r2.l = #0x0000		/* 4MB increments */
+	r2.l = #0x0000		/* 4MB increments even though we're using 16MB pages */
 
-	loop0(1f,SEGTABLE_ENTRIES);
+	loop0(1f,SEGTABLE_ENTRIES-4);  //  hack -- pull up short on the last 4 to allow 4MB granularity and hijinx
 1:
 	memw(r0 ++ #4) = r1;
 	{ r1 = add(r1,r2); } :endloop0
+
+
+	//  reset r2 back to 4MB pages
+	r1 = lsr(r1, #3);
+	r1 = asl(r1, #3);
+	r1 = add(r1, #__HVM_PDE_S_4MB);
+
+	loop0(1f, #4);
+1:
+	memw(r0 ++ #4) = r1;
+	{ r1 = add(r1,r2); } :endloop0
+
+
+
+#ifdef CONFIG_H2
+	/*  Hopefully we don't need this any earlier than here  */
+	r0.l = #LO(0x00000800);
+	r0.h = #HI(0x00000800);
+	call	__vmversion;
+
+	{
+		r1.l = #LO(PAGE_OFFSET);
+		r2.l = #LO(vmversion);
+	}
+	{
+		r1.h = #HI(PAGE_OFFSET);
+		r2.h = #HI(vmversion);
+	}
+	r1 = sub(r2,r1);  /*  &vmversion - PAGE_OFFSET  */
+	r1 = add(r1,r25); /*  + PHYS_OFFSET */
+#endif
 
 	r0 = r24;
 
@@ -119,6 +183,7 @@ ENTRY(stext)
 	 * vm_ops.S
 	 */
 	r1 = #VM_TRANS_TYPE_TABLE
+	r2 = #VM_TLB_INVALIDATE_TRUE
 	call	__vmnewmap;
 
 	/*  Jump into virtual address range.  */
@@ -147,7 +212,6 @@ __head_s_vaddr_target:
 	r2 = asl(r2, #2)	/* times sizeof(PTE) (4bytes)	*/
 	r1 = add(r1,r2);
 	loop0(1f,r26)
-
 1:
 	{
 		memw(R1 ++ #4) = R0
@@ -155,6 +219,7 @@ __head_s_vaddr_target:
 
 	r0 = r24
 	r1 = #VM_TRANS_TYPE_TABLE
+	r2 = #VM_TLB_INVALIDATE_TRUE
 	call __vmnewmap
 
 	/*  Go ahead and install the trap0 return so angel calls work  */
@@ -197,6 +262,10 @@ __head_s_vaddr_target:
 	r2 = sub(r2,r0);
 	call memset;
 
+	R0.H = #HI(boot_info);
+	R0.L = #LO(boot_info);
+	memw(R0) = R27;  //  save the boot info pointer
+
 	/*  Set PHYS_OFFSET; should be in R25 */
 #ifdef CONFIG_HEXAGON_PHYS_OFFSET
 	r0.l = #LO(__phys_offset);
@@ -213,6 +282,21 @@ __head_s_vaddr_target:
 1:
 	jump 1b
 
+//  Bootloader currently still looks at 4k regardless of page size
+//  Leave enough space for a really ripe device tree blob from the bootloader
+//  Might need to be copied for kexec...
+.p2align 12
+ENTRY(external_buffer)
+	.fill 262144,1,0
+#ifdef CONFIG_HEXAGON_MSS
+	//  This image uses 0x40000000 as the sync mailbox
+.p2align 18
+MBN_IMAGE:
+	.incbin "/usr2/rkuo/outbox/hexagon-linux-0xfcc00000.mbn"
+#endif
+
+
+.data
 .p2align PAGE_SHIFT
-ENTRY(external_cmdline_buffer)
+ENTRY(empty_zero_page)
         .fill _PAGE_SIZE,1,0
