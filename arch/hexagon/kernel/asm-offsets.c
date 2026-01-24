@@ -29,10 +29,15 @@ int main(void)
 	DEFINE(_PAGE_SHIFT, PAGE_SHIFT);
 	BLANK();
 
+	COMMENT("Hexagon HVX_Vectors definitions");
+	OFFSET(_PT_VECPREDSAVE, HVX_Vectors, vecpredsave);
+	OFFSET(_PT_V0, HVX_Vectors, v0);
+
 	COMMENT("Hexagon pt_regs definitions");
 	OFFSET(_PT_SYSCALL_NR, pt_regs, syscall_nr);
 	OFFSET(_PT_GPUGP, pt_regs, gpugp);
 	OFFSET(_PT_CS1CS0, pt_regs, cs1cs0);
+
 	OFFSET(_PT_R3130, pt_regs, r3130);
 	OFFSET(_PT_R2928, pt_regs, r2928);
 	OFFSET(_PT_R2726, pt_regs, r2726);
@@ -63,8 +68,10 @@ int main(void)
 
 	COMMENT("Hexagon thread_info definitions");
 	OFFSET(_THREAD_INFO_FLAGS, thread_info, flags);
+	OFFSET(_THREAD_INFO_CPU, thread_info, cpu);
 	OFFSET(_THREAD_INFO_PT_REGS, thread_info, regs);
 	OFFSET(_THREAD_INFO_SP, thread_info, sp);
+
 	DEFINE(_THREAD_SIZE, THREAD_SIZE);
 	BLANK();
 
