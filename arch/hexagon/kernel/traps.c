@@ -372,10 +372,17 @@ void do_trap0(struct pt_regs *regs)
 		regs->restart_r0 = regs->r00;
 
 		if ((unsigned long) regs->syscall_nr >= __NR_syscalls) {
-			regs->r00 = -1;
+			regs->r00 = -ENOSYS;
 		} else {
 			syscall = (syscall_fn)
 				  (sys_call_table[regs->syscall_nr]);
+
+			/* Check for unimplemented syscall (NULL entry in table) */
+			if (!syscall) {
+				regs->r00 = -ENOSYS;
+				break;
+			}
+
 			regs->r00 = syscall(regs->r00, regs->r01,
 				   regs->r02, regs->r03,
 				   regs->r04, regs->r05);
