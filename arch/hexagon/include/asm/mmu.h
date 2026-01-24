@@ -17,6 +17,7 @@ struct mm_context {
 	unsigned long long generation;
 	unsigned long ptbase;
 	struct hexagon_vdso *vdso;
+	bool need_invalidate;
 };
 
 typedef struct mm_context mm_context_t;
