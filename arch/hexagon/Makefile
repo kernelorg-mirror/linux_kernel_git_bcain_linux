@@ -30,6 +30,12 @@ KBUILD_AFLAGS += $(aflags-y)
 #  no KBUILD_LDFLAGS?
 LDFLAGS += $(ldflags-y)
 
+# Set linker emulation for hexagon (needed for empty archive linking)
+LDFLAGS += -m hexagonelf
+
+# Allow multiple definitions (kernel bsearch vs libc bsearch)
+LDFLAGS += --allow-multiple-definition
+
 # Thread-info register will be r19.  This value is not configureable;
 # it is hard-coded in several files.
 TIR_NAME := r19
