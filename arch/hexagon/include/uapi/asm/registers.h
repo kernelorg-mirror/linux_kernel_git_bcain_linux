@@ -9,6 +9,50 @@
 
 #ifndef __ASSEMBLY__
 
+typedef long HEXAGON_VecPred128 __attribute__((__vector_size__(128)))
+  __attribute__((aligned(128)));
+typedef long HEXAGON_Vect1024 __attribute__((__vector_size__(128)))
+  __attribute__((aligned(128)));
+#define HVX_VectorPred     HEXAGON_VecPred128
+#define HVX_Vector         HEXAGON_Vect1024
+
+struct HVX_Vectors {
+	HVX_Vector v0;
+	HVX_Vector v1;
+	HVX_Vector v2;
+	HVX_Vector v3;
+	HVX_Vector v4;
+	HVX_Vector v5;
+	HVX_Vector v6;
+	HVX_Vector v7;
+	HVX_Vector v8;
+	HVX_Vector v9;
+	HVX_Vector v10;
+	HVX_Vector v11;
+	HVX_Vector v12;
+	HVX_Vector v13;
+	HVX_Vector v14;
+	HVX_Vector v15;
+	HVX_Vector v16;
+	HVX_Vector v17;
+	HVX_Vector v18;
+	HVX_Vector v19;
+	HVX_Vector v20;
+	HVX_Vector v21;
+	HVX_Vector v22;
+	HVX_Vector v23;
+	HVX_Vector v24;
+	HVX_Vector v25;
+	HVX_Vector v26;
+	HVX_Vector v27;
+	HVX_Vector v28;
+	HVX_Vector v29;
+	HVX_Vector v30;
+	HVX_Vector v31;
+	/* hvx vector predicate registers */
+	HVX_Vector vecpredsave;
+};
+
 /*  See kernel/entry.S for further documentation.  */
 
 /*
@@ -187,7 +231,7 @@ struct pt_regs {
 		long long int r3130;
 	};
 	/* VM dispatch pushes event record onto stack - we can build on it */
-	struct hvm_event_record hvmer;
+	struct hvm_event_record hvmer __attribute__ ((aligned (8)));
 };
 
 /* Defines to conveniently access the values  */
