@@ -72,6 +72,22 @@ static int __init early_init_dt_scan_chosen_noinitrd(unsigned long node, const c
 
 
 /*
+ * Iterator for of_flat_dt_match_machine
+ */
+static const void * __init arch_get_next_mach(const char *const **match)
+{
+	static const struct machine_desc *mdesc = __arch_info_begin;
+	const struct machine_desc *m = mdesc;
+
+	if (m >= __arch_info_end)
+		return NULL;
+
+	mdesc++;
+	*match = m->dt_compat;
+	return m;
+}
+
+/*
  * setup_machine_fdt - set up machine based on dtb passed to kernel
  * @dt_phys: physical address of dtb
  *
@@ -85,10 +101,9 @@ static int __init early_init_dt_scan_chosen_noinitrd(unsigned long node, const c
  * Also since we're always being fired up by the hypervisor, then
  * we are already running with the MMU on with an init segtable.
  */
-struct machine_desc * __init setup_machine_fdt(void *dt_phys)
+const struct machine_desc * __init setup_machine_fdt(void *dt_phys)
 {
-	struct machine_desc *mdesc, *mdesc_best = NULL;
-	unsigned int score, mdesc_score = ~1;
+	const struct machine_desc *mdesc_best = NULL;
 	unsigned long dt_root;
 
 #ifdef CONFIG_HEXAGON_MSM8974_FLUID
@@ -114,13 +129,7 @@ struct machine_desc * __init setup_machine_fdt(void *dt_phys)
 
 	dt_root = of_get_flat_dt_root();
 
-	for_each_machine_desc(mdesc) {
-		score = of_flat_dt_match(dt_root, mdesc->dt_compat);
-		if (score > 0 && score < mdesc_score) {
-			mdesc_best = mdesc;
-			mdesc_score = score;
-		}
-	}
+	mdesc_best = of_flat_dt_match_machine(NULL, arch_get_next_mach);
 
 	if (!mdesc_best) {
 		panic("Unrecognized device tree\n");
