@@ -17,6 +17,9 @@
 /* A handy thing to have if one has the RAM. Declared in head.S */
 extern unsigned long empty_zero_page;
 
+extern pmd_t _K_io_map;
+extern pte_t _K_init_devicetable;
+
 /*
  * The PTE model described here is that of the Hexagon Virtual Machine,
  * which autonomously walks 2-level page tables.  At a lower level, we
@@ -35,23 +38,25 @@ extern unsigned long empty_zero_page;
 #define _PAGE_EXECUTE	__HVM_PTE_X
 #define _PAGE_USER	__HVM_PTE_U
 
+#define _PAGE_PERM_MASK	(_PAGE_READ | _PAGE_WRITE | _PAGE_EXECUTE | _PAGE_USER)
+#define _SWAP_PERM	(_PAGE_USER)
+#define _NO_PERM	(_PAGE_READ)
 /*
- * We have a total of 4 "soft" bits available in the abstract PTE.
- * The two mandatory software bits are Dirty and Accessed.
- * To make nonlinear swap work according to the more recent
- * model, we want a low order "Present" bit to indicate whether
- * the PTE describes MMU programming or swap space.
+ * The lone software bit we have is used to track dirty.
  */
-#define _PAGE_PRESENT	(1<<0)
-#define _PAGE_DIRTY	(1<<1)
-#define _PAGE_ACCESSED	(1<<2)
+#define _PAGE_DIRTY	(1<<3)
 
 /*
- * For now, let's say that Valid and Present are the same thing.
- * Alternatively, we could say that it's the "or" of R, W, and X
- * permissions.
+ * We're using _PAGE_EXECUTE as our "accessed" bit because we don't
+ * have any more bits to spare.  protection_map only cares about the
+ * X bit in the case of PROT_NONE, for which we can just turn off the
+ * U (user) bit to signify.
+ * If we take an X fault on that page, the fault code runs a mkyoung
+ * on it anyways, which will re-enable it and signify accessed
+ * at the same time.
  */
-#define _PAGE_VALID	_PAGE_PRESENT
+
+#define _PAGE_ACCESSED	_PAGE_EXECUTE
 
 /*
  * We're not defining _PAGE_GLOBAL here, since there's no concept
@@ -95,7 +100,7 @@ extern unsigned long empty_zero_page;
 
 /*  Any bigger and the PTE disappears.  */
 #define pgd_ERROR(e) \
-	printk(KERN_ERR "%s:%d: bad pgd %08lx.\n", __FILE__, __LINE__,\
+	printk(KERN_WARNING "%s:%d: bad pgd %08lx.\n", __FILE__, __LINE__,\
 		pgd_val(e))
 
 /*
@@ -103,61 +108,49 @@ extern unsigned long empty_zero_page;
  */
 extern unsigned long _dflt_cache_att;
 
-#define PAGE_NONE	__pgprot(_PAGE_PRESENT | _PAGE_USER | \
-				_dflt_cache_att)
-#define PAGE_READONLY	__pgprot(_PAGE_PRESENT | _PAGE_USER | \
-				_PAGE_READ | _PAGE_EXECUTE | _dflt_cache_att)
-#define PAGE_COPY	PAGE_READONLY
-#define PAGE_EXEC	__pgprot(_PAGE_PRESENT | _PAGE_USER | \
-				_PAGE_READ | _PAGE_EXECUTE | _dflt_cache_att)
-#define PAGE_COPY_EXEC	PAGE_EXEC
-#define PAGE_SHARED	__pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_READ | \
-				_PAGE_EXECUTE | _PAGE_WRITE | _dflt_cache_att)
-#define PAGE_KERNEL	__pgprot(_PAGE_PRESENT | _PAGE_READ | \
+/*  PROT_NONE still should show up as present but !pte_none */
+#define PAGE_NONE	__pgprot(_NO_PERM | _dflt_cache_att)
+#define PAGE_KERNEL	__pgprot(_PAGE_READ | \
 				_PAGE_WRITE | _PAGE_EXECUTE | _dflt_cache_att)
-
 
 /*
  * Aliases for mapping mmap() protection bits to page protections.
  * These get used for static initialization, so using the _dflt_cache_att
  * variable for the default cache attribute isn't workable. If the
  * default gets changed at boot time, the boot option code has to
- * update data structures like the protaction_map[] array.
+ * update data structures like the protection_map[] array.
  */
 #define CACHEDEF	(CACHE_DEFAULT << 6)
 
 /* Private (copy-on-write) page protections. */
-#define __P000 __pgprot(_PAGE_PRESENT | _PAGE_USER | CACHEDEF)
-#define __P001 __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_READ | CACHEDEF)
+#define __P000 __pgprot(_NO_PERM | CACHEDEF)
+#define __P001 __pgprot(_PAGE_USER | _PAGE_READ | CACHEDEF)
 #define __P010 __P000	/* Write-only copy-on-write */
 #define __P011 __P001	/* Read/Write copy-on-write */
-#define __P100 __pgprot(_PAGE_PRESENT | _PAGE_USER | \
-			_PAGE_EXECUTE | CACHEDEF)
-#define __P101 __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_EXECUTE | \
-			_PAGE_READ | CACHEDEF)
+#define __P100 __pgprot(_PAGE_USER | _PAGE_READ | CACHEDEF)
+#define __P101 __pgprot(_PAGE_USER | _PAGE_READ | CACHEDEF)
 #define __P110 __P100	/* Write/execute copy-on-write */
 #define __P111 __P101	/* Read/Write/Execute, copy-on-write */
 
 /* Shared page protections. */
 #define __S000 __P000
 #define __S001 __P001
-#define __S010 __pgprot(_PAGE_PRESENT | _PAGE_USER | \
-			_PAGE_WRITE | CACHEDEF)
-#define __S011 __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_READ | \
-			_PAGE_WRITE | CACHEDEF)
-#define __S100 __pgprot(_PAGE_PRESENT | _PAGE_USER | \
-			_PAGE_EXECUTE | CACHEDEF)
+#define __S010 __pgprot(_PAGE_USER | _PAGE_WRITE | CACHEDEF)
+#define __S011 __pgprot(_PAGE_USER | _PAGE_READ | _PAGE_WRITE | CACHEDEF)
+#define __S100 __pgprot(_PAGE_USER | _PAGE_READ | CACHEDEF)
 #define __S101 __P101
-#define __S110 __pgprot(_PAGE_PRESENT | _PAGE_USER | \
-			_PAGE_EXECUTE | _PAGE_WRITE | CACHEDEF)
-#define __S111 __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_READ | \
-			_PAGE_EXECUTE | _PAGE_WRITE | CACHEDEF)
+#define __S110 __pgprot(_PAGE_USER | _PAGE_WRITE | CACHEDEF)
+#define __S111 __pgprot(_PAGE_USER | _PAGE_READ | _PAGE_WRITE | CACHEDEF)
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];  /* located in head.S */
 
-/*  HUGETLB not working currently  */
+/* Seems to be zero even in architectures where the zero page is firewalled? */
+#define FIRST_USER_ADDRESS	0UL
+#define pte_special(pte)	0
+#define pte_mkspecial(pte)	(pte)
 #ifdef CONFIG_HUGETLB_PAGE
-#define pte_mkhuge(pte) __pte((pte_val(pte) & ~0x3) | HVM_HUGEPAGE_SIZE)
+#define pte_huge(pte)	((pte_val(pte) & 0x7) == HVM_HUGEPAGE_SIZE)
+#define pte_mkhuge(pte)	__pte((pte_val(pte) & ~0x7) | HVM_HUGEPAGE_SIZE)
 #endif
 
 /*
@@ -166,28 +159,21 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];  /* located in head.S */
  */
 extern void sync_icache_dcache(pte_t pte);
 
-#define pte_present_exec_user(pte) \
-	((pte_val(pte) & (_PAGE_EXECUTE | _PAGE_USER)) == \
-	(_PAGE_EXECUTE | _PAGE_USER))
-
 static inline void set_pte(pte_t *ptep, pte_t pteval)
 {
-	/*  should really be using pte_exec, if it weren't declared later. */
-	if (pte_present_exec_user(pteval))
-		sync_icache_dcache(pteval);
-
 	*ptep = pteval;
 }
 
 /*
  * For the Hexagon Virtual Machine MMU (or its emulation), a null/invalid
- * L1 PTE (PMD/PGD) has 7 in the least significant bits. For the L2 PTE
- * (Linux PTE), the key is to have bits 11..9 all zero.  We'd use 0x7
- * as a universal null entry, but some of those least significant bits
- * are interpreted by software.
+ * L1 PTE (PMD/PGD) has 7 in the least significant bits.
+ */
+
+/*
+ * Hugetlb implementation currently relies on these being the same.
  */
 #define _NULL_PMD	0x7
-#define _NULL_PTE	0x0
+#define _NULL_PTE	_NULL_PMD
 
 static inline void pmd_clear(pmd_t *pmd_entry_ptr)
 {
@@ -232,6 +218,14 @@ static inline int pmd_present(pmd_t pmd)
  */
 static inline int pmd_bad(pmd_t pmd)
 {
+	pte_t *pte = (pte_t *) &pmd;
+
+#ifdef CONFIG_HUGETLB_PAGE
+	//  total hack:  if it's a hugetlb pmd, call it "bad" so free_pgd_range will wipe it out.  I hopez.
+	if (pte_huge(*pte)) {
+		return 1;
+	}
+#endif
 	return 0;
 }
 
@@ -254,12 +248,21 @@ static inline int pte_none(pte_t pte)
 	return pte_val(pte) == _NULL_PTE;
 };
 
+#define pte_match_perm(pte, perm)	((pte_val(pte) & _PAGE_PERM_MASK) == perm)
+
 /*
  * pte_present - check if page is present
  */
 static inline int pte_present(pte_t pte)
 {
-	return pte_val(pte) & _PAGE_PRESENT;
+	int swap = pte_match_perm(pte, _SWAP_PERM);
+
+	/*
+	 * since pte_none isn't a subset of !pte_present like it used to be,
+	 * we seem to need to check for that here as well; see change_pte_range
+	 */
+
+	return !swap && !pte_none(pte);
 }
 
 /* mk_pte - make a PTE out of a page pointer and protection bits */
@@ -320,39 +323,51 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t prot)
 static inline pte_t pte_wrprotect(pte_t pte)
 {
 	pte_val(pte) &= ~_PAGE_WRITE;
+
+	if (pte_match_perm(pte, _SWAP_PERM)) {
+		pte_val(pte) &= ~_PAGE_PERM_MASK;
+		pte_val(pte) |= _NO_PERM;
+	}	/*  This would have made it look like swap  */
+
 	return pte;
 }
 
 /* pte_mkwrite - mark page as writable */
 static inline pte_t pte_mkwrite(pte_t pte)
 {
+	if (pte_match_perm(pte, _NO_PERM)) {
+		/*  Essentially clear the read and set the user  */
+		pte_val(pte) &= ~_PAGE_PERM_MASK;
+		pte_val(pte) |= _PAGE_USER;
+	}
 	pte_val(pte) |= _PAGE_WRITE;
-	return pte;
-}
-
-/* pte_mkexec - mark PTE as executable */
-static inline pte_t pte_mkexec(pte_t pte)
-{
-	pte_val(pte) |= _PAGE_EXECUTE;
 	return pte;
 }
 
 /* pte_read - "is PTE marked as readable?" */
 static inline int pte_read(pte_t pte)
 {
+	if (pte_match_perm(pte, _NO_PERM)) {
+		return 0;
+	}
 	return pte_val(pte) & _PAGE_READ;
 }
 
 /* pte_write - "is PTE marked as writable?" */
 static inline int pte_write(pte_t pte)
 {
+	if (pte_match_perm(pte, _NO_PERM)) {
+		return 0;
+	}
 	return pte_val(pte) & _PAGE_WRITE;
 }
-
 
 /* pte_exec - "is PTE marked as executable?" */
 static inline int pte_exec(pte_t pte)
 {
+	if (pte_match_perm(pte, _NO_PERM)) {
+		return 0;
+	}
 	return pte_val(pte) & _PAGE_EXECUTE;
 }
 
@@ -386,35 +401,35 @@ static inline unsigned long pmd_page_vaddr(pmd_t pmd)
 #define ZERO_PAGE(vaddr) (virt_to_page(&empty_zero_page))
 
 /*
- * Swap/file PTE definitions.  If _PAGE_PRESENT is zero, the rest of the PTE is
- * interpreted as swap information.  The remaining free bits are interpreted as
- * swap type/offset tuple.  Rather than have the TLB fill handler test
- * _PAGE_PRESENT, we're going to reserve the permissions bits and set them to
- * all zeros for swap entries, which speeds up the miss handler at the cost of
- * 3 bits of offset.  That trade-off can be revisited if necessary, but Hexagon
- * processor architecture and target applications suggest a lot of TLB misses
- * and not much swap space.
+ * Swap/file PTE definitions.  If the page is marked with _SWAP_PERM, the rest
+ * of the PTE is interpreted as swap information.  The remaining free bits are
+ * interpreted as swap type/offset tuple.
  *
  * Format of swap PTE:
- *	bit	0:	Present (zero)
- *	bits	1-5:	swap type (arch independent layer uses 5 bits max)
- *	bits	6-9:	bits 3:0 of offset
- *	bits	10-12:	effectively _PAGE_PROTNONE (all zero)
- *	bits	13-31:  bits 22:4 of swap offset
  *
- * The split offset makes some of the following macros a little gnarly,
- * but there's plenty of precedent for this sort of thing.
+ *      bits	[4-0]:		swap type
+ * 	bit	5:		PAGE_USER - must be 1 (_SWAP_PERM)
+ *      bit	6:		reserved
+ *      bit	7:		reserved
+ *      bit	8:		reserved
+ *  	bit	9:		PAGE_READ - must be 0 (_SWAP_PERM)
+ *  	bit	10:		PAGE_WRITE - must be 0 (_SWAP_PERM)
+ *  	bit	11:		PAGE_EXECUTE - must be 0 (_SWAP_PERM)
+ *      bits	[31-12]:	swap offset (22 bits)
+ *
  */
 
 /* Used for swap PTEs */
-#define __swp_type(swp_pte)		(((swp_pte).val >> 1) & 0x1f)
+#define __swp_type(swp_pte)		((swp_pte).val & 0x1f)
+
 
 #define __swp_offset(swp_pte) \
-	((((swp_pte).val >> 6) & 0xf) | (((swp_pte).val >> 9) & 0x7ffff0))
+	((swp_pte).val >> 12)
+
 
 #define __swp_entry(type, offset) \
 	((swp_entry_t)	{ \
-		((type << 1) | \
-		 ((offset & 0x7ffff0) << 9) | ((offset & 0xf) << 6)) })
+		((type & 0x1f) | (_PAGE_USER) | \
+		 (offset << 12)) })
 
 #endif
