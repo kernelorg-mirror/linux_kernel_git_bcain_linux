@@ -19,7 +19,16 @@
  * We don't have PCI yet.
  * _IO_BASE is pointing at what should be unused virtual space.
  */
-#define IO_SPACE_LIMIT 0xffff
+
+/*
+ * FIXME IO_SPACE_LIMIT is set to the full range because we are reusing drivers
+ * without PCI which might just be sitting somewhere in memory.
+ * IO_COND should redirect the ioread/iowrite to use MMIO instead of
+ * port accesses, which will fail in runtime because __IO_BASE is off in
+ * space.  It should be set to something low like 0xffff.
+ */
+
+#define IO_SPACE_LIMIT 0xffffffff
 #define _IO_BASE ((void __iomem *)0xfe000000)
 
 #define IOMEM(x)        ((void __force __iomem *)(x))
