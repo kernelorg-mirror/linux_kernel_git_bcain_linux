@@ -26,6 +26,8 @@
 
 struct pt_regs;
 void arch_do_IRQ(struct pt_regs *);
+void vmsetie_rte_disable(void);
+void vmsetie_disable(void);
 
 #include <linux/of.h>
 
