@@ -9,18 +9,27 @@
 #include <linux/sched/signal.h>
 #include <linux/sched/debug.h>
 #include <linux/sched/task_stack.h>
+#include <linux/workqueue.h>
+#include <linux/wait.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/kdebug.h>
 #include <linux/syscalls.h>
 #include <linux/signal.h>
 #include <linux/tracehook.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
+#include <asm/barrier.h>
+#include <asm/hexagon_vm.h>
+#include <asm/hexagon_debug.h>
 #include <asm/traps.h>
 #include <asm/vm_fault.h>
 #include <asm/syscall.h>
 #include <asm/registers.h>
 #include <asm/unistd.h>
 #include <asm/sections.h>
+#include <asm/hvx.h>
+#include <asm/notify.h>
 #ifdef CONFIG_KGDB
 # include <linux/kgdb.h>
 #endif
@@ -45,12 +54,17 @@ static const char *ex_name(int ex)
 	switch (ex) {
 	case HVM_GE_C_XPROT:
 	case HVM_GE_C_XUSER:
+	case HVM_GE_C_TLBMISSX_0:
+	case HVM_GE_C_TLBMISSX_1:
+	case HVM_GE_C_TLBMISSX_ICINVA:
 		return "Execute protection fault";
 	case HVM_GE_C_RPROT:
 	case HVM_GE_C_RUSER:
+	case HVM_GE_C_TLBMISSR:
 		return "Read protection fault";
 	case HVM_GE_C_WPROT:
 	case HVM_GE_C_WUSER:
+	case HVM_GE_C_TLBMISSW:
 		return "Write protection fault";
 	case HVM_GE_C_XMAL:
 		return "Misaligned instruction";
@@ -69,6 +83,8 @@ static const char *ex_name(int ex)
 		return "Precise bus error";
 	case HVM_GE_C_CACHE:
 		return "Cache error";
+	case HVM_GE_C_COPROC:
+		return "Illegal Coproc instruction";
 
 	case 0xdb:
 		return "Debugger trap";
@@ -233,12 +249,22 @@ int die_if_kernel(char *str, struct pt_regs *regs, long err)
 		return 0;
 }
 
+extern u32 sig_debug;
+
+static void dump_sig_debug(struct pt_regs *regs) {
+	printk(KERN_WARNING "PID %d SIGNAL\n", current_thread_info()->task->pid);
+	show_regs(regs);
+}
+
+
 /*
  * It's not clear that misaligned fetches are ever recoverable.
  */
 static void misaligned_instruction(struct pt_regs *regs)
 {
 	die_if_kernel("Misaligned Instruction", regs, 0);
+	if (sig_debug)
+		dump_sig_debug(regs);
 	force_sig(SIGBUS, current);
 }
 
@@ -250,19 +276,34 @@ static void misaligned_instruction(struct pt_regs *regs)
 static void misaligned_data_load(struct pt_regs *regs)
 {
 	die_if_kernel("Misaligned Data Load", regs, 0);
+	if (sig_debug)
+		dump_sig_debug(regs);
 	force_sig(SIGBUS, current);
 }
 
 static void misaligned_data_store(struct pt_regs *regs)
 {
 	die_if_kernel("Misaligned Data Store", regs, 0);
+	if (sig_debug)
+		dump_sig_debug(regs);
 	force_sig(SIGBUS, current);
 }
 
 static void illegal_instruction(struct pt_regs *regs)
 {
+	siginfo_t info = { 0 };
+
 	die_if_kernel("Illegal Instruction", regs, 0);
-	force_sig(SIGILL, current);
+
+	if (sig_debug)
+		dump_sig_debug(regs);
+
+	info.si_signo = SIGILL;
+	info.si_errno = 0;
+	info.si_code = ILL_ILLOPC;
+	info.si_addr = pt_elr(regs);
+
+	force_sig_info(info.si_signo, &info, current);
 }
 
 /*
@@ -272,6 +313,8 @@ static void illegal_instruction(struct pt_regs *regs)
 static void precise_bus_error(struct pt_regs *regs)
 {
 	die_if_kernel("Precise Bus Error", regs, 0);
+	if (sig_debug)
+		dump_sig_debug(regs);
 	force_sig(SIGBUS, current);
 }
 
@@ -285,11 +328,25 @@ static void cache_error(struct pt_regs *regs)
 	die("Cache Error", regs, 0);
 }
 
+static void coproc_fault(struct pt_regs *regs)
+{
+	atomic_set(&coproc_notify_cnt, 0);
+
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_FAULT_COPROC);
+
+	if (atomic_read(&coproc_notify_cnt) == 0) {
+		force_sig(SIGFPE, current);
+	}
+}
+
 /*
  * General exception handler
  */
 void do_genex(struct pt_regs *regs)
 {
+	clear_ie_cached();
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
+
 	/*
 	 * Decode Cause and Dispatch
 	 */
@@ -331,6 +388,9 @@ void do_genex(struct pt_regs *regs)
 	case HVM_GE_C_CACHE:
 		cache_error(regs);
 		break;
+	case HVM_GE_C_COPROC:
+		coproc_fault(regs);
+		break;
 	default:
 		/* Halt and catch fire */
 		panic("Unrecognized exception 0x%lx\n", pt_cause(regs));
@@ -349,6 +409,9 @@ void do_trap0(struct pt_regs *regs)
 {
 	syscall_fn syscall;
 
+	clear_ie_cached();
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
+
 	switch (pt_cause(regs)) {
 	case TRAP_SYSCALL:
 		/* System call is trap0 #1 */
@@ -359,7 +422,7 @@ void do_trap0(struct pt_regs *regs)
 			return;  /*  return -ENOSYS somewhere?  */
 
 		/* Interrupts should be re-enabled for syscall processing */
-		__vmsetie(VM_INT_ENABLE);
+		vmsetie_cached(VM_INT_ENABLE);
 
 		/*
 		 * System call number is in r6, arguments in r0..r5.
@@ -386,9 +449,20 @@ void do_trap0(struct pt_regs *regs)
 		} else {
 			syscall = (syscall_fn)
 				  (sys_call_table[regs->syscall_nr]);
+
+			if (kernel_strace > 0)
+				printk("%d %s %pf elr=0x%08x sp=0x%08x\n", current->pid, current->comm, syscall, regs->hvmer.vmel, pt_psp(regs));
+
+			if (kernel_strace > 1)
+				printk("%d %08x %08x %08x %08x %08x %08x\n", current->pid,
+					regs->r00, regs->r01, regs->r02, regs->r03, regs->r04, regs->r05);
+
 			regs->r00 = syscall(regs->r00, regs->r01,
 				   regs->r02, regs->r03,
 				   regs->r04, regs->r05);
+
+			if (kernel_strace > 2)
+				printk("%d ret:  %x\n", current->pid, regs->r00);
 		}
 
 		/* allow strace to get the syscall return state  */
@@ -424,8 +498,10 @@ void do_trap0(struct pt_regs *regs)
  */
 void do_machcheck(struct pt_regs *regs)
 {
+	clear_ie_cached();
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
 	/* Halt and catch fire */
-	__vmstop();
+	__vmstop(machinecheck);
 }
 
 /*
@@ -434,7 +510,15 @@ void do_machcheck(struct pt_regs *regs)
 
 void do_debug_exception(struct pt_regs *regs)
 {
+	/*  normally we clear ie cached, but we're calling do_trap0 anyways  */
 	regs->hvmer.vmest &= ~HVM_VMEST_CAUSE_MSK;
 	regs->hvmer.vmest |= (TRAP_DEBUG << HVM_VMEST_CAUSE_SFT);
 	do_trap0(regs);
 }
+
+void abort(void)
+{
+	BUG();
+	panic("Oops failed to kill thread");
+}
+EXPORT_SYMBOL(abort);
