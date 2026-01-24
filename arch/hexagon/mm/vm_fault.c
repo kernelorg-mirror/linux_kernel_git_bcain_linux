@@ -45,37 +45,9 @@
 #define FLT_STORE       1
 
 
-extern void show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid);
-
 void show_vma_map(void)
 {
-	struct seq_file m;  /*  no idea why they called it 'm'  */
-	int is_pid = 1;
-	struct vm_area_struct *vma = current->mm->mmap;
-
-	char *wtf;
-
-	//  increment the mm users?
-
-	memset(&m, 0, sizeof(m));
-
-	//  prepare the seq_file
-	m.buf = kmalloc(PAGE_SIZE, GFP_KERNEL | __GFP_NORETRY | __GFP_NOWARN);
-	BUG_ON(!m.buf);
-	m.size = PAGE_SIZE;
-
-	//  walk the mmap and dump everything
-	while (vma) {
-		show_map_vma(&m, vma, is_pid);
-		vma = vma->vm_next;
-	}
-	//  dump the seq_file buffer
-	wtf = m.buf;
-	while (wtf != (m.buf + m.count)) {
-		printk("%c", *wtf);
-		wtf++;
-	}
-	kfree(m.buf);
+	/* Debug function - stubbed out for compatibility */
 }
 
 /*
