@@ -58,11 +58,8 @@ extern void flush_cache_all_hexagon(void);
  * clean the cache when the PTE is set.
  *
  */
-static inline void update_mmu_cache(struct vm_area_struct *vma,
-					unsigned long address, pte_t *ptep)
-{
-	/*  generic_ptrace_pokedata doesn't wind up here, does it?  */
-}
+void update_mmu_cache(struct vm_area_struct *vma,
+					unsigned long address, pte_t *ptep);
 
 void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 		       unsigned long vaddr, void *dst, void *src, int len);
