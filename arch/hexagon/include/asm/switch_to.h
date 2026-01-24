@@ -10,6 +10,8 @@
 
 struct thread_struct;
 
+void prepare_arch_switch(struct task_struct *next);
+
 extern struct task_struct *__switch_to(struct task_struct *,
 	struct task_struct *,
 	struct task_struct *);
