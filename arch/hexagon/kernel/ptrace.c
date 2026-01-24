@@ -15,8 +15,8 @@
 #include <linux/regset.h>
 #include <linux/user.h>
 #include <linux/elf.h>
-
 #include <asm/user.h>
+#include <asm/hvx.h>
 
 #if arch_has_single_step()
 /*  Both called from ptrace_resume  */
@@ -60,7 +60,7 @@ static int genregs_get(struct task_struct *target,
 	membuf_store(&to, pt_elr(regs)); // pc
 	membuf_store(&to, (unsigned long)pt_cause(regs)); // cause
 	membuf_store(&to, pt_badva(regs)); // badva
-#if CONFIG_HEXAGON_ARCH_VERSION >=4
+#if defined(CONFIG_HEXAGON_ARCH_VERSION) && CONFIG_HEXAGON_ARCH_VERSION >= 4
 	membuf_store(&to, regs->cs0);
 	membuf_store(&to, regs->cs1);
 	return membuf_zero(&to, sizeof(unsigned long));
@@ -74,7 +74,7 @@ static int genregs_set(struct task_struct *target,
 		   unsigned int pos, unsigned int count,
 		   const void *kbuf, const void __user *ubuf)
 {
-	int ret, ignore_offset;
+	int ret;
 	unsigned long bucket;
 	struct pt_regs *regs = task_pt_regs(target);
 
@@ -108,18 +108,13 @@ static int genregs_set(struct task_struct *target,
 	INEXT(&bucket, cause);
 	INEXT(&bucket, badva);
 
-#if CONFIG_HEXAGON_ARCH_VERSION >=4
 	INEXT(&regs->cs0, cs0);
 	INEXT(&regs->cs1, cs1);
-	ignore_offset = offsetof(struct user_regs_struct, pad1);
-#else
-	ignore_offset = offsetof(struct user_regs_struct, cs0);
-#endif
 
 	/* Ignore the rest, if needed */
 	if (!ret)
 		user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf,
-					  ignore_offset, -1);
+			offsetof(struct user_regs_struct, pad1), -1);
 	else
 		return ret;
 
@@ -131,8 +126,51 @@ static int genregs_set(struct task_struct *target,
 	return 0;
 }
 
+/*
+ * HVX (vector) register support for ptrace
+ */
+static int fpregs_get(struct task_struct *target,
+		   const struct user_regset *regset,
+		   struct membuf to)
+{
+	struct thread_info *ti = task_thread_info(target);
+
+	if (!ti->hvx)
+		return -EIO;
+
+	/* 32 vector regs + 1 vecpredregs  == 33 */
+	return membuf_write(&to, ti->hvx->vregs, 33*sizeof(HVX_Vector));
+}
+
+static int fpregs_set(struct task_struct *target,
+		   const struct user_regset *regset,
+		   unsigned int pos, unsigned int count,
+		   const void *kbuf, const void __user *ubuf)
+{
+	int ret;
+	struct thread_info *ti = task_thread_info(target);
+
+	if (!ti->hvx)
+		return -EIO;
+
+	/* 32 vector regs + 1 vecpredregs  == 33 */
+	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+				 ti->hvx->vregs, 0, 33*sizeof(HVX_Vector));
+
+	return ret;
+}
+
+static int fpregs_active(struct task_struct *target,
+                         const struct user_regset *regset)
+{
+	struct thread_info *thread = task_thread_info(target);
+
+	return (int)(thread->hvx != NULL);
+}
+
 enum hexagon_regset {
 	REGSET_GENERAL,
+	REGSET_FPU,
 };
 
 static const struct user_regset hexagon_regsets[] = {
@@ -144,6 +182,16 @@ static const struct user_regset hexagon_regsets[] = {
 		.regset_get = genregs_get,
 		.set = genregs_set,
 	},
+	[REGSET_FPU] = {
+                .core_note_type = NT_PRFPREG,
+                .n              = sizeof(struct user_fpregs_struct) /
+                                  sizeof(HVX_Vector),
+                .size           = sizeof(HVX_Vector),
+                .align          = sizeof(HVX_Vector),
+                .regset_get     = fpregs_get,
+                .set            = fpregs_set,
+                .active         = fpregs_active,
+	},
 };
 
 static const struct user_regset_view hexagon_user_view = {
@@ -151,7 +199,6 @@ static const struct user_regset_view hexagon_user_view = {
 	.e_machine = ELF_ARCH,
 	.ei_osabi = ELF_OSABI,
 	.regsets = hexagon_regsets,
-	.e_flags = ELF_CORE_EFLAGS,
 	.n = ARRAY_SIZE(hexagon_regsets)
 };
 
