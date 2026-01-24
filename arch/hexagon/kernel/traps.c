@@ -65,6 +65,13 @@ static const char *ex_name(int ex)
 		return "Precise bus error";
 	case HVM_GE_C_CACHE:
 		return "Cache error";
+	case HVM_GE_C_TLBMISSX_0:
+	case HVM_GE_C_TLBMISSX_1:
+		return "TLB miss execute";
+	case HVM_GE_C_TLBMISSR:
+		return "TLB miss read";
+	case HVM_GE_C_TLBMISSW:
+		return "TLB miss write";
 
 	case 0xdb:
 		return "Debugger trap";
@@ -192,7 +199,7 @@ int die(const char *str, struct pt_regs *regs, long err)
 
 	spin_lock_irq(&die.lock);
 	bust_spinlocks(1);
-	printk(KERN_EMERG "Oops: %s[#%d]:\n", str, ++die.counter);
+	pr_emerg("Oops: %s[#%d]:\n", str, ++die.counter);
 
 	if (notify_die(DIE_OOPS, str, regs, err, pt_cause(regs), SIGSEGV) ==
 	    NOTIFY_STOP) {
@@ -327,6 +334,16 @@ void do_genex(struct pt_regs *regs)
 	case HVM_GE_C_CACHE:
 		cache_error(regs);
 		break;
+	case HVM_GE_C_TLBMISSX_0:
+	case HVM_GE_C_TLBMISSX_1:
+		execute_protection_fault(regs);
+		break;
+	case HVM_GE_C_TLBMISSR:
+		read_protection_fault(regs);
+		break;
+	case HVM_GE_C_TLBMISSW:
+		write_protection_fault(regs);
+		break;
 	default:
 		/* Halt and catch fire */
 		panic("Unrecognized exception 0x%lx\n", pt_cause(regs));
@@ -349,7 +366,7 @@ void do_trap0(struct pt_regs *regs)
 			return;  /*  return -ENOSYS somewhere?  */
 
 		/* Interrupts should be re-enabled for syscall processing */
-		__vmsetie(VM_INT_ENABLE);
+		vmsetie_cached(VM_INT_ENABLE);
 
 		/*
 		 * System call number is in r6, arguments in r0..r5.
@@ -372,10 +389,17 @@ void do_trap0(struct pt_regs *regs)
 		regs->restart_r0 = regs->r00;
 
 		if ((unsigned long) regs->syscall_nr >= __NR_syscalls) {
-			regs->r00 = -1;
+			regs->r00 = -ENOSYS;
 		} else {
 			syscall = (syscall_fn)
 				  (sys_call_table[regs->syscall_nr]);
+
+			/* Check for unimplemented syscall (NULL entry in table) */
+			if (!syscall) {
+				regs->r00 = -ENOSYS;
+				break;
+			}
+
 			regs->r00 = syscall(regs->r00, regs->r01,
 				   regs->r02, regs->r03,
 				   regs->r04, regs->r05);
@@ -416,7 +440,7 @@ void do_machcheck(struct pt_regs *regs);
 void do_machcheck(struct pt_regs *regs)
 {
 	/* Halt and catch fire */
-	__vmstop();
+	__vmstop(machinecheck);
 }
 
 /*

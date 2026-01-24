@@ -35,6 +35,22 @@ static void __init __maybe_unused early_init_dt_setup_initrd_arch(u64 start,
 #endif
 
 /*
+ * Iterator for of_flat_dt_match_machine
+ */
+static const void * __init arch_get_next_mach(const char *const **match)
+{
+	static const struct machine_desc *mdesc = __arch_info_begin;
+	const struct machine_desc *m = mdesc;
+
+	if (m >= __arch_info_end)
+		return NULL;
+
+	mdesc++;
+	*match = m->dt_compat;
+	return m;
+}
+
+/*
  * setup_machine_fdt - set up machine based on dtb passed to kernel
  * @dt_phys: physical address of dtb
  *
@@ -42,10 +58,9 @@ static void __init __maybe_unused early_init_dt_setup_initrd_arch(u64 start,
  * scans the root node properties, and retrieves the command line
  * from the /chosen node.
  */
-struct machine_desc * __init setup_machine_fdt(void *dt_phys)
+const struct machine_desc * __init setup_machine_fdt(void *dt_phys)
 {
-	struct machine_desc *mdesc, *mdesc_best = NULL;
-	unsigned int score, mdesc_score = ~1;
+	const struct machine_desc *mdesc_best = NULL;
 
 #ifdef CONFIG_DTB_BUILTIN
 	initial_boot_params = dt_phys;
@@ -56,13 +71,7 @@ struct machine_desc * __init setup_machine_fdt(void *dt_phys)
 	if (fdt_magic(initial_boot_params) != OF_DT_HEADER)
 		return NULL;
 
-	for_each_machine_desc(mdesc) {
-		score = of_flat_dt_match(dt_root, mdesc->dt_compat);
-		if (score > 0 && score < mdesc_score) {
-			mdesc_best = mdesc;
-			mdesc_score = score;
-		}
-	}
+	mdesc_best = of_flat_dt_match_machine(NULL, arch_get_next_mach);
 
 	if (!mdesc_best)
 		panic("Unrecognized device tree\n");

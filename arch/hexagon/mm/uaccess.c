@@ -12,26 +12,49 @@
 #include <linux/types.h>
 #include <linux/uaccess.h>
 #include <linux/pgtable.h>
+#include <linux/mm.h>
 
 /*
  * For clear_user(), exploit previously defined copy_to_user function
  * and the fact that we've got a handy zero page defined in kernel/head.S
  *
- * dczero here would be even faster.
+ * The Hexagon H2 hypervisor autonomously walks the kernel's page tables
+ * for TLB misses.  When it encounters an INVALID L1 (PGD) entry during
+ * a kernel-mode write to a user address, the resulting fault path may
+ * not behave correctly on all implementations.  Pre-fault each page via
+ * get_user_pages_fast to ensure valid page table entries exist before
+ * the raw copy.  This workaround applies to all current Hexagon
+ * platforms, not just QEMU.
  */
 __kernel_size_t __clear_user_hexagon(void __user *dest, unsigned long count)
 {
 	long uncleared;
+	unsigned long addr = (unsigned long)dest;
 
-	while (count > PAGE_SIZE) {
-		uncleared = raw_copy_to_user(dest, &empty_zero_page, PAGE_SIZE);
+	while (count > 0) {
+		unsigned long offset = offset_in_page(addr);
+		unsigned long this_len = PAGE_SIZE - offset;
+		struct page *page;
+		int ret;
+
+		if (this_len > count)
+			this_len = count;
+
+		/* Pre-fault the page via software page table walk */
+		ret = get_user_pages_fast(addr, 1, FOLL_WRITE, &page);
+		if (ret <= 0)
+			return count;
+
+		uncleared = raw_copy_to_user((void __user *)addr,
+					     &empty_zero_page, this_len);
+		put_page(page);
+
 		if (uncleared)
-			return count - (PAGE_SIZE - uncleared);
-		count -= PAGE_SIZE;
-		dest += PAGE_SIZE;
-	}
-	if (count)
-		count = raw_copy_to_user(dest, &empty_zero_page, count);
+			return count - this_len + uncleared;
 
-	return count;
+		addr += this_len;
+		count -= this_len;
+	}
+
+	return 0;
 }
