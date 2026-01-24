@@ -119,8 +119,8 @@ static int hexagon_map_sg(struct device *hwdev, struct scatterlist *sg,
 
 		s->dma_length = s->length;
 
-		flush_dcache_range(dma_addr_to_virt(s->dma_address),
-				   dma_addr_to_virt(s->dma_address + s->length));
+		flush_dcache_range((unsigned long)dma_addr_to_virt(s->dma_address),
+				   (unsigned long)dma_addr_to_virt(s->dma_address + s->length));
 	}
 
 	return nents;
