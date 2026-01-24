@@ -23,6 +23,7 @@
 extern unsigned long __rt_sigtramp_template[2];
 
 void do_signal(struct pt_regs *regs);
+int do_work_pending(struct pt_regs *regs, u32 thread_info_flags);
 
 #include <asm-generic/signal.h>
 
