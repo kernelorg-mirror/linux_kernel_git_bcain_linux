@@ -23,10 +23,11 @@
 
 #ifdef __KERNEL__
 
+#include <asm/page.h>
+
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #include <asm/registers.h>
-#include <asm/page.h>
 #include <asm/extensions.h>
 #endif
 
