@@ -70,6 +70,16 @@ void __init mem_init(void)
 }
 
 /*
+ * free_initmem - frees memory used by stuff declared with __init
+ *
+ * The generic implementation poisons init memory, which can cause issues
+ * on hexagon. Keep this empty for now.
+ */
+void __ref free_initmem(void)
+{
+}
+
+/*
  * free_initrd_mem - frees...  initrd memory.
  * @start - start of init memory
  * @end - end of init memory
