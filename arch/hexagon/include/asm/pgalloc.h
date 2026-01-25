@@ -22,7 +22,7 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd;
 
-	pgd = (pgd_t *)__get_free_page(GFP_KERNEL | __GFP_ZERO);
+	pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
 
 	/*
 	 * There may be better ways to do this, but to ensure
@@ -38,6 +38,9 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	/* Physical version is what is passed to virtual machine on switch */
 	mm->context.ptbase = __pa(pgd);
 
+	/*  Always invalidate at switch the first time a base is allocated  */
+	mm->context.need_invalidate = true;
+
 	return pgd;
 }
 
@@ -49,13 +52,21 @@ static inline void pgd_free(struct mm_struct *mm, pgd_t *pgd)
 static inline struct page *pte_alloc_one(struct mm_struct *mm)
 {
 	struct page *pte;
+	pte_t *start;
+	int i;
 
-	pte = alloc_page(GFP_KERNEL | __GFP_ZERO);
+	pte = alloc_page(GFP_KERNEL | __GFP_REPEAT);
 	if (!pte)
 		return NULL;
 	if (!pgtable_page_ctor(pte)) {
 		__free_page(pte);
 		return NULL;
+	}
+	//  need to initialize to _NULL_PTE, or fine tune the macros to differentiate PMD's from PTE's.
+	start = page_to_virt(pte);
+	for (i=0; i < PTRS_PER_PTE; i++) {
+		// feels weird to use pte_clear
+		pte_val(*start++) = _NULL_PTE;
 	}
 	return pte;
 }

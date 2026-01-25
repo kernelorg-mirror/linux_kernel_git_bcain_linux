@@ -33,6 +33,8 @@
 #define FLT_STORE       1
 
 
+/* Debug function disabled - show_map_vma is not exported from fs/proc/task_mmu.c */
+#if 0
 extern void show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid);
 
 void show_vma_map(void)
@@ -65,6 +67,7 @@ void show_vma_map(void)
 	}
 	kfree(m.buf);
 }
+#endif
 
 /*
  * Canonical page fault handler
@@ -78,7 +81,9 @@ void do_page_fault(unsigned long address, long cause, struct pt_regs *regs)
 	vm_fault_t fault;
 	const struct exception_table_entry *fixup;
 	unsigned int flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
+#ifdef VM_FAULT_NEXTPAGE
 	unsigned long next_addr;
+#endif
 
 	/*
 	 * If we're in an interrupt or have no user context,
@@ -127,6 +132,7 @@ good_area:
 
 	fault = handle_mm_fault(vma, address, flags);
 
+#ifdef VM_FAULT_NEXTPAGE
 	if (fault & VM_FAULT_NEXTPAGE) {
 		next_addr = address + 16;
 		next_addr &= PAGE_MASK;
@@ -135,6 +141,7 @@ good_area:
 			fault = handle_mm_fault(mm, vma, next_addr, flags);
 		}
 	}
+#endif
 
 	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
 		return;
@@ -184,7 +191,6 @@ good_area:
 	if (sig_debug) {
 		printk("segfault detected\n");
 		show_regs(regs);
-		show_vma_map();
 	}
 
 	force_sig_fault(si_signo, si_code, (void __user *)address, current);
@@ -197,7 +203,6 @@ bad_area:
 		if (sig_debug) {
 			printk("segfault detected\n");
 			show_regs(regs);
-			show_vma_map();
 		}
 
 		force_sig_fault(SIGSEGV, si_code, (void __user *)address, current);
