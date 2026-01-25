@@ -43,6 +43,16 @@ DEFINE_SPINLOCK(kmap_gen_lock);
 /*  checkpatch says don't init this to 0.  */
 unsigned long long kmap_generation;
 
+/*
+ * free_initmem - frees memory used by stuff declared with __init
+ *
+ * The generic implementation poisons init memory, which can cause issues
+ * on hexagon. Keep this empty for now.
+ */
+void __ref free_initmem(void)
+{
+}
+
 void sync_icache_dcache(pte_t pte)
 {
 	unsigned long addr;
