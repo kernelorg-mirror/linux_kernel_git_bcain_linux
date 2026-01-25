@@ -4,6 +4,13 @@
 # block. This is daft, shut them up.
 ccflags-y += $(call cc-disable-warning, unused-but-set-variable)
 
+# Hexagon: work around assembler constraint issue with instruction bundling
+# The compiler generates code where R0 is written twice in a single packet
+# when inlining __read_once_size. Disable packetization for this file.
+ifdef CONFIG_HEXAGON
+CFLAGS_fair.o += -mno-packets
+endif
+
 # These files are disabled because they produce non-interesting flaky coverage
 # that is not a function of syscall inputs. E.g. involuntary context switches.
 KCOV_INSTRUMENT := n
