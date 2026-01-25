@@ -34,7 +34,7 @@ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 
 void *boot_info;
 
-struct machine_desc *mdesc;
+const struct machine_desc *mdesc;
 
 /*
  * setup_arch -  high level architectural setup routine
