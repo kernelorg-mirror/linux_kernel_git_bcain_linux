@@ -3,7 +3,7 @@
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/delay.h>
 
 struct dentry *clock_lval_dentry;
