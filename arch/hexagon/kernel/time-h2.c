@@ -53,9 +53,9 @@ unsigned long long lat_avg;
 unsigned long lat_tracking_enable;
 #endif
 
-static cycle_t timer_get_cycles(struct clocksource *cs)
+static u64 timer_get_cycles(struct clocksource *cs)
 {
-	return (cycle_t) __vmtimerop(gettime, 0, 0);
+	return (u64) __vmtimerop(gettime, 0, 0);
 }
 
 static struct clocksource hexagon_clocksource = {
