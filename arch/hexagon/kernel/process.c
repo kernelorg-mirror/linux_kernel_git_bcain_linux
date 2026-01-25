@@ -156,13 +156,6 @@ void flush_thread(void)
 }
 
 /*
- * Called midway through cleanup in do_exit
- */
-void exit_thread(void)
-{
-}
-
-/*
  * Seems like the latest arch hook for a task that's going away
  */
 void release_thread(struct task_struct *dead_task)
