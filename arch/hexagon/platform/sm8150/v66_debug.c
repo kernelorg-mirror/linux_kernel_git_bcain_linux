@@ -255,7 +255,7 @@ ssize_t clock_lval_write(struct file *filp,
 
 	buf[size] = '\0';
 
-	ret = kstrtoul(buf, 0, &clock_lval);
+	ret = kstrtou32(buf, 0, &clock_lval);
 	if (ret == 0) {
 		ret = cnt;
 	}
