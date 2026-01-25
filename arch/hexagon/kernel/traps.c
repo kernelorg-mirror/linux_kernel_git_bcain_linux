@@ -352,7 +352,7 @@ void do_trap0(struct pt_regs *regs)
 			return;  /*  return -ENOSYS somewhere?  */
 
 		/* Interrupts should be re-enabled for syscall processing */
-		__vmsetie(VM_INT_ENABLE);
+		vmsetie_cached(VM_INT_ENABLE);
 
 		/*
 		 * System call number is in r6, arguments in r0..r5.
@@ -425,7 +425,7 @@ void do_trap0(struct pt_regs *regs)
 void do_machcheck(struct pt_regs *regs)
 {
 	/* Halt and catch fire */
-	__vmstop();
+	__vmstop(machinecheck);
 }
 
 /*
