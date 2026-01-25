@@ -721,7 +721,10 @@ KBUILD_CFLAGS += $(stackp-flag)
 ifeq ($(cc-name),clang)
 ifneq ($(CROSS_COMPILE),)
 CLANG_TARGET	:= --target=$(notdir $(CROSS_COMPILE:%-=%))
+# Hexagon clang doesn't support --gcc-toolchain
+ifneq ($(ARCH),hexagon)
 GCC_TOOLCHAIN	:= $(realpath $(dir $(shell which $(LD)))/..)
+endif
 endif
 ifneq ($(GCC_TOOLCHAIN),)
 CLANG_GCC_TC	:= --gcc-toolchain=$(GCC_TOOLCHAIN)
