@@ -3,6 +3,9 @@
 
 KBUILD_DEFCONFIG = comet_defconfig
 
+# Hexagon clang doesn't support -gcc-toolchain flag
+CLANG_GCC_TC :=
+
 # Do not use GP-relative jumps
 KBUILD_CFLAGS += -G0
 LDFLAGS_vmlinux += -G0
