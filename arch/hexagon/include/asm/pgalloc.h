@@ -55,7 +55,7 @@ static inline struct page *pte_alloc_one(struct mm_struct *mm)
 	pte_t *start;
 	int i;
 
-	pte = alloc_page(GFP_KERNEL | __GFP_REPEAT);
+	pte = alloc_page(GFP_KERNEL | __GFP_RETRY_MAYFAIL);
 	if (!pte)
 		return NULL;
 	if (!pgtable_page_ctor(pte)) {
@@ -78,7 +78,7 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm)
 	pte_t *start;
 	int i;
 
-	gfp_t flags =  GFP_KERNEL | __GFP_REPEAT;
+	gfp_t flags =  GFP_KERNEL | __GFP_RETRY_MAYFAIL;
 
 	pte = (pte_t *)__get_free_page(flags);
 
