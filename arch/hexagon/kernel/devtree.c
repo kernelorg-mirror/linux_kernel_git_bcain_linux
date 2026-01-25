@@ -35,8 +35,8 @@ void __init early_init_dt_setup_initrd_arch(u64 start,
 int __init early_init_dt_scan_chosen_noinitrd(unsigned long node, const char *uname,
 				     int depth, void *data)
 {
-	unsigned long l;
-	char *p;
+	int l;
+	const char *p;
 
 	pr_debug("search \"chosen\", depth: %d, uname: %s\n", depth, uname);
 
