@@ -304,19 +304,12 @@ static void misaligned_data_store(struct pt_regs *regs)
 
 static void illegal_instruction(struct pt_regs *regs)
 {
-	siginfo_t info = { 0 };
-
 	die_if_kernel("Illegal Instruction", regs, 0);
 
 	if (sig_debug)
 		dump_sig_debug(regs);
 
-	info.si_signo = SIGILL;
-	info.si_errno = 0;
-	info.si_code = ILL_ILLOPC;
-	info.si_addr = (void __user *)pt_elr(regs);
-
-	force_sig_info(info.si_signo, &info, current);
+	force_sig_fault(SIGILL, ILL_ILLOPC, (void __user *)pt_elr(regs), current);
 }
 
 /*
