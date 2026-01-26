@@ -125,10 +125,14 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 	}
 }
 
-void update_mmu_cache(struct vm_area_struct *vma,
-					unsigned long address, pte_t *ptep)
+void update_mmu_cache_range(struct vm_fault *vmf,
+		struct vm_area_struct *vma, unsigned long address,
+		pte_t *ptep, unsigned int nr)
 {
+	unsigned int i;
+
 	if (vma->vm_flags & VM_EXEC) {
-		sync_icache_dcache(*ptep);
+		for (i = 0; i < nr; i++)
+			sync_icache_dcache(ptep[i]);
 	}
 }
