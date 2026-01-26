@@ -55,7 +55,7 @@ static int __init sm8150_init(void)
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 
         of_platform_populate(of_find_node_by_path("/soc"),
-		of_default_bus_match_table, NULL, NULL);
+		NULL, NULL, NULL);
 
 	return 0;
 }
