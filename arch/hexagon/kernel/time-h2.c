@@ -30,8 +30,6 @@
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 
-#include <asm/timer-regs.h>
-#include <asm/platform.h>
 #include <asm/hexagon_vm.h>
 
 /*
