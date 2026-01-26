@@ -2,7 +2,7 @@
 
 config HEXAGON_HVX
 	tristate "Hexagon HVX Module"
-	---help---
+	help
 		Modular support for Hexagon HVX coprocessor
 
 
