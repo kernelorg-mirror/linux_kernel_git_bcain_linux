@@ -4,14 +4,10 @@
 
 #include <asm-generic/hugetlb.h>
 
-static inline int is_hugepage_only_range(struct mm_struct *mm,
-	unsigned long addr, unsigned long len)
-{
-	return 0;
-}
-
-static inline void arch_clear_hugepage_flags(struct page *page)
-{
-}
+/*
+ * The generic hugetlb.h now provides fallbacks for these functions.
+ * Hexagon uses the generic implementations, so no arch-specific
+ * definitions are needed here.
+ */
 
 #endif /* _ASM_HEXAGON_HUGETLB_H */
