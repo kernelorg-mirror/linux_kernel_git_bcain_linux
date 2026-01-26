@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
  * 02110-1301, USA.
  */
-#include <stddef.h>
+#include <linux/types.h>
 #include <linux/printk.h>
 #include <linux/elf.h>
 #include "hexagon_depmask.h"
