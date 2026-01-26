@@ -57,7 +57,7 @@ static inline pgtable_t pte_alloc_one(struct mm_struct *mm)
 	pte = alloc_page(GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_ACCOUNT);
 	if (!pte)
 		return NULL;
-	if (!pagetable_pte_ctor(page_ptdesc(pte))) {
+	if (!pagetable_pte_ctor(mm, page_ptdesc(pte))) {
 		__free_page(pte);
 		return NULL;
 	}
