@@ -56,6 +56,9 @@ void __init setup_arch(char **cmdline_p)
 	/*  initial machine setup from flattened device tree  */
 	mdesc = setup_machine_fdt(dtb);
 
+	if (!mdesc)
+		panic("setup_machine_fdt returned NULL\n");
+
 	if (mdesc->setup_arch_platform) {
 		mdesc->setup_arch_platform();
 	}
