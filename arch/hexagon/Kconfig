@@ -60,19 +60,19 @@ config TRACE_IRQFLAGS_SUPPORT
 	def_bool y
 
 config GENERIC_CSUM
-	def_bool y
+	def_bool n
 
 config GENERIC_CALIBRATE_DELAY
 	def_bool y
 
 config HEXAGON_NOCACHESYNC
 	def_bool n
-	---help---
+	help
 	  Mostly for simulation which doesn't need to sync cache
 
 config HEXAGON_SPLIT_2GB
 	def_bool n
-	---help---
+	help
 	  Kernel/user split is at 2GB instead of 3GB (0xc0000000)
 
 config SYS_SUPPORTS_HUGETLBFS
@@ -149,7 +149,7 @@ config HEXAGON_MSM8960_FLUID
 	select GPIOLIB
 	select ARCH_MSM
 	select ARCH_HAVE_CUSTOM_GPIO_H
-	---help---
+	help
 	  Support MSM8960 FLUID
 
 config HEXAGON_MSM8974_FLUID
@@ -167,7 +167,7 @@ config HEXAGON_MSM8974_FLUID
 	select HEXAGON_SPLIT_2GB
 	select COMMON_CLK
 	select HEXAGON_H2_PIC
-	---help---
+	help
 	  Support MSM8974 FLUID
 
 config HEXAGON_SIMULATOR
@@ -177,7 +177,7 @@ config HEXAGON_SIMULATOR
 	select HEXAGON_PHYS_OFFSET
 	select COMMON_CLK
 	select HEXAGON_H2_PIC
-	---help---
+	help
 	  Support for the software simulator
 
 config HEXAGON_FPGA
@@ -186,7 +186,7 @@ config HEXAGON_FPGA
 	select HEXAGON_H2_PIC
 	select HAVE_DMA_ATTRS
 	select HEXAGON_SPLIT_2GB
-	---help---
+	help
 	  Support for the FPGA emulation
 
 
@@ -195,7 +195,7 @@ config HEXAGON_MSM8996
 	select HEXAGON_PHYS_OFFSET
 	select HEXAGON_H2_PIC
 	select HAVE_DMA_ATTRS
-	---help---
+	help
 	  Support for MSM8996
 
 config HEXAGON_MSM8998
@@ -203,7 +203,7 @@ config HEXAGON_MSM8998
 	select HEXAGON_PHYS_OFFSET
 	select HEXAGON_H2_PIC
 	select HAVE_DMA_ATTRS
-	---help---
+	help
 	  Support for MSM8998
 
 config HEXAGON_SDM845
@@ -211,7 +211,7 @@ config HEXAGON_SDM845
 	select HEXAGON_PHYS_OFFSET
 	select HEXAGON_H2_PIC
 	select HAVE_DMA_ATTRS
-	---help---
+	help
 	  Support for SDM845
 
 config HEXAGON_SM8150
@@ -219,7 +219,7 @@ config HEXAGON_SM8150
 	select HEXAGON_PHYS_OFFSET
 	select HEXAGON_H2_PIC
 	select HAVE_DMA_ATTRS
-	---help---
+	help
 	  Support for SM8150
 
 config HEXAGON_COMET
@@ -237,13 +237,13 @@ config HEXAGON_AMAZON
 	select HEXAGON_PHYS_OFFSET
 	select HAVE_DMA_ATTRS
 	select ARCH_HAVE_CUSTOM_GPIO_H
-	---help---
+	help
 	  Amazon board
 
 config HEXAGON_ARCHSIM
 	bool "Archsim"
 	select HEXAGON_PHYS_OFFSET
-	---help---
+	help
 	  Archsim platform; has QFEC, UART, and a timer.
 
 
@@ -253,7 +253,7 @@ endchoice
 config HEXAGON_LLVM
 	bool "LLVM"
 	default n
-	---help---
+	help
 	  Convenience thing for makefile switches
 
 #config HEXAGON_ARCH_VERSION
@@ -305,20 +305,20 @@ config MINIVM
 	bool "Mini VM"
 	default n
 	depends on HEXAGON_VM
-	---help---
+	help
 	  Choose if we should package Mini VM in the kernel, or if it's
 	  outside the kernel
 
 config H2
 	bool "H2 VM"
 	default n
-	---help---
+	help
 	  Transitional config switch for the new H2 interface
 
 config HEXAGON_ANGEL_TRAPS
 	bool "Use Angel Traps"
 	default n
-	---help---
+	help
 	  Enable angel debug traps (for printk's).
 
 config HVC_UART_DM
@@ -353,7 +353,7 @@ config NR_CPUS
 config BASE_IPI_IRQ
 	int "Base IPI IRQ" if SMP
 	default 8
-	---help---
+	help
 	  The base IRQ used for IPI calls.  Each CPU increments by one,
 	  although the newer hypervisor API specifies the lower range of
 	  interrupts to be percpu anyways.
@@ -362,13 +362,13 @@ config BASE_IPI_IRQ
 
 config MEMTEST
 	bool "Memtest"
-	---help---
+	help
 	  Enable the memtest module for hexagon; add memtest=? to have it...
 	  do something.
 
 config HEXAGON_FASTBOOT
 	bool "Hexagon Fastboot Module"
-	---help---
+	help
 	  Build the Hexagon fastboot module
 
 choice
