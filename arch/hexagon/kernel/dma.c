@@ -36,7 +36,7 @@ void arch_sync_dma_for_device(phys_addr_t paddr, size_t size,
  * Our max_low_pfn should have been backed off by 16MB in mm/init.c to create
  * DMA coherent space.  Use that for the pool.
  */
-static int __init hexagon_dma_init(void)
+int __init hexagon_dma_init(void)
 {
 	return dma_init_global_coherent(PFN_PHYS(max_low_pfn),
 					hexagon_coherent_pool_size);
