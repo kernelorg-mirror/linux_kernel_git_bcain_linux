@@ -15,7 +15,7 @@
 
 / {
 	chosen {
-                bootargs = "";
+                bootargs = "earlycon=pl011,0x10000000 console=ttyAMA0";
 		stdout-path = &uart0;
 
 	};
