@@ -41,6 +41,11 @@ if [ "$1" = GNU -a "$2" = ld ]; then
 elif [ "$1" = GNU -a "$2" = gold ]; then
 	echo "gold linker is not supported as it is not capable of linking the kernel proper." >&2
 	exit 1
+elif [ "$1" = eld ]; then
+	version=$2
+	min_version=$($min_tool_version llvm)
+	name=ELD
+	disp_name=eld
 else
 	while [ $# -gt 1 -a "$1" != "LLD" ]; do
 		shift
