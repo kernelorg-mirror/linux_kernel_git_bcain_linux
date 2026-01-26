@@ -35,6 +35,10 @@ config HEXAGON
 	select TRACE_IRQFLAGS_SUPPORT
 	select IRQ_DOMAIN
 	select ARM_AMBA
+	select HAVE_PAGE_SIZE_4KB
+	select HAVE_PAGE_SIZE_16KB
+	select HAVE_PAGE_SIZE_64KB
+	select HAVE_PAGE_SIZE_256KB
 	help
 	  Qualcomm Hexagon is a processor architecture designed for high
 	  performance and low power across a wide variety of applications.
@@ -371,29 +375,7 @@ config HEXAGON_FASTBOOT
 	help
 	  Build the Hexagon fastboot module
 
-choice
-	prompt "Kernel page size"
-	default PAGE_SIZE_4KB
-	help
-	  Changes the default page size; use with caution.
-
-config PAGE_SIZE_4KB
-	bool "4KB"
-
-config PAGE_SIZE_16KB
-	bool "16KB"
-
-config PAGE_SIZE_64KB
-	bool "64KB"
-
-config PAGE_SIZE_256KB
-	bool "256KB"
-
-endchoice
-
 source "arch/hexagon/kernel/hvx/Kconfig"
-
-source "mm/Kconfig"
 
 source "kernel/Kconfig.hz"
 
