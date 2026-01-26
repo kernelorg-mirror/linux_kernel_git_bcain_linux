@@ -18,6 +18,10 @@ ifneq ($(CONFIG_HEXAGON_ARCH_VERSION),)
   LDFLAGS_vmlinux += -mv$(CONFIG_HEXAGON_ARCH_VERSION)
 endif
 
+# Workaround for compiler packetizer bug generating packets with
+# multiple writes to the same predicate register (cause 0x1d)
+KBUILD_CFLAGS += -mllvm --disable-packetizer -mllvm -disable-nvjump
+
 # Do not use single-byte enums; these will overflow.
 KBUILD_CFLAGS += -fno-short-enums
 
