@@ -17,7 +17,6 @@ EXPORT_SYMBOL(__clear_user_hexagon);
 EXPORT_SYMBOL(raw_copy_from_user);
 EXPORT_SYMBOL(raw_copy_to_user);
 EXPORT_SYMBOL(__vmgetie);
-EXPORT_SYMBOL(__vmsetie);
 EXPORT_SYMBOL(vmgetie_cached);
 EXPORT_SYMBOL(vmsetie_cached);
 EXPORT_SYMBOL(__vmyield);
