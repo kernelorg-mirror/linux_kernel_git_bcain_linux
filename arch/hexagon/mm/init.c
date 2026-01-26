@@ -56,6 +56,12 @@ void __init mem_init(void)
 	memblock_free_all();
 
 	/*
+	 * max_mapnr is needed for pfn_valid() which is used by vmalloc
+	 * since v5.19.
+	 */
+	set_max_mapnr(max_low_pfn - ARCH_PFN_OFFSET);
+
+	/*
 	 *  To-Do:  someone somewhere should wipe out the bootmem map
 	 *  after we're done?
 	 */
