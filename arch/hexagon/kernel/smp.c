@@ -164,7 +164,13 @@ void start_secondary(void)
 
 	cpu = smp_processor_id();
 
-	irq = BASE_IPI_IRQ + cpu;
+	/* Disable all local interrupts first */
+	for (irq = 0; irq < HEXAGON_CPUINTS; irq++)
+		__vmintop_locdis(irq);
+
+	/* Enable and register IPI interrupt */
+	irq = CONFIG_BASE_IPI_IRQ + cpu;
+	__vmintop_globen(irq);
 	if (request_irq(irq, handle_ipi, IRQF_TRIGGER_RISING, "ipi_handler",
 			NULL))
 		pr_err("Failed to request irq %u (ipi_handler)\n", irq);
@@ -215,7 +221,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int i, irq = BASE_IPI_IRQ;
+	int i, irq = CONFIG_BASE_IPI_IRQ;
 
 	/*
 	 * should eventually have some sort of machine
@@ -228,6 +234,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 	/*  Also need to register the interrupts for IPI  */
 	if (max_cpus > 1) {
+		__vmintop_globen(irq);
 		if (request_irq(irq, handle_ipi, IRQF_TRIGGER_RISING,
 				"ipi_handler", NULL))
 			pr_err("Failed to request irq %d (ipi_handler)\n", irq);
