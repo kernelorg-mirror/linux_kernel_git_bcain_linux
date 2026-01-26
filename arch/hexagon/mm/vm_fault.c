@@ -70,6 +70,7 @@ retry:
 	case FLT_IFETCH:
 		if (!(vma->vm_flags & VM_EXEC))
 			goto bad_area;
+		flags |= FAULT_FLAG_INSTRUCTION;
 		break;
 	case FLT_LOAD:
 		if (!(vma->vm_flags & VM_READ))
