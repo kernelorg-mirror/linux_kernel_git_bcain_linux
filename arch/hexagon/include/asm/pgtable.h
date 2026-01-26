@@ -148,6 +148,7 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];  /* located in head.S */
 #define FIRST_USER_ADDRESS	0UL
 #define pte_special(pte)	0
 #define pte_mkspecial(pte)	(pte)
+
 #ifdef CONFIG_HUGETLB_PAGE
 #define pte_huge(pte)	((pte_val(pte) & 0x7) == HVM_HUGEPAGE_SIZE)
 #define pte_mkhuge(pte)	__pte((pte_val(pte) & ~0x7) | HVM_HUGEPAGE_SIZE)
