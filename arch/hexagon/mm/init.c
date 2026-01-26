@@ -292,14 +292,6 @@ void __init setup_arch_memory(void)
 	 */
 }
 
-/*
- * Hexagon page protection map.
- *
- * Note: _PAGE_EXECUTE is aliased to _PAGE_ACCESSED on hexagon, so we
- * must not set it directly in protection entries. Execute permission is
- * granted by the page fault handler setting _PAGE_EXECUTE when the page
- * is actually accessed. Private exec-only pages are mapped as read-only.
- */
 static const pgprot_t protection_map[16] = {
 	[VM_NONE]					= __pgprot(_NO_PERM | CACHEDEF),
 	[VM_READ]					= __pgprot(_PAGE_USER | _PAGE_READ |
