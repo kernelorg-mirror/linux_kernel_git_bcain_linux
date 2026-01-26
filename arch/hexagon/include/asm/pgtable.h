@@ -34,6 +34,7 @@ extern unsigned long empty_zero_page;
 #define _PAGE_WRITE	__HVM_PTE_W
 #define _PAGE_EXECUTE	__HVM_PTE_X
 #define _PAGE_USER	__HVM_PTE_U
+#define _PAGE_PRESENT	0	/* Implicit on hexagon; page size field = valid */
 
 /*
  * We have a total of 4 "soft" bits available in the abstract PTE.
