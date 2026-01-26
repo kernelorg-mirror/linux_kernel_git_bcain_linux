@@ -310,7 +310,7 @@ static int __init v66_debug_init(void)
 {
 	tcxo_lpj = loops_per_jiffy;
 
-	hexagon_pub_base = ioremap_nocache(0x26300000, PAGE_SIZE);
+	hexagon_pub_base = ioremap(0x26300000, PAGE_SIZE);
 
 	if (!hexagon_pub_base) {
 		printk("ioremap error\n");
