@@ -47,7 +47,7 @@ elif [ "$1" = eld ]; then
 	name=ELD
 	disp_name=eld
 else
-	while [ $# -gt 1 -a "$1" != "LLD" ]; do
+	while [ $# -gt 1 -a "$1" != "LLD" -a "$1" != "eld" ]; do
 		shift
 	done
 
@@ -56,6 +56,11 @@ else
 		min_version=$($min_tool_version llvm)
 		name=LLD
 		disp_name=LLD
+	elif [ "$1" = eld ]; then
+		version=$2
+		min_version=$lld_min_version
+		name=LLD
+		disp_name=eld
 	else
 		echo "$orig_args: unknown linker" >&2
 		exit 1
