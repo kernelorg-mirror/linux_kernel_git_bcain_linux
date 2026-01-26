@@ -127,23 +127,20 @@ static int genregs_set(struct task_struct *target,
 	return 0;
 }
 
-//  Any way to move these to the module?
+/*
+ * HVX (vector) register support for ptrace
+ */
 static int fpregs_get(struct task_struct *target,
 		   const struct user_regset *regset,
-		   unsigned int pos, unsigned int count,
-		   void *kbuf, void __user *ubuf)
+		   struct membuf to)
 {
-	int ret;
 	struct thread_info *ti = task_thread_info(target);
 
 	if (!ti->hvx)
 		return -EIO;
 
 	/* 32 vector regs + 1 vecpredregs  == 33 */
-	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-				  ti->hvx->vregs, 0, 33*sizeof(HVX_Vector));
-
-	return ret;
+	return membuf_write(&to, ti->hvx->vregs, 33*sizeof(HVX_Vector));
 }
 
 static int fpregs_set(struct task_struct *target,
@@ -169,7 +166,7 @@ static int fpregs_active(struct task_struct *target,
 {
 	struct thread_info *thread = task_thread_info(target);
 
-	return (int)thread->hvx;
+	return (int)(thread->hvx != NULL);
 }
 
 enum hexagon_regset {
@@ -192,7 +189,7 @@ static const struct user_regset hexagon_regsets[] = {
                                   sizeof(HVX_Vector),
                 .size           = sizeof(HVX_Vector),
                 .align          = sizeof(HVX_Vector),
-                .get            = fpregs_get,
+                .regset_get     = fpregs_get,
                 .set            = fpregs_set,
                 .active         = fpregs_active,
 	},
