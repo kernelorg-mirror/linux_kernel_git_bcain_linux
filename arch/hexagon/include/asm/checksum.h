@@ -21,6 +21,12 @@ __wsum csum_tcpudp_nofold(__be32 saddr, __be32 daddr,
 __sum16 csum_tcpudp_magic(__be32 saddr, __be32 daddr,
 			  __u32 len, __u8 proto, __wsum sum);
 
+#define ip_fast_csum ip_fast_csum
+__sum16 ip_fast_csum(const void *iph, unsigned int ihl);
+
+#define ip_compute_csum ip_compute_csum
+__sum16 ip_compute_csum(const void *buff, int len);
+
 #include <asm-generic/checksum.h>
 
 #endif
