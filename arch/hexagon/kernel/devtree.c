@@ -139,12 +139,12 @@ const struct machine_desc * __init setup_machine_fdt(void *dt_phys)
 	 * Sets the top level address and size cells which are stored
 	 * in globals by the devtree infrastructure.
 	 */
-        of_scan_flat_dt(early_init_dt_scan_root, NULL);
+        early_init_dt_scan_root();
 
         /*  Retrieve various information from the /chosen node  */
 #ifndef CONFIG_HEXAGON_MSM8974_FLUID
 	//  Fixme:  do this consistently for platforms
-	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+	early_init_dt_scan_chosen(boot_command_line);
 #endif
         /*  Setup memory  */
 	//of_scan_flat_dt(early_init_dt_scan_memory, NULL);
