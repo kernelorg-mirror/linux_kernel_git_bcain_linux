@@ -227,9 +227,9 @@ EXPORT_SYMBOL(ip_compute_csum);
  * copy from ds while checksumming, otherwise like csum_partial
  */
 __wsum
-csum_partial_copy_nocheck(const void *src, void *dst, int len, __wsum sum)
+csum_partial_copy_nocheck(const void *src, void *dst, int len)
 {
 	memcpy(dst, src, len);
-	return csum_partial(dst, len, sum);
+	return csum_partial(dst, len, 0);
 }
 EXPORT_SYMBOL(csum_partial_copy_nocheck);

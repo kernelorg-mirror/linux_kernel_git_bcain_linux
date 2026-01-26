@@ -27,6 +27,9 @@ __sum16 ip_fast_csum(const void *iph, unsigned int ihl);
 #define ip_compute_csum ip_compute_csum
 __sum16 ip_compute_csum(const void *buff, int len);
 
+#define _HAVE_ARCH_CSUM_AND_COPY
+__wsum csum_partial_copy_nocheck(const void *src, void *dst, int len);
+
 #include <asm-generic/checksum.h>
 
 #endif
