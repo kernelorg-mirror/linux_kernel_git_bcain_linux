@@ -44,17 +44,6 @@ DEFINE_SPINLOCK(kmap_gen_lock);
 unsigned long long kmap_generation;
 
 /*
- * mem_init - initializes memory
- *
- * max_mapnr is needed for pfn_valid() which is used by vmalloc
- * since v5.19.
- */
-void __init mem_init(void)
-{
-	set_max_mapnr(max_low_pfn - ARCH_PFN_OFFSET);
-}
-
-/*
  * free_initmem - frees memory used by stuff declared with __init
  *
  * The generic implementation poisons init memory, which can cause issues
