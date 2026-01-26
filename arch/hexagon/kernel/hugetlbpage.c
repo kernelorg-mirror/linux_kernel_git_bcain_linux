@@ -63,5 +63,6 @@ pte_t *huge_pte_alloc(struct mm_struct *mm,
 //  Todo:  restrict hugepagesz if we're only supporting 1 size
 static __init int set_default_hugepagesz(void)
 {
+	return 0;
 }
 
