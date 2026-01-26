@@ -224,14 +224,9 @@ config HEXAGON_SM8150
 
 config HEXAGON_COMET
 	bool "Comet Board"
-<<<<<<< HEAD
-	help
-=======
 	select HEXAGON_OLDPLAT
 	select HEXAGON_PHYS_OFFSET
-	select HAVE_CLK
-	---help---
->>>>>>> fbfc61682da3 (hexagon: update build system and Kconfig)
+	help
 	  Support for the Comet platform.
 
 config HEXAGON_AMAZON
