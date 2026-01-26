@@ -49,7 +49,7 @@ int __init early_init_dt_scan_chosen_noinitrd(unsigned long node, const char *un
 	/* Retrieve command line */
 	p = of_get_flat_dt_prop(node, "bootargs", &l);
 	if (p != NULL && l > 0)
-		strlcpy(data, p, min((int)l, COMMAND_LINE_SIZE));
+		strscpy(data, p, min((int)l, COMMAND_LINE_SIZE));
 
 	/*
 	 * CONFIG_CMDLINE is meant to be a default in case nothing else
@@ -60,7 +60,7 @@ int __init early_init_dt_scan_chosen_noinitrd(unsigned long node, const char *un
 #ifndef CONFIG_CMDLINE_FORCE
 	if (!((char *)data)[0])
 #endif
-		strlcpy(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
+		strscpy(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
 #endif /* CONFIG_CMDLINE */
 
 	pr_debug("Command line is: %s\n", (char*)data);
