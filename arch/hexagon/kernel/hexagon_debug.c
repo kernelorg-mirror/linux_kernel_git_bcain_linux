@@ -3,19 +3,10 @@
 
 /*  Skeleton for stuffing stuff in debugfs  */
 u32 sample_u32;
-struct dentry * sample_u32_dentry;
-
-u32 kernel_strace=0;
-struct dentry * kernel_strace_dentry;
-
+u32 kernel_strace;
 u32 sig_debug;
-struct dentry * sig_debug_dentry;
-
 u32 zebu_pmu_dump;
-struct dentry *zebu_pmu_dump_dentry;
-
 u32 memory_debug;
-struct dentry *memory_debug_dentry;
 
 
 //extern u32 xfrm_drop_packets;
@@ -47,16 +38,12 @@ DEFINE_SIMPLE_ATTRIBUTE(zebu_pmu_dump_fops, NULL, zebu_dump_set, "%lu\n");
 static int __init hexagon_debugfs_init(void)
 {
 	printk("%s called\n",__FUNCTION__);
-	sample_u32_dentry = debugfs_create_u32("sample_u32",0700,NULL,&sample_u32);
-	kernel_strace_dentry = debugfs_create_u32("kernel_strace",0700,NULL,&kernel_strace);
-	//  should really not be w by everyone, but...  should be only internal anyways.
-	sig_debug_dentry = debugfs_create_u32("sig_debug",0666,NULL,&sig_debug);
-//	xfrm_drop_packets_dentry = debugfs_create_u32("xfrm_drop_packets",0700,NULL,&xfrm_drop_packets);
-//	xfrm_packets_dropped_dentry = debugfs_create_u32("xfrm_packets_dropped",0700,NULL,&xfrm_packets_dropped.counter);
-
-	zebu_pmu_dump_dentry = debugfs_create_file("zebu_pmu_dump", 0700, NULL, &zebu_pmu_dump, &zebu_pmu_dump_fops);
-
-	memory_debug_dentry = debugfs_create_u32("memory_debug",0700,NULL, &memory_debug);
+	debugfs_create_u32("sample_u32", 0700, NULL, &sample_u32);
+	debugfs_create_u32("kernel_strace", 0700, NULL, &kernel_strace);
+	/*  should really not be w by everyone, but...  should be only internal anyways.  */
+	debugfs_create_u32("sig_debug", 0666, NULL, &sig_debug);
+	debugfs_create_file("zebu_pmu_dump", 0700, NULL, &zebu_pmu_dump, &zebu_pmu_dump_fops);
+	debugfs_create_u32("memory_debug", 0700, NULL, &memory_debug);
 
 
 #ifdef CONFIG_HEXAGON_TMR_LAT
@@ -70,12 +57,7 @@ static int __init hexagon_debugfs_init(void)
 
 static void __exit hexagon_debugfs_exit(void)
 {
-	printk("%s called\n",__FUNCTION__);
-	debugfs_remove(sample_u32_dentry);
-	debugfs_remove(kernel_strace_dentry);
-	debugfs_remove(sig_debug_dentry);
-//	debugfs_remove(xfrm_drop_packets_dentry);
-//	debugfs_remove(xfrm_packets_dropped_dentry);
+	/* debugfs entries cleaned up automatically on module unload */
 }
 
 module_init(hexagon_debugfs_init);
