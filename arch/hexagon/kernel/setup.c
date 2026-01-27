@@ -32,6 +32,7 @@ DEFINE_PER_CPU(u32, vpid);
 #endif
 
 unsigned long vmversion;
+u64 boot_dtb_phys;
 
 char cmd_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
