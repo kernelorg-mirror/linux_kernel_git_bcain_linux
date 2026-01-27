@@ -28,7 +28,8 @@ ENTRY(stext)
 	nop
 	nop
 	nop
-	R27 = R0  /*  Bootloader hands us one value in R0  */
+	R27 = R0  /*  DTB phys addr low, from bootloader R0  */
+	R28 = R1  /*  DTB phys addr high, save before clobbered  */
 #ifdef CONFIG_MINIVM
 	/* Virtual machine startup doesn't require lowest level setup */
 	/*  Need to add PHYS_OFFSET very, very early on.  */
@@ -262,9 +263,10 @@ __head_s_vaddr_target:
 	r2 = sub(r2,r0);
 	call ##memset;
 
-	R0.H = #HI(boot_info);
-	R0.L = #LO(boot_info);
-	memw(R0) = R27;  //  save the boot info pointer
+	R0.H = #HI(boot_dtb_phys);
+	R0.L = #LO(boot_dtb_phys);
+	memw(R0) = R27;     //  save DTB phys addr low
+	memw(R0+#4) = R28;  //  save DTB phys addr high
 
 	/*  Set PHYS_OFFSET; should be in R25 */
 #ifdef CONFIG_HEXAGON_PHYS_OFFSET

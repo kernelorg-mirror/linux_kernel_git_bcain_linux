@@ -13,6 +13,7 @@
 #include <linux/seq_file.h>
 #include <linux/console.h>
 #include <linux/of_fdt.h>
+#include <linux/libfdt.h>
 #include <asm/io.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
@@ -40,7 +41,7 @@ EXPORT_SYMBOL_GPL(elf_hwcap);
 char cmd_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 
-void *boot_info;
+u64 boot_dtb_phys;  /* DTB physical address, set by head.S from R1:0 */
 
 const struct machine_desc *mdesc;
 
@@ -136,8 +137,22 @@ static void __init setup_hwcap(void)
 
 void __init setup_arch(char **cmdline_p)
 {
-	char *p = &external_buffer;
-	void *dtb = &__dtb_start;
+	void *dtb;
+
+	/*
+	 * If bootloader passed a DTB address in R1:0, use it.
+	 * Otherwise fall back to built-in DTB.
+	 */
+	if (boot_dtb_phys) {
+		dtb = phys_to_virt((unsigned long)boot_dtb_phys);
+		if (fdt_magic(dtb) != FDT_MAGIC) {
+			pr_warn("Invalid DTB at phys 0x%llx, using built-in\n",
+				boot_dtb_phys);
+			dtb = &__dtb_start;
+		}
+	} else {
+		dtb = &__dtb_start;
+	}
 
 	/*
 	 * Set up event bindings to handle exceptions and interrupts.
@@ -153,9 +168,8 @@ void __init setup_arch(char **cmdline_p)
 	if (!mdesc)
 		panic("setup_machine_fdt returned NULL\n");
 
-	if (mdesc->setup_arch_platform) {
+	if (mdesc->setup_arch_platform)
 		mdesc->setup_arch_platform();
-	}
 
 	printk("vmversion=0x%08lx\n", vmversion);
 	printk("vm build id=0x%08lx\n", __vmgetinfo(vm_info_build_id));
@@ -165,36 +179,17 @@ void __init setup_arch(char **cmdline_p)
 	setup_hwcap();
 
 	/*
-	 * Will need to work on boot specification.
+	 * Command line precedence:
+	 * - External DTB (boot_dtb_phys != 0): DTB /chosen/bootargs takes
+	 *   precedence, with CONFIG_CMDLINE as fallback if bootargs is empty.
+	 * - Built-in DTB (boot_dtb_phys == 0): always use CONFIG_CMDLINE.
+	 *   The built-in DTB bootargs may be incomplete for the current
+	 *   boot environment (e.g. missing mem=, initrd params).
 	 */
-	//  Todo:  seriously need to fix this for all platforms
-#ifdef CONFIG_HEXAGON_MSM8960_FLUID
-	{
-		unsigned int *magic;
-
-		p = NULL;
-		for (magic = (unsigned int *)&external_buffer;
-		     magic < ((unsigned int *)&external_buffer) + 32; magic++) {
-			if (*magic == 0x54410009) {
-				p = (char *)++magic;
-				break;
-			}
-		}
-	}
-#endif
-
-#ifndef CONFIG_HEXAGON_MSM8974_FLUID
-	if (p && (p[0] != '\0'))
-		strscpy(boot_command_line, p, COMMAND_LINE_SIZE);
-	else
+	if (!boot_dtb_phys || !boot_command_line[0])
 		strscpy(boot_command_line, default_command_line,
 			COMMAND_LINE_SIZE);
-#endif
-	/*
-	 * boot_command_line and the value set up by setup_arch
-	 * are both picked up by the init code. If no reason to
-	 * make them different, pass the same pointer back.
-	 */
+
 	strscpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
@@ -213,7 +208,6 @@ void __init setup_arch(char **cmdline_p)
 	if (!conswitchp)
 		conswitchp = &dummy_con;
 #endif
-
 }
 
 /*
