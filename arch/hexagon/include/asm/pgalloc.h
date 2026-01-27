@@ -11,6 +11,9 @@
 #include <asm/mem-layout.h>
 #include <asm/atomic.h>
 
+#define __HAVE_ARCH_PTE_ALLOC_ONE
+#define __HAVE_ARCH_PTE_ALLOC_ONE_KERNEL
+
 #include <asm-generic/pgalloc.h>
 
 extern unsigned long long kmap_generation;
@@ -39,6 +42,47 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	mm->context.ptbase = __pa(pgd);
 
 	return pgd;
+}
+
+/*
+ * Hexagon needs PTEs initialized to _NULL_PTE (0x7), not zero.
+ * Override the generic pte_alloc_one functions.
+ */
+static inline pgtable_t pte_alloc_one(struct mm_struct *mm)
+{
+	struct page *pte;
+	pte_t *ptep;
+	int i;
+
+	pte = alloc_page(GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_ACCOUNT);
+	if (!pte)
+		return NULL;
+	if (!pagetable_pte_ctor(mm, page_ptdesc(pte))) {
+		__free_page(pte);
+		return NULL;
+	}
+	/* Initialize PTEs to _NULL_PTE */
+	ptep = (pte_t *)page_address(pte);
+	for (i = 0; i < PTRS_PER_PTE; i++)
+		pte_val(ptep[i]) = _NULL_PTE;
+
+	return pte;
+}
+
+static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm)
+{
+	pte_t *pte;
+	int i;
+
+	pte = (pte_t *)__get_free_page(GFP_KERNEL | __GFP_RETRY_MAYFAIL);
+	if (!pte)
+		return NULL;
+
+	/* Initialize PTEs to _NULL_PTE */
+	for (i = 0; i < PTRS_PER_PTE; i++)
+		pte_val(pte[i]) = _NULL_PTE;
+
+	return pte;
 }
 
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd,
