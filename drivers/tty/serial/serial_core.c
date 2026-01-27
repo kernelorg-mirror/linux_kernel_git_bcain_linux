@@ -1934,7 +1934,11 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
  * memd + dealloc_return packet generated at -O2 corrupts
  * callee-saved registers due to incorrect packet semantics.
  */
+#ifdef CONFIG_HEXAGON
 static int __attribute__((optnone))
+#else
+static int
+#endif
 uart_port_activate(struct tty_port *port, struct tty_struct *tty)
 {
 	struct uart_state *state = container_of(port, struct uart_state, port);
