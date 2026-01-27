@@ -11,6 +11,7 @@
 #define _ASM_HEXAGON_SETUP_H
 
 #include <linux/init.h>
+#include <linux/types.h>
 #include <uapi/asm/setup.h>
 
 extern u64 boot_dtb_phys;
