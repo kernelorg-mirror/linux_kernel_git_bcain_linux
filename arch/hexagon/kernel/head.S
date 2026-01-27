@@ -281,22 +281,3 @@ __head_s_vaddr_target:
 	 */
 1:
 	jump 1b
-
-//  Bootloader currently still looks at 4k regardless of page size
-//  Leave enough space for a really ripe device tree blob from the bootloader
-//  Might need to be copied for kexec...
-.p2align 12
-ENTRY(external_buffer)
-	.fill 262144,1,0
-#ifdef CONFIG_HEXAGON_MSS
-	//  This image uses 0x40000000 as the sync mailbox
-.p2align 18
-MBN_IMAGE:
-	.incbin "/usr2/rkuo/outbox/hexagon-linux-0xfcc00000.mbn"
-#endif
-
-
-.data
-.p2align PAGE_SHIFT
-ENTRY(empty_zero_page)
-        .fill _PAGE_SIZE,1,0
