@@ -13,7 +13,8 @@
 #include <linux/init.h>
 #include <uapi/asm/setup.h>
 
-extern char external_cmdline_buffer;
+extern u64 boot_dtb_phys;
+extern char external_buffer;
 
 void __init setup_arch_memory(void);
 
