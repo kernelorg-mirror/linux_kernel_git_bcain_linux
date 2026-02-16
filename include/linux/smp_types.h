@@ -64,6 +64,10 @@ struct __call_single_node {
 #ifdef CONFIG_64BIT
 	u16 src, dst;
 #endif
-};
+} __aligned(8); /* Architectures with strict-alignment 8-byte loads (e.g.
+		 * Hexagon memd) require llist + u_flags to be naturally
+		 * aligned.  alloc_percpu() uses __alignof__ which may not
+		 * inherit the typedef's __aligned(16), so enforce it here.
+		 */
 
 #endif /* __LINUX_SMP_TYPES_H */
