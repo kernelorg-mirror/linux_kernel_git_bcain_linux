@@ -22,6 +22,7 @@ config HEXAGON
 	# select GPIOLIB
 	# select HAVE_CLK
 	select GENERIC_ATOMIC64
+	select HAVE_EBPF_JIT
 	select HAVE_PERF_EVENTS
 	# GENERIC_ALLOCATOR is used by dma_alloc_coherent()
 	select GENERIC_ALLOCATOR
