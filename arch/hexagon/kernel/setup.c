@@ -13,6 +13,7 @@
 #include <linux/seq_file.h>
 #include <linux/console.h>
 #include <linux/of_fdt.h>
+#include <linux/libfdt.h>
 #include <asm/io.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
@@ -139,6 +140,19 @@ void __init setup_arch(char **cmdline_p)
 {
 	char *p = &external_buffer;
 	void *dtb = &__dtb_start;
+
+	/*
+	 * Prefer bootloader-provided FDT (e.g. from QEMU via R0) if valid.
+	 * The boot stub passes the FDT physical address in R0, which head.S
+	 * saves as boot_info.  If it points to a valid FDT within our mapped
+	 * memory range, use it instead of the built-in DTB.
+	 */
+	if (boot_info) {
+		void *boot_dtb = phys_to_virt((unsigned long)boot_info);
+
+		if (fdt_magic(boot_dtb) == FDT_MAGIC)
+			dtb = boot_dtb;
+	}
 
 	/*
 	 * Set up event bindings to handle exceptions and interrupts.
