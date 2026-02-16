@@ -15,7 +15,6 @@
 
 / {
 	chosen {
-                bootargs = "earlycon=pl011,0x10000000 console=ttyAMA0";
 		stdout-path = &uart0;
 		rng-seed = <0xc0de1234 0xabcdef01 0x23456789 0x0fedcba9
 			    0x87654321 0x12345678 0x9abcdef0 0x01234567
