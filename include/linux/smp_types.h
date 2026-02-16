@@ -64,6 +64,12 @@ struct __call_single_node {
 #ifdef CONFIG_64BIT
 	u16 src, dst;
 #endif
-};
+} __aligned(8); /* Ensure compilers can safely merge llist + u_flags into
+		 * a single 8-byte load on strict-alignment architectures
+		 * (e.g. Hexagon memd).  The call_single_data_t typedef
+		 * carries __aligned(16) but some compilers do not propagate
+		 * typedef alignment to __alignof__, causing alloc_percpu()
+		 * to place instances at only 4-byte boundaries.
+		 */
 
 #endif /* __LINUX_SMP_TYPES_H */
