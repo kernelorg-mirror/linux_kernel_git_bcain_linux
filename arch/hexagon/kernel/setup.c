@@ -13,6 +13,7 @@
 #include <linux/seq_file.h>
 #include <linux/console.h>
 #include <linux/of_fdt.h>
+#include <linux/libfdt.h>
 #include <asm/io.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
@@ -36,7 +37,7 @@ unsigned long vmversion;
 char cmd_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 
-void *boot_info;
+u64 boot_info;
 
 const struct machine_desc *mdesc;
 
@@ -47,8 +48,21 @@ const struct machine_desc *mdesc;
 
 void __init setup_arch(char **cmdline_p)
 {
-	char *p = &external_buffer;
+	char *p = (char *)&external_buffer;
 	void *dtb = &__dtb_start;
+
+	/*
+	 * Prefer bootloader-provided FDT if valid.  The boot stub passes
+	 * the FDT physical address in R1:R0, which head.S saves as
+	 * boot_info (64-bit).  If it points to a valid FDT within our
+	 * mapped memory range, use it instead of the built-in DTB.
+	 */
+	if (boot_info) {
+		void *boot_dtb = phys_to_virt((phys_addr_t)boot_info);
+
+		if (fdt_magic(boot_dtb) == FDT_MAGIC)
+			dtb = boot_dtb;
+	}
 
 	/*
 	 * Set up event bindings to handle exceptions and interrupts.
@@ -69,7 +83,7 @@ void __init setup_arch(char **cmdline_p)
 
 	pr_info("vmversion=0x%08lx\n", vmversion);
 	pr_info("vm build id=0x%08lx\n", __vmgetinfo(vm_info_build_id));
-	pr_info("boot_info=%p\n", boot_info);
+	pr_info("boot_info=%08llx\n", boot_info);
 	if (p && (p[0] != '\0'))
 		strscpy(boot_command_line, p, COMMAND_LINE_SIZE);
 	else
