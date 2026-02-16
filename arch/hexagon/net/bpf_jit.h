@@ -621,6 +621,25 @@ static inline u32 hex_a2_swiz(u8 rd, u8 rs)
 }
 
 /*
+ * Rd = memw_locked(Rs) -- load word locked (LL)
+ * Encoding: 1001 0010 000sssss PP000---000ddddd
+ */
+static inline u32 hex_l2_loadw_locked(u8 rd, u8 rs)
+{
+	return 0x92000000 | ((rs & 0x1f) << 16) | (rd & 0x1f);
+}
+
+/*
+ * memw_locked(Rs, Pd) = Rt -- store word locked (SC)
+ * Encoding: 1010 0000 101sssss PP-ttttt----00dd
+ */
+static inline u32 hex_s2_storew_locked(u8 rs, u8 pd, u8 rt)
+{
+	return 0xa0a00000 | ((rs & 0x1f) << 16) | ((rt & 0x1f) << 8) |
+	       (pd & 0x3);
+}
+
+/*
  * Pd = cmp.eq(Rs, #s10) -- compare register with signed 10-bit immediate
  * Encoding: 01110101 00isssssPPiiiiiiii000dd
  */
