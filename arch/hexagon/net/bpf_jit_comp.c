@@ -63,6 +63,57 @@ static s8 lo(const s8 *r) { return r[1]; }
 static bool is_stacked(s8 reg) { return reg < 0; }
 
 /* ------------------------------------------------------------------ */
+/* 64-bit div/mod helpers (called from JIT code)                       */
+/* ------------------------------------------------------------------ */
+
+static u64 jit_udiv64(u64 dividend, u64 divisor)
+{
+	return div64_u64(dividend, divisor);
+}
+
+static u64 jit_mod64(u64 dividend, u64 divisor)
+{
+	u64 rem;
+
+	div64_u64_rem(dividend, divisor, &rem);
+	return rem;
+}
+
+static s64 jit_sdiv64(s64 dividend, s64 divisor)
+{
+	return div64_s64(dividend, divisor);
+}
+
+static s64 jit_smod64(s64 dividend, s64 divisor)
+{
+	return dividend - div64_s64(dividend, divisor) * divisor;
+}
+
+/* ------------------------------------------------------------------ */
+/* 32-bit div/mod helpers (called from JIT code)                       */
+/* ------------------------------------------------------------------ */
+
+static u32 jit_udiv32(u32 dividend, u32 divisor)
+{
+	return dividend / divisor;
+}
+
+static u32 jit_mod32(u32 dividend, u32 divisor)
+{
+	return dividend % divisor;
+}
+
+static s32 jit_sdiv32(s32 dividend, s32 divisor)
+{
+	return dividend / divisor;
+}
+
+static s32 jit_smod32(s32 dividend, s32 divisor)
+{
+	return dividend % divisor;
+}
+
+/* ------------------------------------------------------------------ */
 /* Register spill / fill                                               */
 /* ------------------------------------------------------------------ */
 
@@ -136,6 +187,146 @@ static void emit_imm64(const s8 *rd, s32 imm_hi, s32 imm_lo,
 {
 	emit_imm(lo(rd), imm_lo, ctx);
 	emit_imm(hi(rd), imm_hi, ctx);
+}
+
+/* ------------------------------------------------------------------ */
+/* 64-bit div/mod emission                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Emit a call to a 64-bit div/mod helper.
+ *
+ * The helpers take (u64 dividend, u64 divisor) in R1:R0, R3:R2
+ * and return a 64-bit result in R1:R0.
+ *
+ * We must save/restore R0-R5 since they overlap BPF_REG_1 through BPF_REG_3.
+ * Also save TCC (R14, caller-saved) so it survives the call.
+ */
+static void emit_divmod64(const s8 *dst, const s8 *src, const s8 *tmp,
+			   struct hexagon_jit_context *ctx,
+			   bool is_mod, bool is_signed)
+{
+	const s8 *rd = bpf_get_reg64(dst, tmp, ctx);
+	u32 addr;
+
+	/* Save R0-R5 and TCC on the stack */
+	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, -32), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 0, HEX_REG_R0), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 1, HEX_REG_R1), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 2, HEX_REG_R2), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 3, HEX_REG_R3), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 4, HEX_REG_R4), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 5, HEX_REG_R5), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 6, HEX_REG_TCC), ctx);
+
+	/*
+	 * Move dividend (dst) into R1:R0, divisor (src) into R3:R2.
+	 * If a source register is in R0-R5, it was just saved to the stack
+	 * and may be clobbered by a preceding move -- load from save area.
+	 */
+#define MOVE_OR_LOAD(to, from) do {					\
+	if ((u8)(from) <= HEX_REG_R5)					\
+		emit(hex_l2_loadri_io((to), HEX_REG_SP, (from)), ctx);	\
+	else								\
+		emit(hex_a2_tfr((to), (from)), ctx);			\
+} while (0)
+
+	MOVE_OR_LOAD(HEX_REG_R0, lo(rd));
+	MOVE_OR_LOAD(HEX_REG_R1, hi(rd));
+	MOVE_OR_LOAD(HEX_REG_R2, lo(src));
+	MOVE_OR_LOAD(HEX_REG_R3, hi(src));
+
+#undef MOVE_OR_LOAD
+
+	/* Select helper */
+	if (is_mod)
+		addr = is_signed ? (u32)(uintptr_t)jit_smod64
+				 : (u32)(uintptr_t)jit_mod64;
+	else
+		addr = is_signed ? (u32)(uintptr_t)jit_sdiv64
+				 : (u32)(uintptr_t)jit_udiv64;
+
+	emit_imm(HEX_REG_R28, addr, ctx);
+	emit(hex_j2_callr(HEX_REG_R28), ctx);
+
+	/* Move result R1:R0 into dst */
+	emit(hex_a2_tfr(lo(rd), HEX_REG_R0), ctx);
+	emit(hex_a2_tfr(hi(rd), HEX_REG_R1), ctx);
+
+	/* Restore R0-R5 and TCC */
+	emit(hex_l2_loadri_io(HEX_REG_R0, HEX_REG_SP, 0), ctx);
+	emit(hex_l2_loadri_io(HEX_REG_R1, HEX_REG_SP, 1), ctx);
+	emit(hex_l2_loadri_io(HEX_REG_R2, HEX_REG_SP, 2), ctx);
+	emit(hex_l2_loadri_io(HEX_REG_R3, HEX_REG_SP, 3), ctx);
+	emit(hex_l2_loadri_io(HEX_REG_R4, HEX_REG_SP, 4), ctx);
+	emit(hex_l2_loadri_io(HEX_REG_R5, HEX_REG_SP, 5), ctx);
+	emit(hex_l2_loadri_io(HEX_REG_TCC, HEX_REG_SP, 6), ctx);
+	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, 32), ctx);
+
+	bpf_put_reg64(dst, rd, ctx);
+}
+
+/* ------------------------------------------------------------------ */
+/* 32-bit div/mod emission                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Emit a call to a 32-bit div/mod helper.
+ *
+ * The helpers take (u32 dividend, u32 divisor) in R0, R1
+ * and return a 32-bit result in R0.
+ */
+static void emit_divmod32(const s8 *dst, const s8 *src, const s8 *tmp,
+			   struct hexagon_jit_context *ctx,
+			   bool is_mod, bool is_signed)
+{
+	const s8 *rd = bpf_get_reg32(dst, tmp, ctx);
+	u32 addr;
+
+	/* Save R0-R1 and TCC on the stack */
+	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, -16), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 0, HEX_REG_R0), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 1, HEX_REG_R1), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, 2, HEX_REG_TCC), ctx);
+
+	/*
+	 * Move dividend (dst) into R0, divisor (src) into R1.
+	 * If a source register is R0 or R1, it was just saved to the stack
+	 * and may be clobbered by the preceding move -- load from save area.
+	 */
+#define MOVE_OR_LOAD(to, from) do {					\
+	if ((u8)(from) <= HEX_REG_R1)					\
+		emit(hex_l2_loadri_io((to), HEX_REG_SP, (from)), ctx);	\
+	else								\
+		emit(hex_a2_tfr((to), (from)), ctx);			\
+} while (0)
+
+	MOVE_OR_LOAD(HEX_REG_R0, lo(rd));
+	MOVE_OR_LOAD(HEX_REG_R1, lo(src));
+
+#undef MOVE_OR_LOAD
+
+	/* Select helper */
+	if (is_mod)
+		addr = is_signed ? (u32)(uintptr_t)jit_smod32
+				 : (u32)(uintptr_t)jit_mod32;
+	else
+		addr = is_signed ? (u32)(uintptr_t)jit_sdiv32
+				 : (u32)(uintptr_t)jit_udiv32;
+
+	emit_imm(HEX_REG_R28, addr, ctx);
+	emit(hex_j2_callr(HEX_REG_R28), ctx);
+
+	/* Move result R0 into dst */
+	emit(hex_a2_tfr(lo(rd), HEX_REG_R0), ctx);
+
+	/* Restore R0-R1 and TCC */
+	emit(hex_l2_loadri_io(HEX_REG_R0, HEX_REG_SP, 0), ctx);
+	emit(hex_l2_loadri_io(HEX_REG_R1, HEX_REG_SP, 1), ctx);
+	emit(hex_l2_loadri_io(HEX_REG_TCC, HEX_REG_SP, 2), ctx);
+	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, 16), ctx);
+
+	bpf_put_reg32(dst, rd, ctx);
 }
 
 /* ------------------------------------------------------------------ */
@@ -402,6 +593,98 @@ static void emit_alu_r64(const s8 *dst, const s8 *src,
 		emit(hex_a2_tfrsi(HEX_REG_R28, 1), ctx);
 		emit(hex_j2_jumpt(HEX_REG_P0, 8), ctx);
 		emit(hex_a2_sub(hi(rd), hi(rd), HEX_REG_R28), ctx);
+		break;
+	case BPF_LSH:
+		/*
+		 * 64-bit left shift by register amount.
+		 *
+		 * R28 = lo(rs) - 32
+		 * if (R28 >= 0) {        // shift >= 32
+		 *     hi = asl(lo_d, R28)
+		 *     lo = 0
+		 * } else {               // shift < 32
+		 *     tmp = lsr(lo_d, 1)
+		 *     R28 = 31 - lo(rs)  // = -(R28) - 1 = ~R28
+		 *     tmp = lsr(tmp, R28)
+		 *     hi = asl(hi_d, lo(rs))
+		 *     hi = or(hi, tmp)
+		 *     lo = asl(lo_d, lo(rs))
+		 * }
+		 */
+		emit(hex_a2_addi(HEX_REG_R28, lo(rs), -32), ctx);
+		/* P0 = (R28 >= 0), i.e. shift >= 32 -- use cmp.gt(R28, -1) */
+		emit(hex_c4_cmpeqi(HEX_REG_P0, HEX_REG_R28, -1), ctx);
+		/* if shift==32 exactly, P0 is true (eq -1) -> skip to else.
+		 * We need: if R28 >= 0 jump to big path.
+		 * Use: P0 = cmp.gt(R28, -1) -- but we don't have cmp.gti.
+		 * Instead: R28 >= 0 <-> !(R28 < 0) <-> cmp.gt(-1, R28) is false.
+		 * Actually simpler: just use a sub and check sign.
+		 * Let's use the approach: if (lo(rs) u>= 32) big path.
+		 */
+		/* Redo: use cmpgtu to check lo(rs) >= 32 as unsigned */
+		emit(hex_a2_tfrsi(HEX_REG_R28, 31), ctx);
+		/* P0 = cmp.gtu(lo(rs), 31) -- true if shift >= 32 */
+		emit(hex_c2_cmpgtu(HEX_REG_P0, lo(rs), HEX_REG_R28), ctx);
+		/* if (!P0) jump past big path to small path */
+		emit(hex_j2_jumpf(HEX_REG_P0, 5 * 4), ctx);
+		/* --- big path: shift >= 32 (4 insns) --- */
+		emit(hex_a2_addi(HEX_REG_R28, lo(rs), -32), ctx);
+		emit(hex_s2_asl_r_r(hi(rd), lo(rd), HEX_REG_R28), ctx);
+		emit(hex_a2_tfrsi(lo(rd), 0), ctx);
+		emit(hex_j2_jump(7 * 4), ctx);  /* skip small path */
+		/* --- small path: shift < 32 --- (7 insns) */
+		emit(hex_s2_lsr_i_r(HEX_REG_R28, lo(rd), 1), ctx);
+		emit(hex_a2_subri(hi(tmp2), 31, lo(rs)), ctx);
+		emit(hex_s2_lsr_r_r(HEX_REG_R28, HEX_REG_R28, hi(tmp2)),
+		     ctx);
+		emit(hex_s2_asl_r_r(hi(rd), hi(rd), lo(rs)), ctx);
+		emit(hex_a2_or(hi(rd), hi(rd), HEX_REG_R28), ctx);
+		emit(hex_s2_asl_r_r(lo(rd), lo(rd), lo(rs)), ctx);
+		emit(hex_a2_nop(), ctx);  /* landing pad */
+		break;
+	case BPF_RSH:
+		/*
+		 * 64-bit logical right shift by register amount.
+		 */
+		emit(hex_a2_tfrsi(HEX_REG_R28, 31), ctx);
+		emit(hex_c2_cmpgtu(HEX_REG_P0, lo(rs), HEX_REG_R28), ctx);
+		emit(hex_j2_jumpf(HEX_REG_P0, 5 * 4), ctx);
+		/* --- big path: shift >= 32 --- */
+		emit(hex_a2_addi(HEX_REG_R28, lo(rs), -32), ctx);
+		emit(hex_s2_lsr_r_r(lo(rd), hi(rd), HEX_REG_R28), ctx);
+		emit(hex_a2_tfrsi(hi(rd), 0), ctx);
+		emit(hex_j2_jump(7 * 4), ctx);
+		/* --- small path: shift < 32 --- (7 insns) */
+		emit(hex_s2_asl_i_r(HEX_REG_R28, hi(rd), 1), ctx);
+		emit(hex_a2_subri(hi(tmp2), 31, lo(rs)), ctx);
+		emit(hex_s2_asl_r_r(HEX_REG_R28, HEX_REG_R28, hi(tmp2)),
+		     ctx);
+		emit(hex_s2_lsr_r_r(lo(rd), lo(rd), lo(rs)), ctx);
+		emit(hex_a2_or(lo(rd), lo(rd), HEX_REG_R28), ctx);
+		emit(hex_s2_lsr_r_r(hi(rd), hi(rd), lo(rs)), ctx);
+		emit(hex_a2_nop(), ctx);
+		break;
+	case BPF_ARSH:
+		/*
+		 * 64-bit arithmetic right shift by register amount.
+		 */
+		emit(hex_a2_tfrsi(HEX_REG_R28, 31), ctx);
+		emit(hex_c2_cmpgtu(HEX_REG_P0, lo(rs), HEX_REG_R28), ctx);
+		emit(hex_j2_jumpf(HEX_REG_P0, 5 * 4), ctx);
+		/* --- big path: shift >= 32 --- */
+		emit(hex_a2_addi(HEX_REG_R28, lo(rs), -32), ctx);
+		emit(hex_s2_asr_r_r(lo(rd), hi(rd), HEX_REG_R28), ctx);
+		emit(hex_s2_asr_i_r(hi(rd), hi(rd), 31), ctx);
+		emit(hex_j2_jump(7 * 4), ctx);
+		/* --- small path: shift < 32 --- (7 insns) */
+		emit(hex_s2_asl_i_r(HEX_REG_R28, hi(rd), 1), ctx);
+		emit(hex_a2_subri(hi(tmp2), 31, lo(rs)), ctx);
+		emit(hex_s2_asl_r_r(HEX_REG_R28, HEX_REG_R28, hi(tmp2)),
+		     ctx);
+		emit(hex_s2_lsr_r_r(lo(rd), lo(rd), lo(rs)), ctx);
+		emit(hex_a2_or(lo(rd), lo(rd), HEX_REG_R28), ctx);
+		emit(hex_s2_asr_r_r(hi(rd), hi(rd), lo(rs)), ctx);
+		emit(hex_a2_nop(), ctx);
 		break;
 	}
 
@@ -1050,6 +1333,122 @@ static void emit_bswap_be(const s8 *dst, s32 imm,
 }
 
 /* ------------------------------------------------------------------ */
+/* 32-bit atomic operations (LL/SC loop)                               */
+/* ------------------------------------------------------------------ */
+
+static int emit_atomic(const s8 *dst, const s8 *src, s16 off,
+		       struct hexagon_jit_context *ctx, const s32 imm)
+{
+	const s8 *tmp1 = bpf2hex[TMP_REG_1];
+	const s8 *tmp2 = bpf2hex[TMP_REG_2];
+	const s8 *rd = bpf_get_reg64(dst, tmp1, ctx);
+	const s8 *rs = bpf_get_reg64(src, tmp2, ctx);
+	u8 atomic_op = imm & ~BPF_FETCH;
+	bool fetch = imm & BPF_FETCH;
+	int loop_start;
+
+	/* Compute address into R28 */
+	if (off) {
+		emit_imm(HEX_REG_R28, off, ctx);
+		emit(hex_a2_add(HEX_REG_R28, HEX_REG_R28, lo(rd)), ctx);
+	} else {
+		emit(hex_a2_tfr(HEX_REG_R28, lo(rd)), ctx);
+	}
+
+	/* R28 = address, lo(rs) = source value */
+
+	if (atomic_op == BPF_CMPXCHG) {
+		/*
+		 * CMPXCHG: compare *addr with BPF_REG_0.lo (R16),
+		 * if equal store lo(rs), always return old in BPF_REG_0.lo.
+		 *
+		 * loop: R12 = memw_locked(R28)
+		 *       P0 = cmp.eq(R12, R16)
+		 *       if (!P0) jump done
+		 *       memw_locked(R28, P0) = lo(rs)
+		 *       if (!P0) jump loop
+		 * done: R16 = R12   (old value -> BPF_REG_0.lo)
+		 */
+		loop_start = ctx->ninsns;
+		emit(hex_l2_loadw_locked(HEX_REG_R12, HEX_REG_R28), ctx);
+		emit(hex_c2_cmpeq(HEX_REG_P0, HEX_REG_R12, HEX_REG_R16),
+		     ctx);
+		emit(hex_j2_jumpf(HEX_REG_P0, 3 * 4), ctx);
+		emit(hex_s2_storew_locked(HEX_REG_R28, HEX_REG_P0, lo(rs)),
+		     ctx);
+		emit(hex_j2_jumpf(HEX_REG_P0,
+		     ninsns_rvoff(loop_start - (int)ctx->ninsns)), ctx);
+		/* done: write old value back to R16 (BPF_REG_0 lo) */
+		emit(hex_a2_tfr(HEX_REG_R16, HEX_REG_R12), ctx);
+		return 0;
+	}
+
+	if (atomic_op == BPF_XCHG) {
+		/*
+		 * XCHG: atomically swap *addr with lo(rs).
+		 *
+		 * loop: R12 = memw_locked(R28)
+		 *       memw_locked(R28, P0) = lo(rs)
+		 *       if (!P0) jump loop
+		 *
+		 * lo(rs) = R12 (old value, BPF_FETCH is implicit)
+		 */
+		loop_start = ctx->ninsns;
+		emit(hex_l2_loadw_locked(HEX_REG_R12, HEX_REG_R28), ctx);
+		emit(hex_s2_storew_locked(HEX_REG_R28, HEX_REG_P0, lo(rs)),
+		     ctx);
+		emit(hex_j2_jumpf(HEX_REG_P0,
+		     ninsns_rvoff(loop_start - (int)ctx->ninsns)), ctx);
+		/* XCHG always fetches the old value */
+		emit(hex_a2_tfr(lo(rs), HEX_REG_R12), ctx);
+		bpf_put_reg64(src, rs, ctx);
+		return 0;
+	}
+
+	/*
+	 * ADD, AND, OR, XOR -- with optional FETCH.
+	 *
+	 * loop: R12 = memw_locked(R28)
+	 *       R13 = op(R12, lo(rs))
+	 *       memw_locked(R28, P0) = R13
+	 *       if (!P0) jump loop
+	 * if (fetch) lo(rs) = R12 (old value)
+	 */
+	loop_start = ctx->ninsns;
+	emit(hex_l2_loadw_locked(HEX_REG_R12, HEX_REG_R28), ctx);
+
+	switch (atomic_op) {
+	case BPF_ADD:
+		emit(hex_a2_add(HEX_REG_R13, HEX_REG_R12, lo(rs)), ctx);
+		break;
+	case BPF_AND:
+		emit(hex_a2_and(HEX_REG_R13, HEX_REG_R12, lo(rs)), ctx);
+		break;
+	case BPF_OR:
+		emit(hex_a2_or(HEX_REG_R13, HEX_REG_R12, lo(rs)), ctx);
+		break;
+	case BPF_XOR:
+		emit(hex_a2_xor(HEX_REG_R13, HEX_REG_R12, lo(rs)), ctx);
+		break;
+	default:
+		pr_err("bpf-jit: unknown atomic op %02x\n", atomic_op);
+		return -EINVAL;
+	}
+
+	emit(hex_s2_storew_locked(HEX_REG_R28, HEX_REG_P0, HEX_REG_R13),
+	     ctx);
+	emit(hex_j2_jumpf(HEX_REG_P0,
+	     ninsns_rvoff(loop_start - (int)ctx->ninsns)), ctx);
+
+	if (fetch) {
+		emit(hex_a2_tfr(lo(rs), HEX_REG_R12), ctx);
+		bpf_put_reg64(src, rs, ctx);
+	}
+
+	return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Main instruction emitter                                            */
 /* ------------------------------------------------------------------ */
 
@@ -1098,18 +1497,25 @@ int bpf_jit_emit_insn(const struct bpf_insn *insn,
 		emit_alu_r64(dst, tmp2, ctx, BPF_NEG);
 		break;
 
-	/* 64-bit shifts by register — not supported on 32-bit */
+	/* 64-bit shifts by register */
 	case BPF_ALU64 | BPF_LSH | BPF_X:
 	case BPF_ALU64 | BPF_RSH | BPF_X:
 	case BPF_ALU64 | BPF_ARSH | BPF_X:
-		goto notsupported;
+		emit_alu_r64(dst, src, ctx, BPF_OP(code));
+		break;
 
-	/* 64-bit div/mod — not supported */
+	/* 64-bit div/mod */
 	case BPF_ALU64 | BPF_DIV | BPF_X:
-	case BPF_ALU64 | BPF_DIV | BPF_K:
 	case BPF_ALU64 | BPF_MOD | BPF_X:
+		emit_divmod64(dst, src, tmp1, ctx,
+			      BPF_OP(code) == BPF_MOD, off == 1);
+		break;
+	case BPF_ALU64 | BPF_DIV | BPF_K:
 	case BPF_ALU64 | BPF_MOD | BPF_K:
-		goto notsupported;
+		emit_imm32(tmp2, imm, ctx);
+		emit_divmod64(dst, tmp2, tmp1, ctx,
+			      BPF_OP(code) == BPF_MOD, off == 1);
+		break;
 
 	/* --- 64-bit ALU imm --- */
 	case BPF_ALU64 | BPF_MOV  | BPF_K:
@@ -1163,10 +1569,16 @@ int bpf_jit_emit_insn(const struct bpf_insn *insn,
 		break;
 
 	case BPF_ALU | BPF_DIV | BPF_X:
-	case BPF_ALU | BPF_DIV | BPF_K:
 	case BPF_ALU | BPF_MOD | BPF_X:
+		emit_divmod32(dst, src, tmp1, ctx,
+			      BPF_OP(code) == BPF_MOD, off == 1);
+		break;
+	case BPF_ALU | BPF_DIV | BPF_K:
 	case BPF_ALU | BPF_MOD | BPF_K:
-		goto notsupported;
+		emit_imm32(tmp2, imm, ctx);
+		emit_divmod32(dst, tmp2, tmp1, ctx,
+			      BPF_OP(code) == BPF_MOD, off == 1);
+		break;
 
 	case BPF_ALU | BPF_NEG:
 		emit_alu_r32(dst, tmp2, ctx, BPF_NEG);
@@ -1324,6 +1736,11 @@ int bpf_jit_emit_insn(const struct bpf_insn *insn,
 		break;
 
 	case BPF_STX | BPF_ATOMIC | BPF_W:
+		if (emit_atomic(dst, src, off, ctx, imm))
+			return -1;
+		break;
+
+	/* 64-bit atomics not supported on 32-bit architecture */
 	case BPF_STX | BPF_ATOMIC | BPF_DW:
 		goto notsupported;
 
