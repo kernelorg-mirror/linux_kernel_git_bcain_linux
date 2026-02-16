@@ -40,7 +40,6 @@ u64 boot_dtb_phys;
 EXPORT_SYMBOL_GPL(elf_hwcap);
 
 char cmd_line[COMMAND_LINE_SIZE];
-static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 
 void *boot_info;
 
@@ -199,11 +198,14 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 #ifndef CONFIG_HEXAGON_MSM8974_FLUID
+	/*
+	 * If external_buffer has content (e.g. from a bootloader), use it.
+	 * Otherwise trust early_init_dt_scan_chosen() which already handled:
+	 *   DTB bootargs present -> use them
+	 *   DTB bootargs empty   -> use CONFIG_CMDLINE
+	 */
 	if (p && (p[0] != '\0'))
 		strscpy(boot_command_line, p, COMMAND_LINE_SIZE);
-	else
-		strscpy(boot_command_line, default_command_line,
-			COMMAND_LINE_SIZE);
 #endif
 	/*
 	 * boot_command_line and the value set up by setup_arch
