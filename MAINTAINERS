@@ -4799,6 +4799,12 @@ L:	bpf@vger.kernel.org
 S:	Supported
 F:	arch/arm64/net/
 
+BPF JIT for HEXAGON
+M:	Brian Cain <brian.cain@oss.qualcomm.com>
+L:	bpf@vger.kernel.org
+S:	Maintained
+F:	arch/hexagon/net/
+
 BPF JIT for LOONGARCH
 M:	Tiezhu Yang <yangtiezhu@loongson.cn>
 R:	Hengqi Chen <hengqi.chen@gmail.com>
