@@ -15,6 +15,7 @@ config HEXAGON
 	# select GPIOLIB
 	# select HAVE_CLK
 	select GENERIC_ATOMIC64
+	select HAVE_EBPF_JIT
 	select HAVE_PERF_EVENTS
 	select PERF_EVENTS
 	select HAVE_GENERIC_HARDIRQS
