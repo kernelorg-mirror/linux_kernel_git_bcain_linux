@@ -35,7 +35,6 @@ DEFINE_PER_CPU(u32, vpid);
 unsigned long vmversion;
 
 char cmd_line[COMMAND_LINE_SIZE];
-static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 
 u64 boot_info;
 
@@ -84,11 +83,14 @@ void __init setup_arch(char **cmdline_p)
 	pr_info("vmversion=0x%08lx\n", vmversion);
 	pr_info("vm build id=0x%08lx\n", __vmgetinfo(vm_info_build_id));
 	pr_info("boot_info=%08llx\n", boot_info);
+	/*
+	 * If external_buffer has content (e.g. from a bootloader), use it.
+	 * Otherwise trust early_init_dt_scan_chosen() which already handled:
+	 *   DTB bootargs present -> use them
+	 *   DTB bootargs empty   -> use CONFIG_CMDLINE
+	 */
 	if (p && (p[0] != '\0'))
 		strscpy(boot_command_line, p, COMMAND_LINE_SIZE);
-	else
-		strscpy(boot_command_line, default_command_line,
-			COMMAND_LINE_SIZE);
 	/*
 	 * boot_command_line and the value set up by setup_arch
 	 * are both picked up by the init code. If no reason to
