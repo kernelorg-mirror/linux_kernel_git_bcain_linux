@@ -48,12 +48,10 @@ static int __init sm8150_init(void)
 	printk("%s\n", __func__);
 
 	if (strcmp(mdesc->name,"sm8150")) {
-		printk("omg not sm8150!!!\n");
 		return 0;
 	}
 
 	platform_add_devices(devices, ARRAY_SIZE(devices));
-
         of_platform_populate(of_find_node_by_path("/soc"),
 		NULL, NULL, NULL);
 
