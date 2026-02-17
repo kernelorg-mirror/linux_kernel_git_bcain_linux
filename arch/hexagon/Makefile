@@ -57,12 +57,10 @@ ifneq ($(call clang-min-version, 190100),y)
 KBUILD_CFLAGS += -mllvm -hexagon-cext=false
 endif
 
-LIBGCC := $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name 2>/dev/null)
-libs-y += $(LIBGCC)
-
-# For bcmp dependency:
-LIBC_ARCHIVE := $(shell $(CC) $(KBUILD_CFLAGS) -print-file-name=libc.a)
-libs-y += $(LIBC_ARCHIVE)
+# Hexagon builtins are provided by arch/hexagon/lib/ (divsi3, memcpy, etc.)
+# so we do not link against libgcc or libc.
+LIBGCC :=
+LIBC_ARCHIVE :=
 
 head-y := arch/hexagon/kernel/head.o
 
