@@ -6,7 +6,8 @@
 	#size-cells = <1>;
 	chosen { };
 	aliases {
-		serial0 = &uart0;
+		serial0 = &uart1;
+		serial1 = &uart0;
 	};
 	memory { device_type = "memory"; reg = <0 0>; };
 
@@ -130,6 +131,25 @@
 			clocks = <&xtal24mhz>, <&pclk>;
 			clock-names = "uartclk", "apb_pclk";
 			reg = <0x10000000 0x1000>;
+		};
+
+		geniqup: geniqup@1000a000 {
+			compatible = "qcom,geni-se-qup";
+			reg = <0x1000a000 0x1000>;
+			clocks = <&xtal24mhz>, <&xtal24mhz>;
+			clock-names = "m-ahb", "s-ahb";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			uart1: serial@10004000 {
+				compatible = "qcom,geni-debug-uart";
+				reg = <0x10004000 0x6000>;
+				clocks = <&xtal24mhz>;
+				clock-names = "se";
+				interrupt-parent = <&PIC0>;
+				interrupts = <48 0>;
+			};
 		};
 /* See:
    https://ipcatalog.qualcomm.com/swi/chip/102/version/3816/module/2876327#TURING_QDSP6SS_IPC
