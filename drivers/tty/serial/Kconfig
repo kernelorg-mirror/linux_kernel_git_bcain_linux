@@ -917,6 +917,7 @@ config SERIAL_QCOM_GENI
 	depends on ARCH_QCOM || COMPILE_TEST
 	depends on QCOM_GENI_SE
 	select SERIAL_CORE
+	select PM_OPP
 
 config SERIAL_QCOM_GENI_CONSOLE
 	bool "Qualcomm GENI Serial Console support"
