@@ -58,6 +58,7 @@ head-y := arch/hexagon/kernel/head.o
 
 core-y += arch/hexagon/platform/common/
 
+core-$(CONFIG_HEXAGON_QEMU)		+= arch/hexagon/platform/qemu/
 
 vmlinux.bin:
 	$(OBJCOPY) -O binary vmlinux vmlinux.bin
