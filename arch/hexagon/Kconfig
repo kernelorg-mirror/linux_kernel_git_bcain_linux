@@ -231,6 +231,17 @@ config HEXAGON_SM8150
 	help
 	  Support for SM8150
 
+config HEXAGON_QEMU
+	bool "QEMU virt machine"
+	select HEXAGON_PHYS_OFFSET
+	select HEXAGON_H2_PIC
+	select HAVE_DMA_ATTRS
+	help
+	  Support for the QEMU Hexagon virtual machine (V68_H2).
+	  This provides a dedicated platform with PL011 as the primary
+	  UART console and QUP GENI as a secondary serial port, along
+	  with virtio block and network devices.
+
 config HEXAGON_COMET
 	bool "Comet Board"
 	select HEXAGON_OLDPLAT
