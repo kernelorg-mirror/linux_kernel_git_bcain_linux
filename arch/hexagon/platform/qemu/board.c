@@ -25,7 +25,7 @@ static const char *qemu_dt_compat[] __initconst = {
 static struct platform_device *devices[] __initdata = {
 };
 
-const struct of_device_id platform_of_irq_matches[] __initdata = {
+const struct of_device_id platform_of_irq_matches[] = {
 	{ .compatible = "qcom,h2-pic", .data = hexagon_pic_of_init, },
 	{},
 };
