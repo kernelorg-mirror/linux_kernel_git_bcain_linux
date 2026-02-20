@@ -5,6 +5,7 @@
 
 #include <kunit/test.h>
 #include <asm/checksum.h>
+#include <linux/unaligned.h>
 #include <net/ip6_checksum.h>
 
 #define MAX_LEN 512
@@ -611,9 +612,11 @@ static void test_csum_ipv6_magic(struct kunit *test)
 		saddr = (const struct in6_addr *)(random_buf + i);
 		daddr = (const struct in6_addr *)(random_buf + i +
 						  daddr_offset);
-		len = le32_to_cpu(*(__le32 *)(random_buf + i + len_offset));
+		len = le32_to_cpu(get_unaligned((__le32 *)(random_buf + i +
+							       len_offset)));
 		proto = *(random_buf + i + proto_offset);
-		csum = *(__wsum *)(random_buf + i + csum_offset);
+		csum = get_unaligned((__wsum *)(random_buf + i +
+						csum_offset));
 		CHECK_EQ(to_sum16(expected_csum_ipv6_magic[i]),
 			 csum_ipv6_magic(saddr, daddr, len, proto, csum));
 	}
