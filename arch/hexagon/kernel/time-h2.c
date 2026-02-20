@@ -175,7 +175,7 @@ void __init time_init(void)
 
 	struct device_node *dn;
 
-	ce_dev->cpumask = cpu_all_mask;
+	ce_dev->cpumask = cpumask_of(smp_processor_id());
 
 	hvm_timer_freq = (cycles_t)__vmtimerop(getfreq, 0, 0);
 
@@ -185,7 +185,7 @@ void __init time_init(void)
 	else
 		panic("%s could not find device\n", __func__);
 
-	ce_dev->cpumask = cpu_all_mask;
+	ce_dev->cpumask = cpumask_of(smp_processor_id());
 
 	clocksource_register_khz(&hexagon_clocksource, hvm_timer_freq / 1000);
 
