@@ -21,6 +21,17 @@ __wsum csum_tcpudp_nofold(__be32 saddr, __be32 daddr,
 __sum16 csum_tcpudp_magic(__be32 saddr, __be32 daddr,
 			  __u32 len, __u8 proto, __wsum sum);
 
+/*
+ * Hexagon does not support unaligned loads, so provide an
+ * arch-specific implementation that handles potentially
+ * misaligned in6_addr pointers safely.
+ */
+struct in6_addr;
+#define _HAVE_ARCH_IPV6_CSUM
+__sum16 csum_ipv6_magic(const struct in6_addr *saddr,
+			const struct in6_addr *daddr,
+			__u32 len, __u8 proto, __wsum csum);
+
 #include <asm-generic/checksum.h>
 
 #endif

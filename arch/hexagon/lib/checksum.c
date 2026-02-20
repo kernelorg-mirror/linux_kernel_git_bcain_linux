@@ -14,6 +14,8 @@
 #include <asm/byteorder.h>
 #include <net/checksum.h>
 #include <linux/uaccess.h>
+#include <linux/unaligned.h>
+#include <linux/in6.h>
 #include <asm/intrinsics.h>
 
 
@@ -72,6 +74,52 @@ __wsum csum_tcpudp_nofold(__be32 saddr, __be32 daddr,
 	return (__force __wsum)result;
 }
 EXPORT_SYMBOL(csum_tcpudp_nofold);
+
+/*
+ * Compute the IPv6 pseudo-header checksum.  The generic implementation
+ * in net/ipv6/ip6_checksum.c accesses in6_addr->s6_addr32[] with direct
+ * 32-bit loads, which faults on Hexagon when the address pointers are
+ * not 4-byte aligned.  Use get_unaligned() for safe access.
+ */
+__sum16 csum_ipv6_magic(const struct in6_addr *saddr,
+			const struct in6_addr *daddr,
+			__u32 len, __u8 proto, __wsum csum)
+{
+	int carry;
+	__u32 ulen;
+	__u32 uproto;
+	__u32 sum = (__force u32)csum;
+	int i;
+
+	for (i = 0; i < 4; i++) {
+		__u32 w = (__force u32)get_unaligned(&saddr->s6_addr32[i]);
+
+		sum += w;
+		carry = (sum < w);
+		sum += carry;
+	}
+
+	for (i = 0; i < 4; i++) {
+		__u32 w = (__force u32)get_unaligned(&daddr->s6_addr32[i]);
+
+		sum += w;
+		carry = (sum < w);
+		sum += carry;
+	}
+
+	ulen = (__force u32)htonl((__u32)len);
+	sum += ulen;
+	carry = (sum < ulen);
+	sum += carry;
+
+	uproto = (__force u32)htonl(proto);
+	sum += uproto;
+	carry = (sum < uproto);
+	sum += carry;
+
+	return csum_fold((__force __wsum)sum);
+}
+EXPORT_SYMBOL(csum_ipv6_magic);
 
 /*
  * Do a 64-bit checksum on an arbitrary memory area..

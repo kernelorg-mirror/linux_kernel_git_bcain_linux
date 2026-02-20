@@ -4,6 +4,7 @@
  */
 
 #include <kunit/test.h>
+#include <linux/unaligned.h>
 #include <asm/checksum.h>
 #include <net/ip6_checksum.h>
 
