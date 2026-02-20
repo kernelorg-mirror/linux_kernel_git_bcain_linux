@@ -168,7 +168,7 @@ static void __init time_init_deferred(void)
 	struct clock_event_device *ce_dev = &hexagon_clockevent_dev;
 	unsigned long flag = IRQF_TIMER | IRQF_TRIGGER_RISING;
 
-	ce_dev->cpumask = cpu_all_mask;
+	ce_dev->cpumask = cpumask_of(smp_processor_id());
 
 	resource = rtos_timer_device.resource;
 
