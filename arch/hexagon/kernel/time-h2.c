@@ -191,7 +191,7 @@ void __init time_init(void)
 	struct clock_event_device *ce_dev = &hexagon_clockevent_dev;
 
 	struct device_node *dn;
-	ce_dev->cpumask = cpu_all_mask;
+	ce_dev->cpumask = cpumask_of(smp_processor_id());
 
 	hvm_timer_freq = (cycles_t)__vmtimerop(getfreq, 0, 0);
 
@@ -204,7 +204,7 @@ void __init time_init(void)
 		panic("%s could not find device\n", __func__);
 	}
 
-	ce_dev->cpumask = cpu_all_mask;
+	ce_dev->cpumask = cpumask_of(smp_processor_id());
 
 	/*  normally do an ioremap here of resources  */
 
