@@ -30,7 +30,16 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 				struct task_struct *tsk)
 {
 	int l1;
-	unsigned long tlb_inv = VM_TLB_INVALIDATE_FALSE;
+	unsigned long tlb_inv;
+
+	/*
+	 * Hexagon VM TLB entries are not tagged with an ASID, so TLB
+	 * must be flushed whenever switching to a different address space.
+	 */
+	if (prev != next)
+		tlb_inv = VM_TLB_INVALIDATE_TRUE;
+	else
+		tlb_inv = VM_TLB_INVALIDATE_FALSE;
 
 	/*
 	 * For virtual machine, we have to update system map if it's been
@@ -41,11 +50,6 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 			next->pgd[l1] = init_mm.pgd[l1];
 
 		next->context.generation = prev->context.generation;
-		tlb_inv = VM_TLB_INVALIDATE_TRUE;
-	}
-
-	if (next->context.need_invalidate) {
-		next->context.need_invalidate = false;
 		tlb_inv = VM_TLB_INVALIDATE_TRUE;
 	}
 
