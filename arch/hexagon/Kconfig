@@ -330,6 +330,18 @@ config H2
 	help
 	  Transitional config switch for the new H2 interface
 
+config HEXAGON_QEMU_POLL
+	bool "Poll for IPIs in idle loop (QEMU TCG workaround)"
+	default n
+	depends on HEXAGON_QEMU && SMP
+	help
+	  Work around slow IPI delivery under QEMU TCG by polling
+	  for pending IPIs in arch_cpu_idle() before entering vmwait.
+	  Enable this when running on QEMU builds where the hypervisor-
+	  mediated IPI path is too slow for acceptable boot performance.
+	  Disable this when running on a QEMU with proper direct-to-guest
+	  interrupt delivery.
+
 config HEXAGON_ANGEL_TRAPS
 	bool "Use Angel Traps"
 	default n

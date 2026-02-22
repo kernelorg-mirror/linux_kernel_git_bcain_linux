@@ -18,6 +18,7 @@
 #include <linux/cpu.h>
 #include <linux/mm_types.h>
 #include <linux/irqdomain.h>
+#include <asm/irq_regs.h>
 
 #include <asm/time.h>    /*  timer_interrupt  */
 #include <asm/hexagon_vm.h>
@@ -76,6 +77,34 @@ void smp_vm_unmask_irq(void *info)
 	__vmintop_locen((long) info);
 }
 
+#ifdef CONFIG_HEXAGON_QEMU_POLL
+/*
+ * Poll for pending IPIs from the idle loop.  Under QEMU TCG, the
+ * hypervisor-mediated IPI delivery path (vmintop_post -> SWI -> vmwait
+ * wakeup) is correct but extremely slow due to cross-thread context
+ * switch overhead.  Polling per_cpu ipi_data.bits directly bypasses
+ * this overhead and is necessary for acceptable boot performance.
+ */
+void ipi_poll(void)
+{
+	int cpu = smp_processor_id();
+	struct ipi_data *ipi = &per_cpu(ipi_data, cpu);
+	unsigned long ops;
+	struct pt_regs dummy_regs;
+	struct pt_regs *old_regs;
+
+	if (!ipi->bits)
+		return;
+
+	memset(&dummy_regs, 0, sizeof(dummy_regs));
+	old_regs = set_irq_regs(&dummy_regs);
+
+	while ((ops = xchg(&ipi->bits, 0)) != 0)
+		__handle_ipi(&ops, ipi, cpu);
+
+	set_irq_regs(old_regs);
+}
+#endif
 
 /*
  * This is based on Alpha's IPI stuff.
@@ -112,10 +141,10 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
 		/*  Also, what's passed is the hardware IRQ.  */
 		retval = __vmintop_post(CONFIG_BASE_IPI_IRQ+cpu, per_cpu(vpid, cpu));
 
-		if (retval != 0) {
-			printk(KERN_ERR "interrupt %ld not configured?\n",
-				CONFIG_BASE_IPI_IRQ+cpu);
-		}
+		if (retval != 0)
+			pr_err("IPI to cpu%ld failed: irq=%ld vpid=%u ret=%ld\n",
+			       cpu, CONFIG_BASE_IPI_IRQ+cpu,
+			       per_cpu(vpid, cpu), retval);
 	}
 
 	local_irq_restore(flags);
@@ -170,11 +199,11 @@ static void start_secondary(void)
 	if (request_irq(irq, handle_ipi, IRQF_TRIGGER_RISING, "ipi_handler",
 			NULL))
 		pr_err("Failed to request irq %u (ipi_handler)\n", irq);
+	/* Ensure IPI IRQ is locally enabled after request_irq */
+	__vmintop_locen(irq);
 
 	/*  Register the clock_event dummy  */
 	setup_percpu_clockdev();
-
-	printk(KERN_INFO "%s cpu %d\n", __func__, current_thread_info()->cpu);
 
 	notify_cpu_starting(cpu);
 
@@ -203,10 +232,11 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 
 	/*  Boot to the head.  */
 	stack_start =  ((void *) thread) + THREAD_SIZE;
+
 	__vmstart(start_secondary, stack_start, 0);
 
 	while (!cpu_online(cpu))
-		barrier();
+		cpu_relax();
 
 	return 0;
 }

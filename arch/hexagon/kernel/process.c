@@ -18,6 +18,7 @@
 #include <linux/resume_user_mode.h>
 #include <asm/hexagon_vm.h>
 #include <asm/notify.h>
+#include <asm/smp.h>
 #include <asm/switch_to.h>
 
 /*
@@ -59,6 +60,9 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
  */
 void arch_cpu_idle(void)
 {
+#ifdef CONFIG_HEXAGON_QEMU_POLL
+	ipi_poll();
+#endif
 	__vmwait();
 	/*  interrupts wake us up, but irqs are still disabled */
 }
