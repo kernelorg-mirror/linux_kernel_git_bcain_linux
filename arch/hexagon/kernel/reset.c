@@ -13,8 +13,24 @@ static inline void __do_vmstop(void *info)
 	__vmstop((long)info);
 }
 
+#ifdef CONFIG_HEXAGON_ANGEL_TRAPS
+static inline void angel_exit(void)
+{
+	asm volatile("R0=#0x18;"
+		"R2=#0;"
+		"trap0(#0);"
+		:
+		:
+		: "r0", "r1", "r2", "r3", "r4", "r5"
+	);
+}
+#endif
+
 void machine_power_off(void)
 {
+#ifdef CONFIG_HEXAGON_ANGEL_TRAPS
+	angel_exit();
+#endif
 	on_each_cpu(__do_vmstop, (void *)poweroff, 0);
 }
 
@@ -30,9 +46,11 @@ void machine_restart(char *cmd)
 
 static void hexagon_pm_power_off(void)
 {
+#ifdef CONFIG_HEXAGON_ANGEL_TRAPS
+	angel_exit();
+#endif
 	on_each_cpu(__do_vmstop, (void *)poweroff, 0);
 }
 
 void (*pm_power_off)(void) = hexagon_pm_power_off;
 EXPORT_SYMBOL(pm_power_off);
-
