@@ -7,6 +7,7 @@
 
 #include <linux/cpu.h>
 #include <linux/sched.h>
+#include <linux/smp.h>
 #include <linux/sched/debug.h>
 #include <linux/sched/task.h>
 #include <linux/sched/task_stack.h>
@@ -50,6 +51,29 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
 #ifdef CONFIG_HEXAGON_FORCE_USR
 	regs->usr = CONFIG_HEXAGON_USR_VAL;
 #endif
+}
+
+/*
+ * Flush pending SMP call-function work before entering __vmwait().
+ *
+ * On platforms with high IPI delivery latency (e.g. Hexagon hardware
+ * threads behind a hypervisor under QEMU TCG emulation), the interrupt
+ * from __vmintop_post() can take an extremely long time to wake the
+ * target thread from __vmwait().  During this time, call_single_data_t
+ * objects sit locked on the call_single_queue.  Since v5.7 (commit
+ * 5a18ceca6350), smp_call_function_single_async() returns -EBUSY when
+ * it finds a locked CSD instead of spinning, and callers like the
+ * scheduler's NOHZ kick and hrtimer migration silently drop the work.
+ *
+ * By draining the queue here — with IRQs disabled but before the RCU
+ * idle context (ct_cpuidle_enter) — we unlock CSDs while the CPU is
+ * still responsive.  This shrinks the -EBUSY window to just the
+ * __vmwait() duration and prevents the cascading stalls that otherwise
+ * hang SMP boot on v5.7+ kernels.
+ */
+void arch_cpu_idle_enter(void)
+{
+	flush_smp_call_function_queue();
 }
 
 /*
