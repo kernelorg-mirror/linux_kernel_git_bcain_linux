@@ -179,6 +179,18 @@ void generic_smp_call_function_single_interrupt(void);
 #define generic_smp_call_function_interrupt \
 	generic_smp_call_function_single_interrupt
 
+/*
+ * Flush pending smp-call-function callbacks queued on this CPU.
+ *
+ * Useful in arch idle paths to drain the call_single_queue before
+ * entering a deep idle state, keeping call_single_data_t objects
+ * locked for the minimum time.
+ *
+ * Must be called with interrupts disabled and outside RCU idle context
+ * (i.e. before ct_cpuidle_enter()).
+ */
+void flush_smp_call_function_queue(void);
+
 extern unsigned int setup_max_cpus;
 extern void __init setup_nr_cpu_ids(void);
 extern void __init smp_init(void);
