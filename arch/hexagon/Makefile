@@ -6,6 +6,19 @@ KBUILD_DEFCONFIG = comet_defconfig
 # Hexagon clang doesn't support -gcc-toolchain flag
 CLANG_GCC_TC :=
 
+# lld prior to 22.0.0 has a bug in the relocation handlers that corrupts
+# duplex sub-instruction encodings, turning valid register transfers into
+# register pair combines and causing register write conflicts at runtime.
+# https://github.com/llvm/llvm-project/issues/179856
+# Require lld >= 22.0.0 or use an alternative linker such as ld.eld.
+ifeq ($(CONFIG_LD_IS_LLD),y)
+  ifeq ($(filter %ld.eld,$(LD)),)
+    ifneq ($(call test-ge, $(CONFIG_LLD_VERSION), 220000),y)
+      $(error Hexagon requires lld >= 22.0.0 due to a duplex relocation bug. Use LD=ld.eld or upgrade lld)
+    endif
+  endif
+endif
+
 # Do not use GP-relative jumps
 KBUILD_CFLAGS += -G0
 LDFLAGS_vmlinux += -G0
