@@ -51,7 +51,7 @@ void angel_write(struct console *c, const char *s, unsigned int n)
 static struct console angel_cons_info = {
 	.name	= "angel",
 	.write	= angel_write,
-	.flags	= CON_PRINTBUFFER,
+	.flags	= CON_PRINTBUFFER | CON_BOOT,
 	.index	= -1,
 };
 
