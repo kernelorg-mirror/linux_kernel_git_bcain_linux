@@ -45,6 +45,7 @@ struct qcom_glink_smem {
 	struct mbox_chan *mbox_chan;
 
 	u32 remote_pid;
+	bool is_remote;
 };
 
 struct glink_smem_pipe {
@@ -71,6 +72,8 @@ static size_t glink_smem_rx_avail(struct qcom_glink_pipe *np)
 
 	if (!pipe->fifo) {
 		fifo = qcom_smem_get(smem->remote_pid,
+				     smem->is_remote ?
+				     SMEM_GLINK_NATIVE_XPRT_FIFO_0 :
 				     SMEM_GLINK_NATIVE_XPRT_FIFO_1, &len);
 		if (IS_ERR(fifo)) {
 			pr_err("failed to acquire RX fifo handle: %ld\n",
@@ -217,6 +220,15 @@ static void qcom_glink_smem_release(struct device *dev)
 	kfree(smem);
 }
 
+static void qcom_glink_smem_mbox_rx(struct mbox_client *cl, void *mssg)
+{
+	struct qcom_glink_smem *smem =
+		container_of(cl, struct qcom_glink_smem, mbox_client);
+
+	if (smem->glink)
+		qcom_glink_native_rx(smem->glink);
+}
+
 struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 						 struct device_node *node)
 {
@@ -226,6 +238,7 @@ struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 	struct qcom_glink *glink;
 	struct device *dev;
 	u32 remote_pid;
+	bool intentless;
 	__le32 *descs;
 	size_t size;
 	int ret;
@@ -255,6 +268,7 @@ struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 	}
 
 	smem->remote_pid = remote_pid;
+	smem->is_remote = of_property_read_bool(dev->of_node, "qcom,is-remote");
 
 	rx_pipe = devm_kzalloc(dev, sizeof(*rx_pipe), GFP_KERNEL);
 	tx_pipe = devm_kzalloc(dev, sizeof(*tx_pipe), GFP_KERNEL);
@@ -266,7 +280,8 @@ struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 	ret = qcom_smem_alloc(remote_pid,
 			      SMEM_GLINK_NATIVE_XPRT_DESCRIPTOR, 32);
 	if (ret && ret != -EEXIST) {
-		dev_err(dev, "failed to allocate glink descriptors\n");
+		if (ret != -EPROBE_DEFER)
+			dev_err(dev, "failed to allocate glink descriptors\n");
 		goto err_put_dev;
 	}
 
@@ -284,19 +299,32 @@ struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 		goto err_put_dev;
 	}
 
-	tx_pipe->tail = &descs[0];
-	tx_pipe->head = &descs[1];
-	rx_pipe->tail = &descs[2];
-	rx_pipe->head = &descs[3];
+	if (smem->is_remote) {
+		tx_pipe->tail = &descs[2];
+		tx_pipe->head = &descs[3];
+		rx_pipe->tail = &descs[0];
+		rx_pipe->head = &descs[1];
+	} else {
+		tx_pipe->tail = &descs[0];
+		tx_pipe->head = &descs[1];
+		rx_pipe->tail = &descs[2];
+		rx_pipe->head = &descs[3];
+	}
 
-	ret = qcom_smem_alloc(remote_pid, SMEM_GLINK_NATIVE_XPRT_FIFO_0,
+	ret = qcom_smem_alloc(remote_pid,
+			      smem->is_remote ?
+			      SMEM_GLINK_NATIVE_XPRT_FIFO_1 :
+			      SMEM_GLINK_NATIVE_XPRT_FIFO_0,
 			      SZ_16K);
 	if (ret && ret != -EEXIST) {
 		dev_err(dev, "failed to allocate TX fifo\n");
 		goto err_put_dev;
 	}
 
-	tx_pipe->fifo = qcom_smem_get(remote_pid, SMEM_GLINK_NATIVE_XPRT_FIFO_0,
+	tx_pipe->fifo = qcom_smem_get(remote_pid,
+				      smem->is_remote ?
+				      SMEM_GLINK_NATIVE_XPRT_FIFO_1 :
+				      SMEM_GLINK_NATIVE_XPRT_FIFO_0,
 				      &tx_pipe->native.length);
 	if (IS_ERR(tx_pipe->fifo)) {
 		dev_err(dev, "failed to acquire TX fifo\n");
@@ -305,16 +333,20 @@ struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 	}
 
 	smem->irq = of_irq_get(smem->dev.of_node, 0);
-	ret = devm_request_irq(&smem->dev, smem->irq, qcom_glink_smem_intr,
-			       IRQF_NO_SUSPEND | IRQF_NO_AUTOEN,
-			       "glink-smem", smem);
-	if (ret) {
-		dev_err(&smem->dev, "failed to request IRQ\n");
-		goto err_put_dev;
+	if (smem->irq > 0) {
+		ret = devm_request_irq(&smem->dev, smem->irq,
+				       qcom_glink_smem_intr,
+				       IRQF_NO_SUSPEND | IRQF_NO_AUTOEN,
+				       "glink-smem", smem);
+		if (ret) {
+			dev_err(&smem->dev, "failed to request IRQ\n");
+			goto err_put_dev;
+		}
 	}
 
 	smem->mbox_client.dev = &smem->dev;
 	smem->mbox_client.knows_txdone = true;
+	smem->mbox_client.rx_callback = qcom_glink_smem_mbox_rx;
 	smem->mbox_chan = mbox_request_channel(&smem->mbox_client, 0);
 	if (IS_ERR(smem->mbox_chan)) {
 		ret = dev_err_probe(&smem->dev, PTR_ERR(smem->mbox_chan),
@@ -335,10 +367,23 @@ struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 	*rx_pipe->tail = 0;
 	*tx_pipe->head = 0;
 
+	/*
+	 * Determine intentless mode: check DT property first, then default
+	 * to intentless when running as the remote side (remote endpoints
+	 * always use intentless mode in GLINK).
+	 */
+	intentless = of_property_read_bool(dev->of_node, "qcom,intentless");
+	if (!intentless)
+		intentless = !!of_get_property(dev->of_node,
+					       "qcom,intentless", NULL);
+	if (!intentless && smem->is_remote)
+		intentless = true;
+
 	glink = qcom_glink_native_probe(dev,
 					GLINK_FEATURE_INTENT_REUSE,
-					&rx_pipe->native, &tx_pipe->native,
-					false);
+					&rx_pipe->native,
+					&tx_pipe->native,
+					intentless);
 	if (IS_ERR(glink)) {
 		ret = PTR_ERR(glink);
 		goto err_free_mbox;
@@ -346,7 +391,15 @@ struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 
 	smem->glink = glink;
 
-	enable_irq(smem->irq);
+	if (smem->irq > 0)
+		enable_irq(smem->irq);
+
+	/*
+	 * The mailbox rx_callback may have fired before smem->glink was set,
+	 * dropping any data that arrived during qcom_glink_native_probe().
+	 * Drain the RX FIFO now to process any pending messages.
+	 */
+	qcom_glink_native_rx(glink);
 
 	return smem;
 
@@ -364,7 +417,8 @@ void qcom_glink_smem_unregister(struct qcom_glink_smem *smem)
 {
 	struct qcom_glink *glink = smem->glink;
 
-	disable_irq(smem->irq);
+	if (smem->irq > 0)
+		disable_irq(smem->irq);
 
 	qcom_glink_native_remove(glink);
 
@@ -372,6 +426,41 @@ void qcom_glink_smem_unregister(struct qcom_glink_smem *smem)
 	device_unregister(&smem->dev);
 }
 EXPORT_SYMBOL_GPL(qcom_glink_smem_unregister);
+
+static int qcom_glink_smem_probe(struct platform_device *pdev)
+{
+	struct qcom_glink_smem *smem;
+
+	smem = qcom_glink_smem_register(&pdev->dev, pdev->dev.of_node);
+	if (IS_ERR(smem))
+		return PTR_ERR(smem);
+
+	platform_set_drvdata(pdev, smem);
+	return 0;
+}
+
+static void qcom_glink_smem_pdev_remove(struct platform_device *pdev)
+{
+	struct qcom_glink_smem *smem = platform_get_drvdata(pdev);
+
+	qcom_glink_smem_unregister(smem);
+}
+
+static const struct of_device_id qcom_glink_smem_of_match[] = {
+	{ .compatible = "qcom,glink-smem-edge" },
+	{}
+};
+MODULE_DEVICE_TABLE(of, qcom_glink_smem_of_match);
+
+static struct platform_driver qcom_glink_smem_driver = {
+	.probe = qcom_glink_smem_probe,
+	.remove = qcom_glink_smem_pdev_remove,
+	.driver = {
+		.name = "qcom_glink_smem",
+		.of_match_table = qcom_glink_smem_of_match,
+	},
+};
+module_platform_driver(qcom_glink_smem_driver);
 
 MODULE_AUTHOR("Bjorn Andersson <bjorn.andersson@linaro.org>");
 MODULE_DESCRIPTION("Qualcomm GLINK SMEM driver");
