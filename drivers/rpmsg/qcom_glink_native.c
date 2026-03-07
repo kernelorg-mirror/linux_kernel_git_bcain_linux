@@ -126,6 +126,8 @@ struct qcom_glink {
 	bool sent_read_notify;
 
 	bool abort_tx;
+
+	struct work_struct open_work;
 };
 
 enum {
@@ -668,8 +670,10 @@ static void qcom_glink_receive_version_ack(struct qcom_glink *glink,
 		/* Version negotiation failed */
 		break;
 	case GLINK_VERSION_1:
-		if (features == glink->features)
+		if (features == glink->features) {
+			schedule_work(&glink->open_work);
 			break;
+		}
 
 		glink->features &= features;
 		fallthrough;
@@ -1342,6 +1346,13 @@ static struct rpmsg_endpoint *qcom_glink_create_ept(struct rpmsg_device *rpdev,
 		channel = qcom_glink_create_local(glink, name);
 		if (IS_ERR(channel))
 			return NULL;
+	} else if (channel->lcid) {
+		/*
+		 * Auto-opened: we already sent CMD_OPEN and got
+		 * CMD_OPEN_ACK + CMD_OPEN from remote.  Just ACK
+		 * the remote's CMD_OPEN to complete the handshake.
+		 */
+		qcom_glink_send_open_ack(glink, channel);
 	} else {
 		ret = qcom_glink_create_remote(glink, channel);
 		if (ret)
@@ -1654,6 +1665,13 @@ static int qcom_glink_rx_open(struct qcom_glink *glink, unsigned int rcid,
 
 		/* The opening dance was initiated by the remote */
 		create_device = true;
+	} else if (!channel->rpdev) {
+		/*
+		 * Channel was locally initiated (e.g. auto-open) but the
+		 * rpmsg_device hasn't been created yet.  Create it now that
+		 * the remote has responded with CMD_OPEN.
+		 */
+		create_device = true;
 	}
 
 	trace_qcom_glink_cmd_open_rx(glink->label, name, channel->lcid, rcid);
@@ -1864,6 +1882,37 @@ static void qcom_glink_device_release(struct device *dev)
 	kfree(rpdev);
 }
 
+/*
+ * Auto-open channels listed as DT children of the glink-edge node.
+ * Scheduled after version negotiation completes.
+ */
+static void qcom_glink_open_channels_work(struct work_struct *work)
+{
+	struct qcom_glink *glink = container_of(work, struct qcom_glink,
+						open_work);
+	struct device_node *child;
+	const char *name;
+	struct glink_channel *channel;
+
+	for_each_available_child_of_node(glink->dev->of_node, child) {
+		if (of_property_read_string(child, "qcom,glink-channels", &name))
+			continue;
+
+		/*
+		 * Just send CMD_OPEN to initiate the handshake.  The
+		 * rpmsg_device will be created later in rx_open() when the
+		 * remote responds with its own CMD_OPEN.
+		 */
+		channel = qcom_glink_create_local(glink, name);
+		if (IS_ERR(channel)) {
+			dev_err(glink->dev,
+				"failed to auto-open channel %s: %ld\n",
+				name, PTR_ERR(channel));
+			continue;
+		}
+	}
+}
+
 static int qcom_glink_create_chrdev(struct qcom_glink *glink)
 {
 	struct rpmsg_device *rpdev;
@@ -1912,6 +1961,7 @@ struct qcom_glink *qcom_glink_native_probe(struct device *dev,
 	spin_lock_init(&glink->rx_lock);
 	INIT_LIST_HEAD(&glink->rx_queue);
 	INIT_WORK(&glink->rx_work, qcom_glink_work);
+	INIT_WORK(&glink->open_work, qcom_glink_open_channels_work);
 	init_waitqueue_head(&glink->tx_avail_notify);
 
 	spin_lock_init(&glink->idr_lock);
