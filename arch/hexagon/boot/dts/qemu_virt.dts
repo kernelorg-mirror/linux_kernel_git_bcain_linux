@@ -18,6 +18,11 @@
 
 	memory@0 { device_type = "memory"; reg = <0 0>; };
 
+	smem_mem: smem-mem@90900000 {
+		reg = <0x90900000 0x200000>;
+		no-map;
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -62,6 +67,7 @@
 	};
 
 	soc: soc {
+		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;
@@ -101,9 +107,10 @@
 		uart0: uart@10000000 {
 			compatible = "arm,pl011", "arm,primecell";
 			interrupt-parent = <&PIC0>;
-			interrupts = <47 0>;
-			clocks = <&xtal24mhz>, <&pclk>;
+			interrupts = <15 0>;
+			clocks = <&xtal24mhz>, <&xtal24mhz>;
 			clock-names = "uartclk", "apb_pclk";
+			arm,primecell-periphid = <0x00141011>;
 			reg = <0x10000000 0x1000>;
 		};
 
@@ -122,7 +129,7 @@
 				clocks = <&xtal24mhz>;
 				clock-names = "se";
 				interrupt-parent = <&PIC0>;
-				interrupts = <48 0>;
+				interrupts = <16 0>;
 			};
 		};
 
@@ -130,6 +137,35 @@
 			compatible = "qcom,hexagon-hvx";
 			qcom,hvx-max-ctxts = <4>;
 			qcom,hvx-vlength = <7>;
+		};
+
+		tcsr_mutex: hwlock@1f40000 {
+			compatible = "qcom,tcsr-mutex";
+			reg = <0x1f40000 0x20000>;
+			#hwlock-cells = <1>;
+		};
+
+		smem@90900000 {
+			compatible = "qcom,smem";
+			memory-region = <&smem_mem>;
+			hwlocks = <&tcsr_mutex 3>;
+		};
+
+		ivshmem_mbox: mailbox@19000000 {
+			compatible = "ivshmem-doorbell";
+			reg = <0x19000000 0x10>;
+			interrupt-parent = <&PIC0>;
+			interrupts = <26 0>;
+			peer-id = <0>;
+			signal-vector = <0>;
+			#mbox-cells = <0>;
+		};
+
+		glink-edge {
+			compatible = "qcom,glink-smem-edge";
+			mboxes = <&ivshmem_mbox>;
+			qcom,remote-pid = <0>;
+			qcom,is-remote;
 		};
 	};
 };
