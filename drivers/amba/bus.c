@@ -65,8 +65,13 @@ static int amba_get_enable_pclk(struct amba_device *pcdev)
 	int ret;
 
 	pcdev->pclk = clk_get(&pcdev->dev, "apb_pclk");
-	if (IS_ERR(pcdev->pclk))
+	if (IS_ERR(pcdev->pclk)) {
+		if (IS_ENABLED(CONFIG_HEXAGON_QEMU)) {
+			pcdev->pclk = NULL;
+			return 0;
+		}
 		return PTR_ERR(pcdev->pclk);
+	}
 
 	ret = clk_prepare_enable(pcdev->pclk);
 	if (ret)
@@ -209,6 +214,7 @@ static int amba_match(struct device *dev, const struct device_driver *drv)
 {
 	struct amba_device *pcdev = to_amba_device(dev);
 	const struct amba_driver *pcdrv = to_amba_driver(drv);
+	int result;
 
 	mutex_lock(&pcdev->periphid_lock);
 	if (!pcdev->periphid) {
@@ -233,7 +239,8 @@ static int amba_match(struct device *dev, const struct device_driver *drv)
 	if (pcdev->driver_override)
 		return !strcmp(pcdev->driver_override, drv->name);
 
-	return amba_lookup(pcdrv->id_table, pcdev) != NULL;
+	result = amba_lookup(pcdrv->id_table, pcdev) != NULL;
+	return result;
 }
 
 static int amba_uevent(const struct device *dev, struct kobj_uevent_env *env)

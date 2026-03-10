@@ -1815,6 +1815,8 @@ static int pl011_hwinit(struct uart_port *port)
 		return retval;
 
 	uap->port.uartclk = clk_get_rate(uap->clk);
+	if (!uap->port.uartclk)
+		uap->port.uartclk = 24000000;
 
 	/* Clear pending error and receive interrupts */
 	pl011_write(UART011_OEIS | UART011_BEIS | UART011_PEIS |
@@ -2506,6 +2508,8 @@ static int pl011_console_setup(struct console *co, char *options)
 	}
 
 	uap->port.uartclk = clk_get_rate(uap->clk);
+	if (!uap->port.uartclk)
+		uap->port.uartclk = 24000000;
 
 	if (uap->vendor->fixed_options) {
 		baud = uap->fixed_baud;
@@ -2578,6 +2582,32 @@ static int pl011_console_match(struct console *co, char *name, int idx,
 	}
 
 	return -ENODEV;
+}
+
+static void
+pl011_console_write(struct console *co, const char *s, unsigned int count)
+{
+	struct uart_amba_port *uap = amba_ports[co->index];
+	unsigned int old_cr;
+	clk_enable(uap->clk);
+
+	if (!uap->vendor->always_enabled) {
+		old_cr = pl011_read(uap, REG_CR);
+		pl011_write((old_cr & ~UART011_CR_CTSEN) |
+			    (UART01x_CR_UARTEN | UART011_CR_TXE),
+			    uap, REG_CR);
+	}
+
+	uart_console_write(&uap->port, s, count, pl011_console_putchar);
+
+	while ((pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr) &
+	       uap->vendor->fr_busy)
+		cpu_relax();
+
+	if (!uap->vendor->always_enabled)
+		pl011_write(old_cr, uap, REG_CR);
+
+	clk_disable(uap->clk);
 }
 
 static void
@@ -2671,14 +2701,11 @@ pl011_console_device_unlock(struct console *co, unsigned long flags)
 static struct uart_driver amba_reg;
 static struct console amba_console = {
 	.name		= "ttyAMA",
+	.write		= pl011_console_write,
 	.device		= uart_console_device,
 	.setup		= pl011_console_setup,
 	.match		= pl011_console_match,
-	.write_atomic	= pl011_console_write_atomic,
-	.write_thread	= pl011_console_write_thread,
-	.device_lock	= pl011_console_device_lock,
-	.device_unlock	= pl011_console_device_unlock,
-	.flags		= CON_PRINTBUFFER | CON_ANYTIME | CON_NBCON,
+	.flags		= CON_PRINTBUFFER | CON_ANYTIME,
 	.index		= -1,
 	.data		= &amba_reg,
 };
@@ -2985,8 +3012,13 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 		return -ENOMEM;
 
 	uap->clk = devm_clk_get(&dev->dev, NULL);
-	if (IS_ERR(uap->clk))
-		return PTR_ERR(uap->clk);
+	if (IS_ERR(uap->clk)) {
+		if (IS_ENABLED(CONFIG_HEXAGON_QEMU)) {
+			uap->clk = NULL;
+		} else {
+			return PTR_ERR(uap->clk);
+		}
+	}
 
 	uap->reg_offset = vendor->reg_offset;
 	uap->vendor = vendor;

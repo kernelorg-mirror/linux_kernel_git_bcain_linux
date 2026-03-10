@@ -23,6 +23,7 @@
 #include <asm/platform.h>
 #include <asm/prom.h>
 #include <asm/time.h>
+#include <linux/clk-provider.h>
 #include <asm/angel_console.h>
 #include <linux/percpu.h>
 
@@ -105,6 +106,9 @@ void __init setup_arch(char **cmdline_p)
 
 	/* Unflatten device tree */
 	unflatten_device_tree();
+
+	/* Initialize early clock providers from DT (e.g. fixed-clock) */
+	of_clk_init(NULL);
 
 #ifdef CONFIG_SMP
 	smp_start_cpus();
