@@ -38,14 +38,16 @@ KBUILD_CFLAGS += -mllvm --disable-packetizer -mllvm -disable-nvjump
 # Do not use single-byte enums; these will overflow.
 KBUILD_CFLAGS += -fno-short-enums
 
-# We must use long-calls:
-KBUILD_CFLAGS += -mlong-calls
-
 # Modules must use either long-calls, or use pic/plt.
-# Use long-calls for now, it's easier.  And faster.
-# KBUILD_CFLAGS_MODULE += -fPIC
-# KBUILD_LDFLAGS_MODULE += -shared
-KBUILD_CFLAGS_MODULE += -mlong-calls
+# lld >= 21.0.0 and ld.eld generate range-extension thunks for Hexagon,
+# so -mlong-calls is only needed with older linkers.
+ifeq ($(CONFIG_LD_IS_LLD),y)
+  ifneq ($(call test-ge, $(CONFIG_LLD_VERSION), 210000),y)
+    KBUILD_CFLAGS_MODULE += -mlong-calls
+  endif
+else
+  KBUILD_CFLAGS_MODULE += -mlong-calls
+endif
 
 KBUILD_CFLAGS += $(cflags-y) -fno-pic
 KBUILD_AFLAGS += $(aflags-y)
