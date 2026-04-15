@@ -12,10 +12,8 @@ CLANG_GCC_TC :=
 # https://github.com/llvm/llvm-project/issues/179856
 # Require lld >= 22.0.0 or use an alternative linker such as ld.eld.
 ifeq ($(CONFIG_LD_IS_LLD),y)
-  ifeq ($(filter %ld.eld,$(LD)),)
-    ifneq ($(call test-ge, $(CONFIG_LLD_VERSION), 220000),y)
-      $(error Hexagon requires lld >= 22.0.0 due to a duplex relocation bug. Use LD=ld.eld or upgrade lld)
-    endif
+  ifneq ($(call test-ge, $(CONFIG_LLD_VERSION), 220000),y)
+    $(error Hexagon requires lld >= 22.0.0 due to a duplex relocation bug. Use LD=ld.eld or upgrade lld)
   endif
 endif
 
@@ -36,14 +34,18 @@ KBUILD_CFLAGS += -mllvm --disable-packetizer -mllvm -disable-nvjump
 # Do not use single-byte enums; these will overflow.
 KBUILD_CFLAGS += -fno-short-enums
 
-# We must use long-calls:
-KBUILD_CFLAGS += -mlong-calls
-
-# Modules must use either long-calls, or use pic/plt.
-# Use long-calls for now, it's easier.  And faster.
-# KBUILD_CFLAGS_MODULE += -fPIC
-# KBUILD_LDFLAGS_MODULE += -shared
-KBUILD_CFLAGS_MODULE += -mlong-calls
+# Modules may have out-of-range calls to kernel symbols.  ld.eld has always
+# supported range-extension thunks (trampolines) for Hexagon, and lld gained
+# them in 21.0.0.  Add -mlong-calls only for linkers that lack this support.
+ifeq ($(CONFIG_LD_IS_ELD),y)
+  # eld always generates range-extension thunks
+else ifeq ($(CONFIG_LD_IS_LLD),y)
+  ifneq ($(call test-ge, $(CONFIG_LLD_VERSION), 210000),y)
+    KBUILD_CFLAGS_MODULE += -mlong-calls
+  endif
+else
+  KBUILD_CFLAGS_MODULE += -mlong-calls
+endif
 
 KBUILD_CFLAGS += $(cflags-y) -fno-pic
 KBUILD_AFLAGS += $(aflags-y)
