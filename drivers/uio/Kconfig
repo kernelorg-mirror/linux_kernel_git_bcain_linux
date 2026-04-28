@@ -181,12 +181,26 @@ config UIO_HEXAGON_TCM
 	depends on HEXAGON
 	help
 	  Userspace I/O interface for Hexagon TCM (Tightly Coupled Memory).
+	  TCM is a low-latency on-chip SRAM region used for performance-
+	  critical code and data.  This driver exposes the TCM physical
+	  address range to userspace via the UIO framework.
 
 config UIO_HEXAGON_VTCM
 	tristate "Hexagon VTCM UIO driver"
 	depends on HEXAGON && HEXAGON_HVX
 	help
-	  Userspace I/O interface for Hexagon VTCM (Vector TCM).
-	  Requires HVX to be enabled.
+	  Userspace I/O interface for Hexagon VTCM (Vector Tightly Coupled
+	  Memory).  VTCM is a dedicated on-chip SRAM for HVX vector
+	  operations.  This driver gates access on HVX context ownership
+	  and exposes the VTCM physical address range via UIO.
+
+config UIO_HEXAGON_SHBUF
+	tristate "Hexagon Shared Buffer UIO driver"
+	depends on HEXAGON
+	help
+	  Userspace I/O interface for Hexagon shared memory buffers.
+	  Provides userspace access to shared memory regions specified
+	  via device tree or platform device resources, used for
+	  inter-processor communication with the Hexagon DSP.
 
 endif
