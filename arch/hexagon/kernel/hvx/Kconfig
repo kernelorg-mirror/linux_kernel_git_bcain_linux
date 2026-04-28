@@ -1,0 +1,8 @@
+config HEXAGON_HVX
+	tristate "Hexagon HVX Module"
+	help
+	  Modular support for Hexagon HVX coprocessor context management.
+	  HVX (Hexagon Vector eXtensions) provides SIMD vector processing
+	  with 128-byte vector registers.  This module handles per-thread
+	  context save/restore, lazy allocation on coprocessor fault, and
+	  hardware configuration via the H2 hypervisor HWCONFIG interface.
