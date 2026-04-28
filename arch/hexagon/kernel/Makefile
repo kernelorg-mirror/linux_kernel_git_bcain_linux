@@ -17,7 +17,7 @@ obj-y += time.o
 endif
 
 obj-$(CONFIG_KGDB)    += kgdb.o
-obj-$(CONFIG_MODULES) += module.o hexagon_ksyms.o
+obj-$(CONFIG_MODULES) += module.o reloc.o hexagon_ksyms.o
 
 # Modules required to work with the Hexagon Virtual Machine
 obj-y += vm_entry.o vm_events.o vm_switch.o vm_ops.o vm_init_segtable.o
