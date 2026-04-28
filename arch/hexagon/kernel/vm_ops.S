@@ -29,6 +29,10 @@ ENTRY(__vmsetvec)
 	trap1(#HVM_TRAP1_VMSETVEC);
 	jumpr	R31;
 
+ENTRY(__vmsetie)
+	trap1(#HVM_TRAP1_VMSETIE);
+	jumpr	R31;
+
 ENTRY(__vmsetie_cached)
 	{
 	  allocframe(#8);

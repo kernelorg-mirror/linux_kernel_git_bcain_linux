@@ -243,8 +243,9 @@ long __vmsetvec(void *);
 
 void load_ie_cache(void);
 long vmgetie_cached(void);
-long vmsetie_cached(long);
-long __vmsetie_cached(long, long *);
+long __vmsetie(long ie);
+long vmsetie_cached(long ie);
+long __vmsetie_cached(long ie, long *cache);
 void clear_ie_cached(void);
 
 long __vmgetie(void);
