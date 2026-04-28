@@ -182,4 +182,11 @@ config UIO_HEXAGON_TCM
 	help
 	  Userspace I/O interface for Hexagon TCM (Tightly Coupled Memory).
 
+config UIO_HEXAGON_VTCM
+	tristate "Hexagon VTCM UIO driver"
+	depends on HEXAGON && HEXAGON_HVX
+	help
+	  Userspace I/O interface for Hexagon VTCM (Vector TCM).
+	  Requires HVX to be enabled.
+
 endif
