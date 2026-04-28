@@ -13,3 +13,4 @@ obj-$(CONFIG_UIO_HV_GENERIC)	+= uio_hv_generic.o
 obj-$(CONFIG_UIO_DFL)	+= uio_dfl.o
 obj-$(CONFIG_UIO_PCI_GENERIC_SVA)  += uio_pci_generic_sva.o
 obj-$(CONFIG_UIO_HEXAGON_TCM)	+= uio_hexagon_tcm.o
+obj-$(CONFIG_UIO_HEXAGON_VTCM)	+= uio_hexagon_vtcm.o
