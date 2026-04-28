@@ -33,5 +33,7 @@ obj-$(CONFIG_OF) += devtree.o
 
 obj-y += hexagon_debug.o
 
+obj-$(CONFIG_HEXAGON_PMUCONTROL) += pmucontrol.o
+
 obj-y += hvx/
 
