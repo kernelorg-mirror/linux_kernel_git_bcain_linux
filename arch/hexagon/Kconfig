@@ -386,4 +386,6 @@ config HEXAGON_FASTBOOT
 
 source "kernel/Kconfig.hz"
 
+source "arch/hexagon/kernel/hvx/Kconfig"
+
 endmenu
