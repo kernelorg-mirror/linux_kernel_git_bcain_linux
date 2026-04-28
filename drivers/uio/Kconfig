@@ -176,4 +176,10 @@ config UIO_PCI_GENERIC_SVA
 	  This driver binds to PCI devices and exposes them to userspace
 	  via the UIO framework.
 
+config UIO_HEXAGON_TCM
+	tristate "Hexagon TCM UIO driver"
+	depends on HEXAGON
+	help
+	  Userspace I/O interface for Hexagon TCM (Tightly Coupled Memory).
+
 endif
