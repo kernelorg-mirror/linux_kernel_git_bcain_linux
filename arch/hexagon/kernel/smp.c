@@ -70,11 +70,6 @@ static inline void __handle_ipi(unsigned long *ops, struct ipi_data *ipi,
 	} while (msg < BITS_PER_LONG);
 }
 
-/*  Used for IPI call from other CPU's to unmask int  */
-void smp_vm_unmask_irq(void *info)
-{
-	__vmintop_locen((long) info);
-}
 
 
 /*

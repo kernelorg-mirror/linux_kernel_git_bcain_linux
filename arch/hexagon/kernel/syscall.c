@@ -32,15 +32,6 @@
 
 asmlinkage int sys_mmap(unsigned long addr, size_t len,
 			unsigned long prot, unsigned long flags,
-			unsigned long fd, off_t off);
-asmlinkage long sys_mmap2(unsigned long addr, size_t len,
-			unsigned long prot, unsigned long flags,
-			unsigned long fd, unsigned long pgoff);
-
-//  I think this might be deprecated.
-
-asmlinkage int sys_mmap(unsigned long addr, size_t len,
-			unsigned long prot, unsigned long flags,
 			unsigned long fd, off_t off)
 {
 	int retval = -EINVAL;
