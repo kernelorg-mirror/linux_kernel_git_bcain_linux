@@ -60,6 +60,14 @@ config LLD_VERSION
 	default $(ld-version) if LD_IS_LLD
 	default 0
 
+config LD_IS_ELD
+	def_bool $(success,test "$(ld-name)" = ELD)
+
+config ELD_VERSION
+	int
+	default $(ld-version) if LD_IS_ELD
+	default 0
+
 config RUSTC_VERSION
 	int
 	default $(rustc-version)
@@ -176,7 +184,7 @@ config CC_HAS_MULTIDIMENSIONAL_NONSTRING
 config LD_CAN_USE_KEEP_IN_OVERLAY
 	# ld.lld prior to 21.0.0 did not support KEEP within an overlay description
 	# https://github.com/llvm/llvm-project/pull/130661
-	def_bool LD_IS_BFD || LLD_VERSION >= 210000
+	def_bool LD_IS_BFD || LLD_VERSION >= 210000 || LD_IS_ELD
 
 config RUSTC_HAS_SPAN_FILE
 	def_bool RUSTC_VERSION >= 108800
