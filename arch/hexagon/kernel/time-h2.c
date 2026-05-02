@@ -10,6 +10,7 @@
 #include <linux/clockchips.h>
 #include <linux/clocksource.h>
 #include <linux/debugfs.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/err.h>
 #include <linux/platform_device.h>
@@ -206,6 +207,9 @@ void __init time_init(void)
 	if (request_irq(ce_dev->irq, timer_interrupt,
 			IRQF_TIMER | IRQF_TRIGGER_RISING, "rtos_timer", NULL))
 		pr_err("Failed to request timer irq\n");
+
+	if (IS_ENABLED(CONFIG_HEXAGON_QEMU))
+		lpj_fine = hvm_timer_freq / HZ;
 }
 
 void __delay(unsigned long loops)
