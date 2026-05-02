@@ -21,6 +21,16 @@
 #endif
 	__INIT
 ENTRY(stext)
+	/* NOP sled: bootloader may jump to start of .init.text + offset */
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	R27 = R0  /*  Bootloader hands us phys addr in R1:0  */
+	R28 = R1
 	/*
 	 * VMM will already have set up true vector page, MMU, etc.
 	 * To set up initial kernel identity map, we have to pass
@@ -129,6 +139,24 @@ ENTRY(stext)
 	memw(r0 ++ #4) = r1;
 	{ r1 = add(r1,r2); } :endloop0
 
+#ifdef CONFIG_H2
+	/*  Hopefully we don't need this any earlier than here  */
+	r0.l = #LO(0x00000800);
+	r0.h = #HI(0x00000800);
+	call	__vmversion;
+
+	{
+		r1.l = #LO(PAGE_OFFSET);
+		r2.l = #LO(vmversion);
+	}
+	{
+		r1.h = #HI(PAGE_OFFSET);
+		r2.h = #HI(vmversion);
+	}
+	r1 = sub(r2,r1);  /*  &vmversion - PAGE_OFFSET  */
+	r1 = add(r1,r25); /*  + PHYS_OFFSET */
+#endif
+
 	r0 = r24;
 
 	/*
@@ -217,6 +245,11 @@ __head_s_vaddr_target:
 	r2 = sub(r2,r0);
 	call memset;
 
+	r0.h = #hi(boot_info)
+	r0.l = #lo(boot_info)
+	memw(r0 ++ #4) = r27  /* save boot_info low word (from R0) */
+	memw(r0) = r28        /* save boot_info high word (from R1) */
+
 	/*  Set PHYS_OFFSET; should be in R25 */
 #ifdef CONFIG_HEXAGON_PHYS_OFFSET
 	r0.l = #LO(__phys_offset);
@@ -233,6 +266,11 @@ __head_s_vaddr_target:
 1:
 	jump 1b
 
-.p2align PAGE_SHIFT
+/*
+ * Reserve 256KB for bootloader DTB handoff.
+ * Bootloader aligns to 4K regardless of kernel page size.
+ */
+.p2align 12
 ENTRY(external_cmdline_buffer)
-        .fill _PAGE_SIZE,1,0
+ENTRY(external_buffer)
+	.fill 262144,1,0

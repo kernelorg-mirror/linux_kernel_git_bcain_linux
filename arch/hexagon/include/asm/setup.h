@@ -17,4 +17,6 @@ extern char external_cmdline_buffer;
 
 void __init setup_arch_memory(void);
 
+extern unsigned long external_buffer;
+
 #endif
