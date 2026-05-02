@@ -53,8 +53,8 @@ else
 		disp_name=LLD
 	elif [ "$1" = eld ]; then
 		version=$2
-		min_version=$lld_min_version
-		name=LLD
+		min_version=$($min_tool_version eld)
+		name=ELD
 		disp_name=eld
 	else
 		echo "$orig_args: unknown linker" >&2
