@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/interrupt-controller/qcom,h2-pic.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm Hexagon H2 Virtual Interrupt Controller
+
+maintainers:
+  - Brian Cain <bcain@quicinc.com>
+
+description:
+  The H2 virtual interrupt controller provides interrupt delivery for
+  guest operating systems running under the Hexagon H2 hypervisor.
+  Interrupts are managed via trap1 hypercalls (vmintop).
+
+properties:
+  compatible:
+    const: qcom,h2-pic
+
+  interrupt-controller: true
+
+  '#interrupt-cells':
+    const: 2
+    description:
+      The first cell is the IRQ number.  The second cell is the trigger
+      type (unused, should be 0).
+
+required:
+  - compatible
+  - interrupt-controller
+  - '#interrupt-cells'
+
+additionalProperties: false
+
+examples:
+  - |
+    interrupt-controller@0 {
+        compatible = "qcom,h2-pic";
+        interrupt-controller;
+        #interrupt-cells = <2>;
+    };

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/hexagon/qcom,hexagon-virt.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm Hexagon QEMU Virtual Machine
+
+maintainers:
+  - Brian Cain <bcain@quicinc.com>
+
+description:
+  The Hexagon QEMU virt machine is a virtual platform for running Linux
+  on the Qualcomm Hexagon DSP architecture under QEMU system emulation.
+
+properties:
+  $nodename:
+    const: /
+  compatible:
+    items:
+      - const: qcom,hexagon-virt
+
+required:
+  - compatible
+
+additionalProperties: true
