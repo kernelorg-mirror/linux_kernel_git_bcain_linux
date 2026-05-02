@@ -13,8 +13,12 @@
 #include <asm/page.h>
 #include <asm/hexagon_vm.h>
 
+#ifdef CONFIG_HEXAGON_SPLIT_2GB
+/* 2GB split has more kernel entries */
+#define SEGTABLE_ENTRIES #0x1e0
+#else
 #define SEGTABLE_ENTRIES #0x0e0
-
+#endif
 	__INIT
 ENTRY(stext)
 	/*
@@ -90,6 +94,10 @@ ENTRY(stext)
 	memw(r0 ++ #4) = r1
 	{ r1 = add(r1, r2); } :endloop0
 
+#define PTE_BITS_16MB ( __HVM_PTE_R | __HVM_PTE_W | __HVM_PTE_X	\
+		  | __HEXAGON_C_WB_L2 << 6			\
+		  | __HVM_PDE_S_16MB)
+
 	/*  Also need to overwrite the initial 0xc0000000 entries  */
 	/*  PAGE_OFFSET >> (4MB shift - 4 bytes per entry shift)  */
 	R1.H = #HI(PAGE_OFFSET >> (22 - 2))
@@ -100,12 +108,23 @@ ENTRY(stext)
 	r2.h = #0xffc0;
 	r2.l = #0x0000;		/* round back down to 4MB boundary  */
 	r1 = and(r1,r2);	/* for huge page */
-	r2 = #PTE_BITS
+	r2 = #PTE_BITS_16MB
 	r1 = add(r1,r2);
 	r2.h = #0x0040
-	r2.l = #0x0000		/* 4MB increments */
+	r2.l = #0x0000		/* 4MB increments even though we're using 16MB pages */
 
-	loop0(1f,SEGTABLE_ENTRIES);
+	/* Fill all but last 4 entries with 16MB pages */
+	loop0(1f,SEGTABLE_ENTRIES-4);
+1:
+	memw(r0 ++ #4) = r1;
+	{ r1 = add(r1,r2); } :endloop0
+
+	/* Reset last 4 entries to 4MB page size */
+	r1 = lsr(r1, #3);
+	r1 = asl(r1, #3);
+	r1 = add(r1, #__HVM_PDE_S_4MB);
+
+	loop0(1f, #4);
 1:
 	memw(r0 ++ #4) = r1;
 	{ r1 = add(r1,r2); } :endloop0
