@@ -22,6 +22,7 @@
 #include <asm/platform.h>
 #include <asm/prom.h>
 #include <asm/time.h>
+#include <asm/angel_console.h>
 #include <linux/percpu.h>
 
 #ifdef CONFIG_SMP
@@ -53,6 +54,8 @@ void __init setup_arch(char **cmdline_p)
 	 * Set up event bindings to handle exceptions and interrupts.
 	 */
 	__vmsetvec(_K_VM_event_vector);
+
+	register_angel_console();
 
 	pr_info("PHYS_OFFSET=0x%08lx\n", PHYS_OFFSET);
 	/* Initial machine setup from flattened device tree */
