@@ -138,6 +138,7 @@ ENTRY(stext)
 	 * vm_ops.S
 	 */
 	r1 = #VM_TRANS_TYPE_TABLE
+	r2 = #VM_TLB_INVALIDATE_TRUE
 	call	__vmnewmap;
 
 	/*  Jump into virtual address range.  */
@@ -166,7 +167,6 @@ __head_s_vaddr_target:
 	r2 = asl(r2, #2)	/* times sizeof(PTE) (4bytes)	*/
 	r1 = add(r1,r2);
 	loop0(1f,r26)
-
 1:
 	{
 		memw(R1 ++ #4) = R0
@@ -174,6 +174,7 @@ __head_s_vaddr_target:
 
 	r0 = r24
 	r1 = #VM_TRANS_TYPE_TABLE
+	r2 = #VM_TLB_INVALIDATE_TRUE
 	call __vmnewmap
 
 	/*  Go ahead and install the trap0 return so angel calls work  */
