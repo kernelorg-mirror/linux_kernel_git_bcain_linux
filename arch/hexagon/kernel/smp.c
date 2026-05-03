@@ -249,7 +249,23 @@ void arch_send_call_function_ipi_mask(const struct cpumask *mask)
 void smp_start_cpus(void)
 {
 	int i;
+	unsigned long mask;
 
-	for (i = 0; i < NR_CPUS; i++)
+	mask = __vmhwconfig(HWCONFIG_HWTHREADS_MASK, 0, 0, 0);
+
+	pr_info("SMP: HW thread mask from hypervisor: 0x%lx\n", mask);
+
+	if (!mask) {
+		pr_warn("SMP: HWCONFIG returned empty thread mask, falling back to NR_CPUS\n");
+		for (i = 0; i < NR_CPUS; i++)
+			set_cpu_possible(i, true);
+		return;
+	}
+
+	if (mask >> NR_CPUS)
+		pr_warn("SMP: HW thread mask 0x%lx exceeds NR_CPUS=%d, increase CONFIG_NR_CPUS\n",
+			mask, NR_CPUS);
+
+	for_each_set_bit(i, &mask, NR_CPUS)
 		set_cpu_possible(i, true);
 }
