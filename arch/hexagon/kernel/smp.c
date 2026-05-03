@@ -205,8 +205,11 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	 * descriptor that has this stuff
 	 */
 
-	for (i = 0; i < max_cpus; i++)
+	for_each_possible_cpu(i) {
+		if (i >= max_cpus)
+			break;
 		set_cpu_present(i, true);
+	}
 
 	/* Register the interrupts for IPI */
 	if (max_cpus > 1) {

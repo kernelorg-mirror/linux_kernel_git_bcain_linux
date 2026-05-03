@@ -200,12 +200,12 @@ config SMP
 
 config NR_CPUS
 	int "Maximum number of CPUs" if SMP
-	range 2 6 if SMP
+	range 2 16 if SMP
 	default "1" if !SMP
-	default "6" if SMP
+	default "16" if SMP
 	help
 	  This allows you to specify the maximum number of CPUs which this
-	  kernel will support.  The maximum supported value is 6 and the
+	  kernel will support.  The maximum supported value is 16 and the
 	  minimum value which makes sense is 2.
 
 	  This is purely to save memory - each supported CPU adds
