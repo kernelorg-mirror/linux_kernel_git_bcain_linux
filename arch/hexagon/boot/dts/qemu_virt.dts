@@ -166,6 +166,14 @@
 			mboxes = <&ivshmem_mbox>;
 			qcom,remote-pid = <0>;
 			qcom,is-remote;
+
+			ip-bridge {
+				qcom,glink-channels = "IP_BRIDGE";
+			};
+
+			fastrpc {
+				qcom,glink-channels = "fastrpc-cdsp-smd";
+			};
 		};
 	};
 };
