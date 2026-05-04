@@ -310,6 +310,15 @@ config QCOM_FASTRPC
 	  applications DSP processor. Say M if you want to enable this
 	  module.
 
+config FASTRPC_DEVICE
+	tristate "FastRPC device-side handler"
+	depends on RPMSG
+	help
+	  Device-side FastRPC handler that receives invoke requests over
+	  GLINK/rpmsg and exposes them to userspace via /dev/fastrpc_device.
+	  Used on a DSP running Linux to handle method invocations from
+	  the application processor.
+
 config SGI_GRU
 	tristate "SGI GRU driver"
 	depends on X86_UV && SMP
