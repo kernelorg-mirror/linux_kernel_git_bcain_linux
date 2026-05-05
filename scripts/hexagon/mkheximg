@@ -1,0 +1,790 @@
+#!/usr/bin/env python3
+#
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+#
+# mkheximg - Combine Hexagon boot components into a single QEMU-loadable ELF
+#
+# Creates a combined ELF containing:
+#   - H2 hypervisor (loadlinux)
+#   - Linux kernel (vmlinux)
+#   - Device tree blob
+#   - Optional initramfs
+#
+# The resulting ELF can boot QEMU with just: -kernel combined.elf
+
+import argparse
+import struct
+import sys
+from pathlib import Path
+
+# ELF constants
+ELFMAG = b'\x7fELF'
+ELFCLASS32 = 1
+ELFDATA2LSB = 1
+ET_EXEC = 2
+EM_HEXAGON = 164
+EV_CURRENT = 1
+PT_LOAD = 1
+PT_NULL = 0
+PF_X = 1
+PF_W = 2
+PF_R = 4
+SHT_SYMTAB = 2
+SHT_STRTAB = 3
+STB_GLOBAL = 1
+
+# ELF32 structure sizes
+ELF32_EHDR_SIZE = 52
+ELF32_PHDR_SIZE = 32
+ELF32_SHDR_SIZE = 40
+ELF32_SYM_SIZE = 16
+
+# Default addresses
+DEFAULT_H2_ADDR = 0x9b800000
+DEFAULT_LINUX_ADDR = 0xa0000000
+
+# FDT constants
+FDT_MAGIC = 0xd00dfeed
+FDT_BEGIN_NODE = 0x00000001
+FDT_END_NODE = 0x00000002
+FDT_PROP = 0x00000003
+FDT_NOP = 0x00000004
+FDT_END = 0x00000009
+
+
+def parse_int(s):
+    """Parse an integer from string, supporting 0x hex prefix."""
+    if s.startswith('0x') or s.startswith('0X'):
+        return int(s, 16)
+    return int(s)
+
+
+def align_up(val, alignment):
+    """Align val up to the next multiple of alignment."""
+    return (val + alignment - 1) & ~(alignment - 1)
+
+
+class ELF32:
+    """Minimal ELF32 parser for Hexagon executables."""
+
+    def __init__(self, data):
+        self.data = bytearray(data)
+        self._parse_header()
+        self._parse_phdrs()
+        self._parse_shdrs()
+
+    def _parse_header(self):
+        if self.data[:4] != ELFMAG:
+            raise ValueError("Not an ELF file")
+        if self.data[4] != ELFCLASS32:
+            raise ValueError("Not a 32-bit ELF")
+        if self.data[5] != ELFDATA2LSB:
+            raise ValueError("Not little-endian")
+
+        hdr = struct.unpack_from('<HHIIIIIHHHHHH', self.data, 16)
+        self.e_type = hdr[0]
+        self.e_machine = hdr[1]
+        self.e_version = hdr[2]
+        self.e_entry = hdr[3]
+        self.e_phoff = hdr[4]
+        self.e_shoff = hdr[5]
+        self.e_flags = hdr[6]
+        self.e_ehsize = hdr[7]
+        self.e_phentsize = hdr[8]
+        self.e_phnum = hdr[9]
+        self.e_shentsize = hdr[10]
+        self.e_shnum = hdr[11]
+        self.e_shstrndx = hdr[12]
+
+    def _parse_phdrs(self):
+        self.phdrs = []
+        for i in range(self.e_phnum):
+            off = self.e_phoff + i * self.e_phentsize
+            phdr = struct.unpack_from('<IIIIIIII', self.data, off)
+            self.phdrs.append({
+                'p_type': phdr[0],
+                'p_offset': phdr[1],
+                'p_vaddr': phdr[2],
+                'p_paddr': phdr[3],
+                'p_filesz': phdr[4],
+                'p_memsz': phdr[5],
+                'p_flags': phdr[6],
+                'p_align': phdr[7],
+            })
+
+    def _parse_shdrs(self):
+        self.shdrs = []
+        if self.e_shoff == 0:
+            return
+        for i in range(self.e_shnum):
+            off = self.e_shoff + i * self.e_shentsize
+            shdr = struct.unpack_from('<IIIIIIIIII', self.data, off)
+            self.shdrs.append({
+                'sh_name': shdr[0],
+                'sh_type': shdr[1],
+                'sh_flags': shdr[2],
+                'sh_addr': shdr[3],
+                'sh_offset': shdr[4],
+                'sh_size': shdr[5],
+                'sh_link': shdr[6],
+                'sh_info': shdr[7],
+                'sh_addralign': shdr[8],
+                'sh_entsize': shdr[9],
+            })
+
+    def get_load_segments(self):
+        """Return all PT_LOAD segments with their data."""
+        segments = []
+        for phdr in self.phdrs:
+            if phdr['p_type'] == PT_LOAD:
+                data = self.data[phdr['p_offset']:
+                                 phdr['p_offset'] + phdr['p_filesz']]
+                segments.append({
+                    'paddr': phdr['p_paddr'],
+                    'vaddr': phdr['p_vaddr'],
+                    'filesz': phdr['p_filesz'],
+                    'memsz': phdr['p_memsz'],
+                    'flags': phdr['p_flags'],
+                    'align': phdr['p_align'],
+                    'data': bytes(data),
+                })
+        return segments
+
+    def find_symbol(self, name):
+        """Find a symbol by name, return its value and section info."""
+        symtab = None
+        strtab_idx = None
+
+        for shdr in self.shdrs:
+            if shdr['sh_type'] == SHT_SYMTAB:
+                symtab = shdr
+                strtab_idx = shdr['sh_link']
+                break
+
+        if symtab is None:
+            return None
+
+        strtab = self.shdrs[strtab_idx]
+        strtab_data = self.data[strtab['sh_offset']:
+                                strtab['sh_offset'] + strtab['sh_size']]
+
+        num_syms = symtab['sh_size'] // symtab['sh_entsize']
+        for i in range(num_syms):
+            off = symtab['sh_offset'] + i * symtab['sh_entsize']
+            sym = struct.unpack_from('<IIIBBH', self.data, off)
+            st_name = sym[0]
+            st_value = sym[1]
+            st_size = sym[2]
+            st_shndx = sym[5]
+
+            # Get symbol name from string table
+            name_end = strtab_data.index(b'\x00', st_name)
+            sym_name = strtab_data[st_name:name_end].decode('ascii')
+
+            if sym_name == name:
+                return {
+                    'value': st_value,
+                    'size': st_size,
+                    'shndx': st_shndx,
+                }
+
+        return None
+
+    def find_symbol_file_offset(self, name):
+        """Find the file offset of a symbol's data within the ELF."""
+        sym = self.find_symbol(name)
+        if sym is None:
+            return None, None
+
+        sym_addr = sym['value']
+
+        # Find which PT_LOAD segment contains this address
+        for phdr in self.phdrs:
+            if phdr['p_type'] != PT_LOAD:
+                continue
+            seg_start = phdr['p_paddr']
+            seg_end = seg_start + phdr['p_filesz']
+            if seg_start <= sym_addr < seg_end:
+                offset_in_seg = sym_addr - seg_start
+                file_offset = phdr['p_offset'] + offset_in_seg
+                return file_offset, sym_addr
+
+        # Try with vaddr
+        for phdr in self.phdrs:
+            if phdr['p_type'] != PT_LOAD:
+                continue
+            seg_start = phdr['p_vaddr']
+            seg_end = seg_start + phdr['p_filesz']
+            if seg_start <= sym_addr < seg_end:
+                offset_in_seg = sym_addr - seg_start
+                file_offset = phdr['p_offset'] + offset_in_seg
+                return file_offset, sym_addr
+
+        return None, sym_addr
+
+
+def patch_fdt_chosen(fdt_data, initrd_start, initrd_end):
+    """Patch or create /chosen node with linux,initrd-start/end properties.
+
+    Returns the modified FDT as bytes.
+    """
+    fdt = bytearray(fdt_data)
+
+    # Parse FDT header
+    magic = struct.unpack_from('>I', fdt, 0)[0]
+    if magic != FDT_MAGIC:
+        raise ValueError(f"Invalid FDT magic: 0x{magic:08x}")
+
+    totalsize = struct.unpack_from('>I', fdt, 4)[0]
+    off_dt_struct = struct.unpack_from('>I', fdt, 8)[0]
+    off_dt_strings = struct.unpack_from('>I', fdt, 12)[0]
+    off_mem_rsvmap = struct.unpack_from('>I', fdt, 16)[0]
+    version = struct.unpack_from('>I', fdt, 20)[0]
+    size_dt_strings = struct.unpack_from('>I', fdt, 32)[0]
+    size_dt_struct = struct.unpack_from('>I', fdt, 36)[0]
+
+    strings_block = fdt[off_dt_strings:off_dt_strings + size_dt_strings]
+
+    def get_string(offset):
+        end = strings_block.index(b'\x00', offset)
+        return strings_block[offset:end].decode('ascii')
+
+    def find_string_offset(name):
+        """Find or add a string in the strings block."""
+        name_bytes = name.encode('ascii') + b'\x00'
+        idx = strings_block.find(name_bytes)
+        if idx >= 0:
+            return idx
+        return None
+
+    # Walk the structure block to find /chosen node
+    pos = off_dt_struct
+    depth = 0
+    chosen_end = None  # position just before FDT_END_NODE of /chosen
+    in_chosen = False
+    chosen_depth = -1
+    has_initrd_start = False
+    has_initrd_end = False
+
+    while pos < off_dt_struct + size_dt_struct:
+        token = struct.unpack_from('>I', fdt, pos)[0]
+        pos += 4
+
+        if token == FDT_BEGIN_NODE:
+            # Node name follows (null-terminated, padded to 4 bytes)
+            name_start = pos
+            while fdt[pos] != 0:
+                pos += 1
+            node_name = fdt[name_start:pos].decode('ascii')
+            pos += 1  # skip null
+            pos = align_up(pos, 4)
+            depth += 1
+
+            if depth == 2 and node_name == 'chosen':
+                in_chosen = True
+                chosen_depth = depth
+
+        elif token == FDT_END_NODE:
+            if in_chosen and depth == chosen_depth:
+                chosen_end = pos - 4  # before this FDT_END_NODE
+                in_chosen = False
+            depth -= 1
+
+        elif token == FDT_PROP:
+            prop_len = struct.unpack_from('>I', fdt, pos)[0]
+            prop_nameoff = struct.unpack_from('>I', fdt, pos + 4)[0]
+            pos += 8
+            prop_name = get_string(prop_nameoff)
+
+            if in_chosen:
+                if prop_name == 'linux,initrd-start':
+                    has_initrd_start = True
+                    # Patch in place if size matches
+                    if prop_len == 8:
+                        struct.pack_into('>Q', fdt, pos, initrd_start)
+                    elif prop_len == 4:
+                        struct.pack_into('>I', fdt, pos, initrd_start)
+                elif prop_name == 'linux,initrd-end':
+                    has_initrd_end = True
+                    if prop_len == 8:
+                        struct.pack_into('>Q', fdt, pos, initrd_end)
+                    elif prop_len == 4:
+                        struct.pack_into('>I', fdt, pos, initrd_end)
+
+            pos += prop_len
+            pos = align_up(pos, 4)
+
+        elif token == FDT_NOP:
+            pass
+
+        elif token == FDT_END:
+            break
+
+    # If properties already existed and were patched in place, return
+    if has_initrd_start and has_initrd_end:
+        return bytes(fdt)
+
+    # Need to insert properties into /chosen node
+    # Build the new properties to insert
+    new_props = bytearray()
+
+    # Ensure string table has our property names
+    new_strings = bytearray(strings_block)
+
+    def ensure_string(name):
+        name_bytes = name.encode('ascii') + b'\x00'
+        idx = new_strings.find(name_bytes)
+        if idx >= 0:
+            return idx
+        idx = len(new_strings)
+        new_strings.extend(name_bytes)
+        return idx
+
+    if not has_initrd_start:
+        nameoff = ensure_string('linux,initrd-start')
+        new_props += struct.pack('>I', FDT_PROP)
+        new_props += struct.pack('>II', 8, nameoff)  # len=8, nameoff
+        new_props += struct.pack('>Q', initrd_start)
+
+    if not has_initrd_end:
+        nameoff = ensure_string('linux,initrd-end')
+        new_props += struct.pack('>I', FDT_PROP)
+        new_props += struct.pack('>II', 8, nameoff)  # len=8, nameoff
+        new_props += struct.pack('>Q', initrd_end)
+
+    if chosen_end is None:
+        # No /chosen node exists — insert one before the root's FDT_END_NODE
+        # Find root's end node (last FDT_END_NODE before FDT_END)
+        pos = off_dt_struct
+        root_end = None
+        while pos < off_dt_struct + size_dt_struct:
+            token = struct.unpack_from('>I', fdt, pos)[0]
+            if token == FDT_END:
+                root_end = pos
+                break
+            elif token == FDT_BEGIN_NODE:
+                pos += 4
+                while fdt[pos] != 0:
+                    pos += 1
+                pos += 1
+                pos = align_up(pos, 4)
+            elif token == FDT_END_NODE:
+                root_end = pos
+                pos += 4
+            elif token == FDT_PROP:
+                pos += 4
+                prop_len = struct.unpack_from('>I', fdt, pos)[0]
+                pos += 8 + align_up(prop_len, 4)
+            elif token == FDT_NOP:
+                pos += 4
+            else:
+                pos += 4
+
+        if root_end is None:
+            raise ValueError("Cannot find root node end in FDT")
+
+        # Build chosen node: BEGIN_NODE "chosen\0" + props + END_NODE
+        chosen_node = bytearray()
+        chosen_node += struct.pack('>I', FDT_BEGIN_NODE)
+        chosen_name = b'chosen\x00'
+        chosen_node += chosen_name
+        # Pad to 4-byte alignment
+        pad = align_up(len(chosen_name), 4) - len(chosen_name)
+        chosen_node += b'\x00' * pad
+        chosen_node += new_props
+        chosen_node += struct.pack('>I', FDT_END_NODE)
+
+        # Insert before root_end
+        fdt[root_end:root_end] = chosen_node
+        insert_len = len(chosen_node)
+    else:
+        # Insert new properties before the chosen FDT_END_NODE
+        fdt[chosen_end:chosen_end] = new_props
+        insert_len = len(new_props)
+
+    # The struct insertion shifted the strings block position in the bytearray.
+    # Compute the new strings block position before replacing it.
+    new_off_dt_strings = off_dt_strings
+    if off_dt_strings > off_dt_struct:
+        new_off_dt_strings = off_dt_strings + insert_len
+
+    # Replace strings block at its new position
+    old_str_size = len(strings_block)
+    fdt[new_off_dt_strings:new_off_dt_strings + old_str_size] = new_strings
+
+    # Update header fields
+    struct.pack_into('>I', fdt, 4, len(fdt))            # totalsize
+    struct.pack_into('>I', fdt, 8, off_dt_struct)       # off_dt_struct (unchanged)
+    struct.pack_into('>I', fdt, 12, new_off_dt_strings) # off_dt_strings
+    struct.pack_into('>I', fdt, 32, len(new_strings))   # size_dt_strings
+    struct.pack_into('>I', fdt, 36, size_dt_struct + insert_len)  # size_dt_struct
+
+    return bytes(fdt)
+
+
+def build_output_elf(segments, entry_point):
+    """Build a minimal ELF32 with multiple PT_LOAD segments.
+
+    segments: list of dicts with 'paddr', 'flags', 'data', 'align'
+    entry_point: e_entry value
+    """
+    num_segments = len(segments)
+    # Layout: ELF header + program headers + segment data (page-aligned)
+    headers_size = ELF32_EHDR_SIZE + num_segments * ELF32_PHDR_SIZE
+    data_start = align_up(headers_size, 0x1000)
+
+    # Compute file offsets for each segment
+    file_offset = data_start
+    seg_offsets = []
+    for seg in segments:
+        seg_offsets.append(file_offset)
+        file_offset += len(seg['data'])
+        file_offset = align_up(file_offset, 0x1000)
+
+    total_size = file_offset
+
+    # Build the output
+    out = bytearray(total_size)
+
+    # ELF header
+    out[0:4] = ELFMAG
+    out[4] = ELFCLASS32      # EI_CLASS
+    out[5] = ELFDATA2LSB     # EI_DATA
+    out[6] = EV_CURRENT      # EI_VERSION
+    # EI_OSABI = 0 (ELFOSABI_NONE)
+    struct.pack_into('<H', out, 16, ET_EXEC)       # e_type
+    struct.pack_into('<H', out, 18, EM_HEXAGON)    # e_machine
+    struct.pack_into('<I', out, 20, EV_CURRENT)    # e_version
+    struct.pack_into('<I', out, 24, entry_point)   # e_entry
+    struct.pack_into('<I', out, 28, ELF32_EHDR_SIZE)  # e_phoff
+    struct.pack_into('<I', out, 32, 0)             # e_shoff (no sections)
+    struct.pack_into('<I', out, 36, 0)             # e_flags
+    struct.pack_into('<H', out, 40, ELF32_EHDR_SIZE)  # e_ehsize
+    struct.pack_into('<H', out, 42, ELF32_PHDR_SIZE)  # e_phentsize
+    struct.pack_into('<H', out, 44, num_segments)  # e_phnum
+    struct.pack_into('<H', out, 46, 0)               # e_shentsize
+    struct.pack_into('<H', out, 48, 0)             # e_shnum
+    struct.pack_into('<H', out, 50, 0)             # e_shstrndx
+
+    # Program headers
+    for i, seg in enumerate(segments):
+        off = ELF32_EHDR_SIZE + i * ELF32_PHDR_SIZE
+        memsz = seg.get('memsz', len(seg['data']))
+        struct.pack_into('<I', out, off + 0, PT_LOAD)        # p_type
+        struct.pack_into('<I', out, off + 4, seg_offsets[i])  # p_offset
+        struct.pack_into('<I', out, off + 8, seg['paddr'])    # p_vaddr
+        struct.pack_into('<I', out, off + 12, seg['paddr'])   # p_paddr
+        struct.pack_into('<I', out, off + 16, len(seg['data']))  # p_filesz
+        struct.pack_into('<I', out, off + 20, memsz)          # p_memsz
+        struct.pack_into('<I', out, off + 24, seg['flags'])   # p_flags
+        struct.pack_into('<I', out, off + 28, seg.get('align', 0x1000))  # p_align
+
+    # Segment data
+    for i, seg in enumerate(segments):
+        out[seg_offsets[i]:seg_offsets[i] + len(seg['data'])] = seg['data']
+
+    return bytes(out)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Combine Hexagon boot components into a single '
+                    'QEMU-loadable ELF.')
+
+    parser.add_argument('-o', '--output', required=True,
+                        help='Output ELF path')
+    parser.add_argument('--h2', required=True, metavar='H2_ELF',
+                        help='H2 hypervisor ELF (loadlinux)')
+    parser.add_argument('--linux', required=True, metavar='VMLINUX_ELF',
+                        help='Linux kernel ELF (vmlinux)')
+    parser.add_argument('--dtb', required=True, metavar='DTB',
+                        help='Device tree blob (.dtb)')
+    parser.add_argument('--initramfs', metavar='FILE',
+                        help='Initramfs/initrd image (cpio or cpio.gz)')
+    parser.add_argument('--h2-addr', metavar='ADDR', type=parse_int,
+                        help=f'H2 load address override '
+                             f'(default: from ELF, 0x{DEFAULT_H2_ADDR:08x})')
+    parser.add_argument('--linux-addr', metavar='ADDR', type=parse_int,
+                        default=DEFAULT_LINUX_ADDR,
+                        help=f'Linux PHYS_OFFSET '
+                             f'(default: 0x{DEFAULT_LINUX_ADDR:08x})')
+    parser.add_argument('--dtb-addr', metavar='ADDR', type=parse_int,
+                        help='DTB placement address (default: auto)')
+    parser.add_argument('--initramfs-addr', metavar='ADDR', type=parse_int,
+                        help='Initramfs address (default: auto)')
+
+    args = parser.parse_args()
+
+    # Read input files
+    h2_data = Path(args.h2).read_bytes()
+    linux_data = Path(args.linux).read_bytes()
+    dtb_data = bytearray(Path(args.dtb).read_bytes())
+
+    initramfs_data = None
+    if args.initramfs:
+        initramfs_data = Path(args.initramfs).read_bytes()
+
+    # Parse ELFs
+    h2_elf = ELF32(h2_data)
+    linux_elf = ELF32(linux_data)
+
+    if h2_elf.e_machine != EM_HEXAGON:
+        print(f"Warning: H2 ELF e_machine={h2_elf.e_machine}, "
+              f"expected {EM_HEXAGON} (Hexagon)", file=sys.stderr)
+    if linux_elf.e_machine != EM_HEXAGON:
+        print(f"Warning: Linux ELF e_machine={linux_elf.e_machine}, "
+              f"expected {EM_HEXAGON} (Hexagon)", file=sys.stderr)
+
+    # Collect H2 segments (physical addresses from ELF)
+    h2_segments = h2_elf.get_load_segments()
+    print(f"H2: {len(h2_segments)} PT_LOAD segments, "
+          f"entry=0x{h2_elf.e_entry:08x}")
+    for seg in h2_segments:
+        print(f"  0x{seg['paddr']:08x} - 0x{seg['paddr']+seg['memsz']:08x} "
+              f"({seg['filesz']:#x} bytes)")
+
+    # Collect Linux segments, applying PHYS_OFFSET
+    linux_phys_offset = args.linux_addr
+    linux_segments = linux_elf.get_load_segments()
+    linux_end = 0
+    print(f"\nLinux: {len(linux_segments)} PT_LOAD segments, "
+          f"PHYS_OFFSET=0x{linux_phys_offset:08x}")
+    for seg in linux_segments:
+        seg['paddr'] += linux_phys_offset
+        seg_end = seg['paddr'] + seg['memsz']
+        if seg_end > linux_end:
+            linux_end = seg_end
+        print(f"  0x{seg['paddr']:08x} - 0x{seg_end:08x} "
+              f"({seg['filesz']:#x} bytes)")
+
+    # Compute DTB address (must be after all Linux segments including BSS)
+    if args.dtb_addr is not None:
+        dtb_addr = args.dtb_addr
+    else:
+        dtb_addr = align_up(linux_end, 0x1000)  # 4KB-aligned after Linux
+    print(f"\nDTB: 0x{dtb_addr:08x} ({len(dtb_data)} bytes)")
+
+    # Compute initramfs address and patch DTB
+    initramfs_addr = None
+    if initramfs_data is not None:
+        if args.initramfs_addr is not None:
+            initramfs_addr = args.initramfs_addr
+        else:
+            # 1MB-aligned after DTB
+            initramfs_addr = align_up(dtb_addr + len(dtb_data), 0x100000)
+
+        initramfs_end = initramfs_addr + len(initramfs_data)
+        print(f"Initramfs: 0x{initramfs_addr:08x} - 0x{initramfs_end:08x} "
+              f"({len(initramfs_data)} bytes)")
+
+        # Patch DTB with initrd addresses
+        dtb_data = bytearray(patch_fdt_chosen(
+            bytes(dtb_data), initramfs_addr, initramfs_end))
+        print(f"  Patched DTB /chosen with initrd-start=0x{initramfs_addr:08x}"
+              f" initrd-end=0x{initramfs_end:08x}")
+
+    # Patch the NOP sled at __bootvm_entry_point.
+    #
+    # Layout: the first word is `jump .Lunpatched` (skips the sled when
+    # unpatched), followed by 15 NOP words.  When patched, we overwrite
+    # the jump and as many NOPs as needed, then let execution fall through
+    # the remaining NOPs into .Lunpatched (which saves R0 and jumps to
+    # hexagon_pre_main).
+    #
+    # The patched code uses scratch registers (r2-r4) to store the 64-bit
+    # DTB address into __boot_metadata, leaving R0 untouched (it carries
+    # the net physical offset from H2).
+    #
+    # Patched sequence (7 words):
+    #   { r2 = ##dtb_addr[31:0] }        2 words (extender + transfer)
+    #   { r3 = ##dtb_addr[63:32] }       2 words
+    #   { r4 = ##__boot_metadata }       2 words
+    #   { memd(r4+#0) = r3:2 }           1 word
+    #   [remaining NOPs fall through to .Lunpatched]
+    #
+    SLED_WORDS = 16  # jump + 15 NOPs
+    PATCH_WORDS = 7
+    entry_offset, entry_addr = h2_elf.find_symbol_file_offset(
+        '__bootvm_entry_point')
+    if entry_offset is not None:
+        # The first word should be a jump (or NOP if old-style sled).
+        # Verify we have enough patchable space: word 0 is jump, words 1-15
+        # are NOPs.
+        nop_word = 0x7f00c000
+        words = [struct.unpack_from('<I', h2_elf.data,
+                                    entry_offset + i * 4)[0]
+                 for i in range(SLED_WORDS)]
+
+        # Accept either: all NOPs (old-style) or jump + 15 NOPs (new-style)
+        is_jump_sled = (words[0] != nop_word and
+                        all(w == nop_word for w in words[1:]))
+        is_nop_sled = all(w == nop_word for w in words)
+
+        if is_jump_sled or is_nop_sled:
+            # Find __boot_metadata symbol address
+            meta_sym = h2_elf.find_symbol('__boot_metadata')
+            if meta_sym is None:
+                print(f"\nWarning: '__boot_metadata' symbol not found. "
+                      f"DTB address will not be passed to kernel.",
+                      file=sys.stderr)
+            else:
+                meta_addr = meta_sym['value']
+
+                # 64-bit DTB address split into low and high 32-bit halves
+                imm_lo = dtb_addr & 0xffffffff
+                imm_hi = (dtb_addr >> 32) & 0xffffffff
+
+                def encode_rx_imm32(rd, imm):
+                    """Encode { Rd = ##imm32 } as (extender, base) pair."""
+                    # Extender: imm[31:20] in [27:16], PP=01 in [15:14],
+                    #           imm[19:6] in [13:0]
+                    ext = (((imm >> 20) & 0xfff) << 16) | \
+                          (0b01 << 14) | \
+                          ((imm >> 6) & 0x3fff)
+                    # Base: 0x7800c000 has PP=11 (end of packet)
+                    #       Rd in [4:0], imm[5:0] in [10:5]
+                    base = 0x7800c000 | (rd & 0x1f) | ((imm & 0x3f) << 5)
+                    return ext, base
+
+                # Use R6-R8: caller-saved scratch registers that won't
+                # clobber function arguments (R0-R5) passed by H2.
+                # { r6 = ##dtb_lo }
+                ext0, base0 = encode_rx_imm32(6, imm_lo)
+                # { r7 = ##dtb_hi }
+                ext1, base1 = encode_rx_imm32(7, imm_hi)
+                # { r8 = ##__boot_metadata }
+                ext2, base2 = encode_rx_imm32(8, meta_addr)
+                # { memd(r8+#0) = r7:6 }
+                # memd(Rs+#0)=Rtt: bits[20:16]=Rs, bits[4:0]=Rtt_even
+                memd_word = 0xa1c8c006  # memd(r8+#0) = r7:6
+
+                struct.pack_into('<I', h2_elf.data, entry_offset + 0, ext0)
+                struct.pack_into('<I', h2_elf.data, entry_offset + 4, base0)
+                struct.pack_into('<I', h2_elf.data, entry_offset + 8, ext1)
+                struct.pack_into('<I', h2_elf.data, entry_offset + 12, base1)
+                struct.pack_into('<I', h2_elf.data, entry_offset + 16, ext2)
+                struct.pack_into('<I', h2_elf.data, entry_offset + 20, base2)
+                struct.pack_into('<I', h2_elf.data, entry_offset + 24, memd_word)
+
+                print(f"\nPatched NOP sled @ 0x{entry_addr:08x}:")
+                print(f"  {{ r6 = ##0x{imm_lo:08x} }}  // dtb[31:0]")
+                print(f"  {{ r7 = ##0x{imm_hi:08x} }}  // dtb[63:32]")
+                print(f"  {{ r8 = ##0x{meta_addr:08x} }}  // __boot_metadata")
+                print(f"  {{ memd(r8+#0) = r7:6 }}")
+                print(f"  ({SLED_WORDS - PATCH_WORDS} words remain, "
+                      f"fall through to .Lunpatched)")
+
+                # Re-extract H2 segments with patched data
+                h2_segments = h2_elf.get_load_segments()
+        else:
+            # Count how many leading NOPs we have
+            nop_count = sum(1 for w in words if w == nop_word)
+            print(f"\nWarning: Expected {SLED_WORDS}-word patchable sled at "
+                  f"__bootvm_entry_point (0x{entry_addr:08x}), "
+                  f"found unexpected content.",
+                  file=sys.stderr)
+            print(f"DTB address will not be passed to kernel.",
+                  file=sys.stderr)
+    else:
+        print(f"\nWarning: '__bootvm_entry_point' symbol not found in H2 ELF."
+              f" DTB address will not be passed to kernel.",
+              file=sys.stderr)
+
+    # Compute H2 BSS extent.  The bootvm_image has BSS beyond the loaded
+    # data (FileSiz < MemSiz internally), but the outer loadlinux ELF
+    # embeds it as a flat binary with FileSiz==MemSiz.  We need to cover
+    # the BSS region explicitly so QEMU backs it with RAM.
+    h2_bss_end = None
+    for sym_name in ('__sbss_end', '__bss_end', '__end'):
+        sym = h2_elf.find_symbol(sym_name)
+        if sym is not None and sym['value'] > 0:
+            # Pick the bootvm-range symbol (0x9b8xxxxx), not H2 kernel (0xff0xxxxx)
+            if sym['value'] < 0xf0000000:
+                h2_bss_end = sym['value']
+                break
+
+    # Build output segments list
+    output_segments = []
+
+    # Find which H2 segment is closest to (immediately preceding) BSS end,
+    # and extend only that segment's memsz.
+    bss_seg_idx = None
+    if h2_bss_end is not None:
+        best_end = 0
+        for i, seg in enumerate(h2_segments):
+            seg_end = seg['paddr'] + seg['filesz']
+            if seg_end > best_end and seg_end <= h2_bss_end:
+                best_end = seg_end
+                bss_seg_idx = i
+
+    # H2 segments
+    for i, seg in enumerate(h2_segments):
+        memsz = seg['memsz']
+        if i == bss_seg_idx:
+            memsz = h2_bss_end - seg['paddr']
+            print(f"\nH2 BSS: extended segment @ 0x{seg['paddr']:08x} "
+                  f"memsz to 0x{memsz:x} (BSS ends at 0x{h2_bss_end:08x})")
+        output_segments.append({
+            'paddr': seg['paddr'],
+            'flags': seg['flags'],
+            'data': seg['data'],
+            'memsz': memsz,
+            'align': seg['align'],
+        })
+
+    # Linux segments
+    for seg in linux_segments:
+        output_segments.append({
+            'paddr': seg['paddr'],
+            'flags': seg['flags'],
+            'data': seg['data'],
+            'memsz': seg['memsz'],
+            'align': seg['align'],
+        })
+
+    # DTB segment (read-only data)
+    output_segments.append({
+        'paddr': dtb_addr,
+        'flags': PF_R,
+        'data': bytes(dtb_data),
+        'memsz': len(dtb_data),
+        'align': 0x1000,
+    })
+
+    # Initramfs segment (read-only data)
+    if initramfs_data is not None:
+        output_segments.append({
+            'paddr': initramfs_addr,
+            'flags': PF_R,
+            'data': initramfs_data,
+            'memsz': len(initramfs_data),
+            'align': 0x1000,
+        })
+
+    # Sort segments by physical address for clean layout
+    output_segments.sort(key=lambda s: s['paddr'])
+
+    # Check for overlaps
+    for i in range(len(output_segments) - 1):
+        seg_a = output_segments[i]
+        seg_b = output_segments[i + 1]
+        end_a = seg_a['paddr'] + seg_a['memsz']
+        if end_a > seg_b['paddr']:
+            print(f"ERROR: Segment overlap detected: "
+                  f"0x{seg_a['paddr']:08x}+0x{seg_a['memsz']:x} overlaps "
+                  f"0x{seg_b['paddr']:08x}", file=sys.stderr)
+            sys.exit(1)
+
+    # Generate output ELF
+    entry_point = h2_elf.e_entry
+    output_data = build_output_elf(output_segments, entry_point)
+
+    # Write output
+    Path(args.output).write_bytes(output_data)
+    print(f"\nOutput: {args.output} ({len(output_data)} bytes, "
+          f"{len(output_segments)} segments, entry=0x{entry_point:08x})")
+
+
+if __name__ == '__main__':
+    main()
