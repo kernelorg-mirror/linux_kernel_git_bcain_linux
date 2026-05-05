@@ -69,7 +69,9 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	__vmsetvec(_K_VM_event_vector);
 
+#ifdef CONFIG_HEXAGON_ANGEL_TRAPS
 	register_angel_console();
+#endif
 
 	pr_info("PHYS_OFFSET=0x%08lx\n", PHYS_OFFSET);
 	/* Initial machine setup from flattened device tree */

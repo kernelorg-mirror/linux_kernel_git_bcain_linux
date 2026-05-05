@@ -136,6 +136,16 @@ config HEXAGON_COMET
 	help
 	  Support for the Comet platform.
 
+config HEXAGON_SA8775P_CDSP0
+	bool "SA8775P CDSP0"
+	select HEXAGON_PHYS_OFFSET
+	select HEXAGON_H2_PIC
+	select PM_OPP
+	help
+	  Support for Compute DSP subsystem 0 on the Qualcomm SA8775P
+	  SoC.  This configures the kernel for the CDSP0 hardware thread
+	  group with QUP GENI UART console.
+
 endchoice
 
 config HEXAGON_MSS
@@ -163,7 +173,7 @@ config HEXAGON_VM
 	def_bool y
 
 config DTB_BUILTIN
-	def_bool HEXAGON_QEMU
+	def_bool HEXAGON_QEMU || HEXAGON_SA8775P_CDSP0
 	help
 	  Build device tree blob into kernel image.
 
