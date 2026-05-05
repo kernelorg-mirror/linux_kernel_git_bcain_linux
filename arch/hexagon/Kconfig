@@ -255,7 +255,15 @@ config HEXAGON_ARCHSIM
 	help
 	  Archsim platform; has QFEC, UART, and a timer.
 
-
+config HEXAGON_SA8775P_CDSP0
+	bool "SA8775P CDSP0"
+	select HEXAGON_PHYS_OFFSET
+	select HEXAGON_H2_PIC
+	select PM_OPP
+	help
+	  Support for Compute DSP subsystem 0 on the Qualcomm SA8775P
+	  SoC.  This configures the kernel for the CDSP0 hardware thread
+	  group with QUP GENI UART console.
 
 endchoice
 

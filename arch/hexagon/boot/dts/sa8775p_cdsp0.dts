@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/dts-v1/;
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	model = "SA8775P CDSP0";
+	compatible = "qcom,sa8775p-cdsp0";
+
+	aliases {
+		serial0 = &uart_qup;
+		serial1 = &uart_pl011;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory@0 { device_type = "memory"; reg = <0 0>; };
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "qcom,hexagon-v73";
+			reg = <0>;
+		};
+	};
+
+	xtal24mhz: xtal24mhz {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <24000000>;
+	};
+
+	soc: soc {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		interrupt-parent = <&PIC0>;
+
+		PIC0: interrupt-controller@0 {
+			compatible = "qcom,h2-pic";
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+		gpt@263a1000 {
+			compatible = "qcom,h2-timer";
+			reg = <0x263a1000 0x1000>;
+			interrupts = <3 0>;
+		};
+
+		geniqup: geniqup@ac0000 {
+			compatible = "qcom,geni-se-qup";
+			reg = <0xac0000 0x6000>;
+			clocks = <&xtal24mhz>, <&xtal24mhz>;
+			clock-names = "m-ahb", "s-ahb";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			uart_qup: serial@a8c000 {
+				compatible = "qcom,geni-debug-uart";
+				reg = <0x00a8c000 0x4000>;
+				clocks = <&xtal24mhz>;
+				clock-names = "se";
+				interrupts = <16 0>;
+			};
+		};
+
+		uart_pl011: uart@10000000 {
+			compatible = "arm,pl011", "arm,primecell";
+			reg = <0x10000000 0x1000>;
+			clocks = <&xtal24mhz>, <&xtal24mhz>;
+			clock-names = "uartclk", "apb_pclk";
+			arm,primecell-periphid = <0x00141011>;
+			interrupts = <15 0>;
+		};
+	};
+};
