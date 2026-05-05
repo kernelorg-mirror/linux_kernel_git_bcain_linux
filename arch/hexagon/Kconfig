@@ -163,7 +163,7 @@ config HEXAGON_VM
 	def_bool y
 
 config DTB_BUILTIN
-	def_bool y
+	def_bool HEXAGON_QEMU
 	help
 	  Build device tree blob into kernel image.
 
