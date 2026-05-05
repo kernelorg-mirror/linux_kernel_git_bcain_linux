@@ -11,9 +11,12 @@ CLANG_GCC_TC :=
 # register pair combines and causing register write conflicts at runtime.
 # https://github.com/llvm/llvm-project/issues/179856
 # Require lld >= 22.0.0 or use an alternative linker such as ld.eld.
+# Note: LLVM=1 causes $(LD) to resolve as ld.lld from PATH even when the
+# command line specifies LD=ld.eld.  Use LD= on the make command line to
+# override the actual linker invoked.
 ifeq ($(CONFIG_LD_IS_LLD),y)
   ifneq ($(call test-ge, $(CONFIG_LLD_VERSION), 220000),y)
-    $(error Hexagon requires lld >= 22.0.0 due to a duplex relocation bug. Use LD=ld.eld or upgrade lld)
+    $(warning Kconfig detected lld $(CONFIG_LLD_VERSION) < 22.0.0. Ensure LD=ld.eld is passed on the make command line.)
   endif
 endif
 
