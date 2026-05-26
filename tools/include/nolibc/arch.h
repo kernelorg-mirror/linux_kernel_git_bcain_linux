@@ -28,6 +28,8 @@
 #include "arch-m68k.h"
 #elif defined(__sh__)
 #include "arch-sh.h"
+#elif defined(__hexagon__)
+#include "arch-hexagon.h"
 #else
 #error Unsupported Architecture
 #endif
