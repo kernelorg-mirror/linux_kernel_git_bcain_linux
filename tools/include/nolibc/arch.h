@@ -32,6 +32,8 @@
 #include "arch-openrisc.h"
 #elif defined(__hppa__)
 #include "arch-parisc.h"
+#elif defined(__hexagon__)
+#include "arch-hexagon.h"
 #else
 #error Unsupported Architecture
 #endif

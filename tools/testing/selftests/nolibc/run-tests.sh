@@ -30,6 +30,7 @@ all_archs=(
 	m68k
 	sh4
 	parisc32
+	hexagon
 )
 archs="${all_archs[@]}"
 
@@ -194,6 +195,10 @@ test_arch() {
 	esac
 	printf '%-15s' "$arch:"
 	if [ "$arch" = "m68k" -o "$arch" = "sh4" -o "$arch" = "openrisc" -o "$arch" = "parisc32" ] && [ "$llvm" = "1" ]; then
+		echo "Unsupported configuration"
+		return
+	fi
+	if [ "$arch" = "hexagon" ] && [ "$llvm" != "1" ]; then
 		echo "Unsupported configuration"
 		return
 	fi

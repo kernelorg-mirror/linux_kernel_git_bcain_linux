@@ -104,6 +104,7 @@ DEFCONFIG_sparc64    = sparc64_defconfig
 DEFCONFIG_m68k       = virt_defconfig
 DEFCONFIG_sh4        = rts7751r2dplus_defconfig
 DEFCONFIG_openrisc   = virt_defconfig
+DEFCONFIG_hexagon    = qemu_defconfig
 DEFCONFIG            = $(or $(DEFCONFIG_$(XARCH)),defconfig)
 
 EXTRACONFIG_x32       = -e CONFIG_X86_X32_ABI
@@ -204,6 +205,7 @@ CFLAGS_mips64be = -EB -mabi=64 -march=mips64r2
 CFLAGS_loongarch = $(if $(LLVM),-fuse-ld=lld)
 CFLAGS_sparc32 = $(call cc-option,-m32) -mcpu=v8
 CFLAGS_sh4 = -ml -m4
+CFLAGS_hexagon = -fno-builtin
 ifeq ($(origin XARCH),command line)
 CFLAGS_XARCH = $(CFLAGS_$(XARCH))
 endif
