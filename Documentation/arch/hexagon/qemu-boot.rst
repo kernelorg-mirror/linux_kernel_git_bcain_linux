@@ -77,28 +77,24 @@ loadlinux
   loaded separately by QEMU at a fixed physical address (``0xa0000000``)
   via a ``loader`` device.
 
-  Clone the hypervisor repository::
+  Clone the hypervisor repository and check out commit ``283694d2``::
 
     git clone https://github.com/qualcomm/hexagon-hypervisor.git
     cd hexagon-hypervisor
+    git checkout 283694d2
 
   Build the H2 hypervisor libraries (required by ``loadlinux``)::
 
     ARCHV=73
     make USE_PKW=0 ARCHV=$ARCHV TARGET=opt -j"$(nproc)"
 
-  Then build ``loadlinux`` from the ``linux/`` subdirectory.  Pass the
-  same ``ARCHV`` and the ``INSTALLPATH`` exported by the top-level build.
+  Then build ``loadlinux`` from the ``linux/`` subdirectory.
   ``NO_LOAD=1`` tells ``loadlinux`` not to load the kernel from a file;
   QEMU loads it instead.  ``LINUX_LINK_ADDR`` must match the kernel load
   address (``0xa0000000``)::
 
-    INSTALLPATH=$(pwd)/artifacts/v${ARCHV}/opt/install
-    KERNELPATH=$(pwd)/artifacts/v${ARCHV}/opt/build/kernel
     make -C linux USE_PKW=0 ARCHV=$ARCHV NO_LOAD=1 \
-        LINUX_LINK_ADDR=0xa0000000 \
-        INSTALLPATH=$INSTALLPATH \
-        KERNELPATH=$KERNELPATH loadlinux
+        LINUX_LINK_ADDR=0xa0000000 loadlinux
 
   The resulting ``linux/loadlinux`` ELF is passed to QEMU via the
   ``-bios`` flag as shown in the `Boot`_ section below.
@@ -222,7 +218,6 @@ Option                              Purpose
 ``CONFIG_USE_OF=y``                 Device tree support
 ``CONFIG_SERIAL_AMBA_PL011=y``      PL011 UART driver (QEMU console)
 ``CONFIG_SERIAL_AMBA_PL011_CONSOLE``  PL011 as boot console
-``CONFIG_HEXAGON_ANGEL_TRAPS=y``    Angel debug traps (early printk)
 ``CONFIG_BLK_DEV_INITRD=y``         Initramfs/initrd support
 ``CONFIG_VIRTIO_MMIO=y``            Virtio over MMIO transport
 ``CONFIG_PAGE_SIZE_64KB=y``         64 KB page size
