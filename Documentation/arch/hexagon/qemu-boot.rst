@@ -12,28 +12,42 @@ Prerequisites
 
 The following components are required:
 
-Toolchain
+Hexagon SDK
+  The Hexagon SDK provides ``hexagon-clang`` and related tools required
+  to build the H2 hypervisor libraries and ``loadlinux``.
+
+  Download the SDK tarball from the ``snapdragon-toolchain/hexagon-sdk``
+  releases page on GitHub::
+
+    curl -LO https://github.com/snapdragon-toolchain/hexagon-sdk/releases/download/v6.4.0.2/hexagon-sdk-v6.4.0.2-amd64-lnx.tar.xz
+    tar -xf hexagon-sdk-v6.4.0.2-amd64-lnx.tar.xz -C /opt/hexagon-sdk
+    export HEXAGON_SDK_ROOT=/opt/hexagon-sdk/6.4.0.2
+    export HEXAGON_TOOLS_ROOT=$HEXAGON_SDK_ROOT/tools/HEXAGON_Tools/19.0.04
+    export PATH=$HEXAGON_TOOLS_ROOT/Tools/bin:$PATH
+
+  Verify the toolchain is accessible::
+
+    hexagon-clang --version
+
+Linux cross-compilation toolchain
   A Clang/LLVM cross-compilation toolchain targeting
-  ``hexagon-unknown-linux-musl``. This provides ``clang``, ``ld.eld``
-  (or ``ld.lld``), ``llvm-objcopy``, ``llvm-ar``, ``llvm-nm``, and
-  ``llvm-strip``.
+  ``hexagon-unknown-linux-musl`` is required to build the kernel.
+  This provides ``hexagon-unknown-linux-musl-clang``, ``llvm-objcopy``,
+  ``llvm-ar``, ``llvm-nm``, and ``llvm-strip``.
 
   Pre-built tarballs are available from the ``quic/toolchain_for_hexagon``
-  releases page on GitHub:
+  releases page on GitHub::
 
     https://github.com/quic/toolchain_for_hexagon/releases/tag/v22.1.4_
 
   Download ``clang+llvm-22.1.4-cross-hexagon-unknown-linux-musl.tar.zst``
-  and extract it to a convenient location::
+  from the artifacts page and extract it::
 
+    curl -LO https://artifacts.codelinaro.org/artifactory/codelinaro-toolchain-for-hexagon/22.1.4_/clang+llvm-22.1.4-cross-hexagon-unknown-linux-musl.tar.zst
     tar -xf clang+llvm-22.1.4-cross-hexagon-unknown-linux-musl.tar.zst \
         -C /opt/hexagon-toolchain
     export LLVM_TOOLCHAIN_PATH=/opt/hexagon-toolchain/clang+llvm-22.1.4-cross-hexagon-unknown-linux-musl/x86_64-linux-gnu
     export PATH=$LLVM_TOOLCHAIN_PATH/bin:$PATH
-
-  Alternatively, the release also provides ``hexagon-debs-22.1.4_.tar.gz``
-  containing ``.deb`` packages (depends on ``clang-22`` and ``lld-22``)
-  which install triple-prefixed symlinks and sysroots system-wide.
 
   Verify the toolchain is accessible::
 
@@ -80,9 +94,11 @@ loadlinux
   address (``0xa0000000``)::
 
     INSTALLPATH=$(pwd)/artifacts/v${ARCHV}/opt/install
+    KERNELPATH=$(pwd)/artifacts/v${ARCHV}/opt/build/kernel
     make -C linux USE_PKW=0 ARCHV=$ARCHV NO_LOAD=1 \
         LINUX_LINK_ADDR=0xa0000000 \
-        INSTALLPATH=$INSTALLPATH loadlinux
+        INSTALLPATH=$INSTALLPATH \
+        KERNELPATH=$KERNELPATH loadlinux
 
   The resulting ``linux/loadlinux`` ELF is passed to QEMU via the
   ``-bios`` flag as shown in the `Boot`_ section below.
