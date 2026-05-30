@@ -932,8 +932,14 @@ void __meminit memmap_init_range(unsigned long size, int nid, unsigned long zone
 		 * over the place during system boot.
 		 */
 		if (pageblock_aligned(pfn)) {
-			init_pageblock_migratetype(page, migratetype,
-					isolate_pageblock);
+			struct zone *z = page_zone(page);
+			if (likely(z->pageblock_flags)) {
+				init_pageblock_migratetype(page, migratetype,
+						isolate_pageblock);
+			} else {
+				pr_warn_once("memmap_init_range: skipping pageblock init for pfn 0x%lx (zone %s has no pageblock_flags)\n",
+					     pfn, z->name);
+			}
 			cond_resched();
 		}
 		pfn++;
