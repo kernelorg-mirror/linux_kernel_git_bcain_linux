@@ -317,12 +317,25 @@ static inline bool _deferred_grow_zone(struct zone *zone, unsigned int order)
 
 /* Return a pointer to the bitmap storing bits affecting a block of pages */
 static inline unsigned long *get_pageblock_bitmap(const struct page *page,
-							unsigned long pfn)
+						  unsigned long pfn)
 {
 #ifdef CONFIG_SPARSEMEM
 	return section_to_usemap(__pfn_to_section(pfn));
 #else
-	return page_zone(page)->pageblock_flags;
+	unsigned long *bitmap = page_zone(page)->pageblock_flags;
+
+	/*
+	 * pageblock_flags may be NULL if the zone the page resolves to has
+	 * no allocated bitmap (e.g. an uninhabited ZONE_MOVABLE).  Guard
+	 * reads by returning a static zero word so callers see
+	 * MIGRATE_MOVABLE (0) without faulting.
+	 */
+	if (unlikely(!bitmap)) {
+		static unsigned long dummy_pageblock_bitmap;
+
+		return &dummy_pageblock_bitmap;
+	}
+	return bitmap;
 #endif /* CONFIG_SPARSEMEM */
 }
 
@@ -1580,6 +1593,29 @@ static void __free_pages_ok(struct page *page, unsigned int order,
 	unsigned long pfn = page_to_pfn(page);
 	struct zone *zone = page_zone(page);
 
+	/*
+	 * On some architectures page_zone() can resolve to a zone that was
+	 * never initialised (e.g. ZONE_MOVABLE with no spanned pages) if the
+	 * page's zone bits were not set correctly during memmap init.  Fall
+	 * back to the first initialised zone in the same node so that these
+	 * pages are not lost from the buddy allocator.
+	 */
+	if (unlikely(!zone_is_initialized(zone))) {
+		pg_data_t *pgdat = page_pgdat(page);
+		enum zone_type z;
+
+		zone = NULL;
+		for (z = 0; z < MAX_NR_ZONES; z++) {
+			if (zone_is_initialized(&pgdat->node_zones[z])) {
+				zone = &pgdat->node_zones[z];
+				set_page_zone(page, z);
+				break;
+			}
+		}
+		if (!zone)
+			return;
+	}
+
 	if (__free_pages_prepare(page, order, fpi_flags))
 		free_one_page(zone, page, pfn, order, fpi_flags);
 }
@@ -1590,6 +1626,27 @@ void __meminit __free_pages_core(struct page *page, unsigned int order,
 	unsigned int nr_pages = 1 << order;
 	struct page *p = page;
 	unsigned int loop;
+	struct zone *zone = page_zone(page);
+
+	/*
+	 * If page_zone() resolves to an uninitialised zone (e.g. ZONE_MOVABLE
+	 * with no spanned pages on some architectures), correct the page zone
+	 * bits to point to the first initialised zone in the node before
+	 * accounting or freeing into the buddy allocator.
+	 */
+	if (unlikely(!zone_is_initialized(zone))) {
+		pg_data_t *pgdat = page_pgdat(page);
+		enum zone_type z;
+
+		for (z = 0; z < MAX_NR_ZONES; z++) {
+			if (zone_is_initialized(&pgdat->node_zones[z])) {
+				zone = &pgdat->node_zones[z];
+				for (loop = 0; loop < nr_pages; loop++)
+					set_page_zone(&page[loop], z);
+				break;
+			}
+		}
+	}
 
 	/*
 	 * When initializing the memmap, __init_single_page() sets the refcount
@@ -1601,7 +1658,7 @@ void __meminit __free_pages_core(struct page *page, unsigned int order,
 	 */
 	if (IS_ENABLED(CONFIG_MEMORY_HOTPLUG) &&
 	    unlikely(context == MEMINIT_HOTPLUG)) {
-		for (loop = 0; loop < nr_pages; loop++, p++) {
+		for (loop = 0, p = page; loop < nr_pages; loop++, p++) {
 			VM_WARN_ON_ONCE(PageReserved(p));
 			__ClearPageOffline(p);
 			set_page_count(p, 0);
@@ -1609,13 +1666,13 @@ void __meminit __free_pages_core(struct page *page, unsigned int order,
 
 		adjust_managed_page_count(page, nr_pages);
 	} else {
-		for (loop = 0; loop < nr_pages; loop++, p++) {
+		for (loop = 0, p = page; loop < nr_pages; loop++, p++) {
 			__ClearPageReserved(p);
 			set_page_count(p, 0);
 		}
 
 		/* memblock adjusts totalram_pages() manually. */
-		atomic_long_add(nr_pages, &page_zone(page)->managed_pages);
+		atomic_long_add(nr_pages, &zone->managed_pages);
 	}
 
 	if (page_contains_unaccepted(page, order)) {
