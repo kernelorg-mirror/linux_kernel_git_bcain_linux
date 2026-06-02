@@ -95,8 +95,15 @@ loadlinux
   ``NO_LOAD=1`` tells ``loadlinux`` not to load the kernel from a file;
   QEMU loads it instead.  ``LINUX_LINK_ADDR`` must match the kernel load
   address (``0xa0000000``).  Pass ``NULL_ANGEL_TRAP=1`` again so the
-  bootloader is linked with the null angel stubs::
+  bootloader is linked with the null angel stubs.
 
+  The ``linux/makefile`` defaults its build paths to ``../install`` and
+  ``../kernel``, but the actual artifacts from the step above land in
+  ``artifacts/v${ARCHV}/opt/``.  Export the correct paths before
+  invoking make::
+
+    export INSTALLPATH=$(pwd)/artifacts/v${ARCHV}/opt/install
+    export KERNELPATH=$(pwd)/artifacts/v${ARCHV}/opt/build/kernel
     make -C linux USE_PKW=0 ARCHV=$ARCHV NO_LOAD=1 \
         NULL_ANGEL_TRAP=1 LINUX_LINK_ADDR=0xa0000000 loadlinux
 
