@@ -83,18 +83,22 @@ loadlinux
     cd hexagon-hypervisor
     git checkout 283694d2
 
-  Build the H2 hypervisor libraries (required by ``loadlinux``)::
+  Build the H2 hypervisor libraries (required by ``loadlinux``).
+  ``NULL_ANGEL_TRAP=1`` disables the angel semihosting handler, which
+  otherwise polls for a host response that the QEMU ``virt`` machine
+  never provides, causing a silent hang::
 
     ARCHV=73
-    make USE_PKW=0 ARCHV=$ARCHV TARGET=opt -j"$(nproc)"
+    make USE_PKW=0 ARCHV=$ARCHV TARGET=opt NULL_ANGEL_TRAP=1 -j"$(nproc)"
 
   Then build ``loadlinux`` from the ``linux/`` subdirectory.
   ``NO_LOAD=1`` tells ``loadlinux`` not to load the kernel from a file;
   QEMU loads it instead.  ``LINUX_LINK_ADDR`` must match the kernel load
-  address (``0xa0000000``)::
+  address (``0xa0000000``).  Pass ``NULL_ANGEL_TRAP=1`` again so the
+  bootloader is linked with the null angel stubs::
 
     make -C linux USE_PKW=0 ARCHV=$ARCHV NO_LOAD=1 \
-        LINUX_LINK_ADDR=0xa0000000 loadlinux
+        NULL_ANGEL_TRAP=1 LINUX_LINK_ADDR=0xa0000000 loadlinux
 
   The resulting ``linux/loadlinux`` ELF is passed to QEMU via the
   ``-bios`` flag as shown in the `Boot`_ section below.
