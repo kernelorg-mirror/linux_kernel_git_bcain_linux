@@ -18,11 +18,9 @@ ifneq ($(CONFIG_HEXAGON_ARCH_VERSION),)
   LDFLAGS_vmlinux += -mv$(CONFIG_HEXAGON_ARCH_VERSION)
 endif
 
-# Workaround for assembler bug
+# Workaround for packetizer generating invalid instruction encodings.
 # https://github.com/llvm/llvm-project/issues/178338
-ifneq ($(call clang-min-version, 220100),y)
 KBUILD_CFLAGS += -mllvm --disable-packetizer -mllvm -disable-nvjump
-endif
 
 # Do not use single-byte enums; these will overflow.
 KBUILD_CFLAGS += -fno-short-enums
