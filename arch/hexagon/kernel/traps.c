@@ -294,6 +294,13 @@ void do_genex(struct pt_regs *regs);
 void do_genex(struct pt_regs *regs)
 {
 	/*
+	 * The VM disables guest interrupts on event delivery; the IE
+	 * cache must be cleared before anything reads or updates it,
+	 * or a later local_irq_enable() becomes a silent no-op.
+	 */
+	clear_ie_cached();
+
+	/*
 	 * Decode Cause and Dispatch
 	 */
 	switch (pt_cause(regs)) {
@@ -355,6 +362,14 @@ void do_trap0(struct pt_regs *regs);
 void do_trap0(struct pt_regs *regs)
 {
 	syscall_fn syscall;
+
+	/*
+	 * The VM disabled guest interrupts to deliver this event; without
+	 * this, the cache still says "enabled" and the VM_INT_ENABLE below
+	 * is treated as no change, so the whole syscall runs with guest
+	 * interrupts disabled at the hypervisor.
+	 */
+	clear_ie_cached();
 
 	switch (pt_cause(regs)) {
 	case TRAP_SYSCALL:
@@ -439,6 +454,8 @@ void do_trap0(struct pt_regs *regs)
 void do_machcheck(struct pt_regs *regs);
 void do_machcheck(struct pt_regs *regs)
 {
+	clear_ie_cached();
+
 	/* Halt and catch fire */
 	__vmstop(machinecheck);
 }
@@ -450,6 +467,8 @@ void do_machcheck(struct pt_regs *regs)
 void do_debug_exception(struct pt_regs *regs);
 void do_debug_exception(struct pt_regs *regs)
 {
+	clear_ie_cached();
+
 	regs->hvmer.vmest &= ~HVM_VMEST_CAUSE_MSK;
 	regs->hvmer.vmest |= (TRAP_DEBUG << HVM_VMEST_CAUSE_SFT);
 	do_trap0(regs);
