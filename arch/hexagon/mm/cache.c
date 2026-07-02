@@ -5,6 +5,13 @@
  * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
  */
 
+/*
+ * These operations are CPU-local instructions.  Hexagon hardware
+ * threads of one core share the L1 caches, so a local operation
+ * covers all threads scheduled on the core; multi-cluster parts
+ * would require broadcasting to a thread on each cluster.
+ */
+
 #include <linux/mm.h>
 #include <asm/cacheflush.h>
 #include <asm/hexagon_vm.h>
