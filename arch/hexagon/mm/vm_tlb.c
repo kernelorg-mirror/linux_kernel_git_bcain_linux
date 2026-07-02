@@ -30,6 +30,8 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 
 	if (mm->context.ptbase == current->active_mm->context.ptbase)
 		__vmclrmap((void *)start, end - start);
+	else
+		mm->context.need_invalidate = true;
 }
 
 /*
@@ -59,6 +61,8 @@ void flush_tlb_mm(struct mm_struct *mm)
 	/* Current Virtual Machine has only one map active at a time */
 	if (current->active_mm->context.ptbase == mm->context.ptbase)
 		tlb_flush_all();
+	else
+		mm->context.need_invalidate = true;
 }
 
 /*
@@ -70,6 +74,8 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long vaddr)
 
 	if (mm->context.ptbase  == current->active_mm->context.ptbase)
 		__vmclrmap((void *)(vaddr & ~(PAGE_SIZE - 1)), PAGE_SIZE);
+	else
+		mm->context.need_invalidate = true;
 }
 
 /*
