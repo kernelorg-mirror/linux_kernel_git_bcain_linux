@@ -144,10 +144,24 @@ void __init setup_arch(char **cmdline_p)
 	 * Otherwise fall back to built-in DTB.
 	 */
 	if (boot_dtb_phys) {
+		/*
+		 * The linear map only covers RAM at/above PHYS_OFFSET; a
+		 * DTB below it (e.g. from a bootloader that placed it
+		 * outside our window) cannot be phys_to_virt()'d.
+		 */
+		if (boot_dtb_phys < PHYS_OFFSET) {
+			pr_warn("DTB at phys 0x%llx below PHYS_OFFSET, using built-in\n",
+				boot_dtb_phys);
+			boot_dtb_phys = 0;
+		}
+	}
+
+	if (boot_dtb_phys) {
 		dtb = phys_to_virt((unsigned long)boot_dtb_phys);
 		if (fdt_magic(dtb) != FDT_MAGIC) {
 			pr_warn("Invalid DTB at phys 0x%llx, using built-in\n",
 				boot_dtb_phys);
+			boot_dtb_phys = 0;
 			dtb = &__dtb_start;
 		}
 	} else {

@@ -8,6 +8,8 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/memblock.h>
+#include <linux/of_fdt.h>
+#include <linux/libfdt.h>
 #include <linux/sizes.h>
 #include <asm/atomic.h>
 #include <linux/highmem.h>
@@ -190,6 +192,14 @@ void __init setup_arch_memory(void)
 	/* Reserve kernel text/data/bss */
 	memblock_reserve(PHYS_OFFSET,
 			 (bootmem_startpg - ARCH_PFN_OFFSET) << PAGE_SHIFT);
+
+	/*
+	 * A bootloader-provided DTB sits in our RAM until it is
+	 * unflattened; keep the allocator away from it.
+	 */
+	if (boot_dtb_phys && initial_boot_params)
+		memblock_reserve(boot_dtb_phys,
+				 fdt_totalsize(initial_boot_params));
 	/*
 	 * Reserve the top DMA_RESERVE bytes of RAM for DMA (uncached)
 	 * memory allocation
