@@ -356,11 +356,15 @@ config NR_CPUS
 
 config BASE_IPI_IRQ
 	int "Base IPI IRQ" if SMP
-	default 8
+	default 0
 	help
 	  The base IRQ used for IPI calls.  Each CPU increments by one,
 	  although the newer hypervisor API specifies the lower range of
 	  interrupts to be percpu anyways.
+
+	  The range BASE..BASE+NR_CPUS-1 must not overlap interrupts
+	  claimed by devices; the H2 timer guest interrupt is 12, which
+	  the previous default of 8 aliased once five CPUs were enabled.
 
 	  Todo:  Maybe make this a devtree thing instead?
 
