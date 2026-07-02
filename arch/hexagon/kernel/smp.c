@@ -158,6 +158,14 @@ static void start_secondary(void)
 	mmgrab(&init_mm);
 	current->active_mm = &init_mm;
 
+	/*
+	 * The new virtual processor inherited the creator's address
+	 * space; install init_mm's explicitly so the VM state matches
+	 * active_mm, invalidating whatever the inherited ASID cached.
+	 */
+	__vmnewmap((void *)init_mm.context.ptbase, VM_TRANS_TYPE_TABLE,
+		   VM_TLB_INVALIDATE_TRUE);
+
 	cpu = smp_processor_id();
 
 	/* Disable all local interrupts first */
