@@ -14,6 +14,7 @@
 #include <linux/sched.h>
 #include <asm/page.h>
 #include <asm/hexagon_vm.h>
+#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
 /*
@@ -84,5 +85,19 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long vaddr)
  */
 void flush_tlb_kernel_range(unsigned long start, unsigned long end)
 {
-		__vmclrmap((void *)start, end - start);
+	extern spinlock_t kmap_gen_lock;
+
+	/*
+	 * The VM caches kernel translations per address space and the
+	 * clrmap below only purges the current one.  Bump the kernel map
+	 * generation so every other address space invalidates its cached
+	 * VM state when next switched in, as switch_mm() does when kernel
+	 * mappings are created.
+	 */
+	spin_lock(&kmap_gen_lock);
+	kmap_generation++;
+	current->active_mm->context.generation = kmap_generation;
+	spin_unlock(&kmap_gen_lock);
+
+	__vmclrmap((void *)start, end - start);
 }
