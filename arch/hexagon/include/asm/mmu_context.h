@@ -34,9 +34,11 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 
 	/*
 	 * For virtual machine, we have to update system map if it's been
-	 * touched.
+	 * touched.  Compare for inequality: the generation is a single
+	 * word bumped under kmap_gen_lock, possibly on another CPU, so
+	 * ordering can't be assumed and wrapping must stay harmless.
 	 */
-	if (next->context.generation < prev->context.generation) {
+	if (next->context.generation != prev->context.generation) {
 		for (l1 = MIN_KERNEL_SEG; l1 <= max_kernel_seg; l1++)
 			next->pgd[l1] = init_mm.pgd[l1];
 
@@ -44,10 +46,12 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		tlb_inv = VM_TLB_INVALIDATE_TRUE;
 	}
 
-	if (next->context.need_invalidate) {
-		next->context.need_invalidate = false;
+	/*
+	 * xchg so a flush marking this mm from another CPU can't be
+	 * lost to a plain read-then-clear while we're switching in.
+	 */
+	if (xchg(&next->context.need_invalidate, 0))
 		tlb_inv = VM_TLB_INVALIDATE_TRUE;
-	}
 
 	__vmnewmap((void *)next->context.ptbase, VM_TRANS_TYPE_TABLE, tlb_inv);
 }
