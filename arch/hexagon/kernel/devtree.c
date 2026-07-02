@@ -16,8 +16,13 @@ static void * __init __maybe_unused early_init_dt_alloc_memory_arch(u64 size, u6
 /*  called via early_init_dt_scan_memory?  */
 void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 {
-	//  Cheesy solution is to just twiddle bootmem_lastpg
-	BUG();  ///  XXX Todo fixme
+	/*
+	 * RAM discovery comes from bootmem_lastpg (mem=) rather than the
+	 * DTB; ignore /memory nodes instead of tripping over them when a
+	 * bootloader-provided tree carries one.
+	 */
+	pr_info("Ignoring DT memory node: base 0x%llx size 0x%llx\n",
+		base, size);
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
