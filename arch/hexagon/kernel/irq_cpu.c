@@ -40,6 +40,12 @@ void vmsetie_disable(void)
 	__vmsetie_cached(VM_INT_DISABLE, this_cpu_ptr(&ie_cached));
 }
 
+/*
+ * May run with preemption enabled (arch_local_save_flags), so after a
+ * migration the value can describe another CPU.  That is acceptable:
+ * the result is a 0/1 flag, and restoring it via vmsetie_cached()
+ * operates on whichever CPU the task is on by then.
+ */
 long vmgetie_cached(void)
 {
 	return __this_cpu_read(ie_cached);
