@@ -167,9 +167,9 @@ static void start_secondary(void)
 	/* Enable and register IPI interrupt */
 	irq = CONFIG_BASE_IPI_IRQ + cpu;
 	__vmintop_globen(irq);
-	if (request_irq(irq, handle_ipi, IRQF_TRIGGER_RISING, "ipi_handler",
-			NULL))
-		pr_err("Failed to request irq %u (ipi_handler)\n", irq);
+	if (request_irq(irq_find_mapping(hexagon_irq_domain, irq), handle_ipi,
+			IRQF_TRIGGER_RISING, "ipi_handler", NULL))
+		pr_err("Failed to request hwirq %u (ipi_handler)\n", irq);
 
 	/*  Register the clock_event dummy  */
 	setup_percpu_clockdev();
@@ -231,9 +231,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	/*  Also need to register the interrupts for IPI  */
 	if (max_cpus > 1) {
 		__vmintop_globen(irq);
-		if (request_irq(irq, handle_ipi, IRQF_TRIGGER_RISING,
+		if (request_irq(irq_find_mapping(hexagon_irq_domain, irq),
+				handle_ipi, IRQF_TRIGGER_RISING,
 				"ipi_handler", NULL))
-			pr_err("Failed to request irq %d (ipi_handler)\n", irq);
+			pr_err("Failed to request hwirq %d (ipi_handler)\n", irq);
 	}
 
 #ifdef CONFIG_H2
