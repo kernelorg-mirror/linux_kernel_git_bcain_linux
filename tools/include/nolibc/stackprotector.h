@@ -48,7 +48,7 @@ static __no_stack_protector void __stack_chk_init(void)
 		__stack_chk_guard ^= (uintptr_t) &__stack_chk_guard;
 }
 #else /* !defined(_NOLIBC_STACKPROTECTOR) */
-static void __stack_chk_init(void) {}
+static __attribute__((unused)) void __stack_chk_init(void) {}
 #endif /* defined(_NOLIBC_STACKPROTECTOR) */
 #endif /* NOLIBC_NO_RUNTIME */
 
