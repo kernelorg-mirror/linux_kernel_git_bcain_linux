@@ -77,11 +77,11 @@ loadlinux
   loaded separately by QEMU at a fixed physical address (``0xa0000000``)
   via a ``loader`` device.
 
-  Clone the hypervisor repository and check out tag ``h2-bcain-1-june-2026``::
+  Clone the hypervisor repository and check out tag ``h2-bcain-2-july-2026``::
 
     git clone https://github.com/androm3da/hexagon-hypervisor.git
     cd hexagon-hypervisor
-    git checkout h2-bcain-1-june-2026
+    git checkout h2-bcain-2-july-2026
 
   Build the H2 hypervisor libraries (required by ``loadlinux``).
   ``NULL_ANGEL_TRAP=1`` disables the angel semihosting handler, which
