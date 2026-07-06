@@ -94,7 +94,7 @@ the initramfs passed via ``-initrd``::
         -M virt \
         -kernel vmlinux \
         -initrd rootfs.cpio \
-        -append 'console=ttyAMA0 mem=892M' \
+        -append 'console=ttyAMA1 mem=892M' \
         -m 4G \
         -nographic \
         -serial mon:stdio
@@ -104,6 +104,13 @@ sizes usable memory from the command line rather than the generated
 device tree's memory node, which is informational-only.  Without it
 the kernel defaults to a 64 MB memory window, which is too small to
 hold the initramfs and leads to a boot-time oops.
+
+The console is ``ttyAMA1``, not ``ttyAMA0``: QEMU's machine-generated
+device tree aliases the PL011 UART as ``serial1``, so the ``amba-pl011``
+driver enumerates it as the second port. Passing ``console=ttyAMA0``
+boots the kernel but ``/dev/console`` never opens, and ``getty`` waits
+forever on a tty that was never created -- a silent hang rather than an
+early failure.
 
 An external device tree can be supplied with ``-dtb``; otherwise the
 machine generates one.  Use ``-bios none`` to boot the kernel ELF
@@ -116,13 +123,13 @@ directly at its entry point without any firmware, or pass another
         -bios /path/to/loadlinux \
         -kernel vmlinux \
         -initrd rootfs.cpio \
-        -append 'console=ttyAMA0 mem=892M' \
+        -append 'console=ttyAMA1 mem=892M' \
         -m 4G \
         -nographic \
         -serial mon:stdio
 
 On a successful boot the kernel prints messages to the PL011 UART
-(``ttyAMA0``) and eventually reaches a login prompt from the embedded
+(``ttyAMA1``) and eventually reaches a login prompt from the embedded
 initramfs.
 
 Boot Sequence
@@ -167,7 +174,7 @@ The boot process has the following stages:
    The device tree (``arch/hexagon/boot/dts/sm8150.dts``) describes:
 
    - **PL011 UART** at ``0x10000000`` -- serial console
-     (``ttyAMA0``).
+     (``ttyAMA1`` under QEMU's machine-generated device tree).
    - **H2 timer** at ``0xab000000`` -- clock source and clock events.
    - **H2 PIC** -- interrupt controller.
    - **Virtio MMIO** devices for networking and block storage.
