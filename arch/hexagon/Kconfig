@@ -129,6 +129,9 @@ config MSM_GPIOMUX
 config ARCH_QCOM
 	def_bool y
 
+config FIX_EARLYCON_MEM
+	def_bool y
+
 menu "Machine selection"
 
 choice
