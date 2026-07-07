@@ -115,6 +115,7 @@ extern unsigned long _dflt_cache_att;
 #define PAGE_NONE	__pgprot(_NO_PERM | _dflt_cache_att)
 #define PAGE_KERNEL	__pgprot(_PAGE_READ | \
 				_PAGE_WRITE | _PAGE_EXECUTE | _dflt_cache_att)
+#define PAGE_KERNEL_IO	PAGE_KERNEL
 
 /*
  * Aliases for mapping mmap() protection bits to page protections.

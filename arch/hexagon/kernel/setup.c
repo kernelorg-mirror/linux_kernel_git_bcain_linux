@@ -16,6 +16,7 @@
 #include <linux/of_fdt.h>
 #include <linux/libfdt.h>
 #include <asm/io.h>
+#include <asm/fixmap.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
 #include <asm/processor.h>
@@ -207,6 +208,8 @@ void __init setup_arch(char **cmdline_p)
 
 	strscpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
+
+	early_fixmap_init();
 
 	parse_early_param();
 

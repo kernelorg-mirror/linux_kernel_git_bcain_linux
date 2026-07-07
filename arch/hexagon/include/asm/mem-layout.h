@@ -53,6 +53,7 @@ extern unsigned long	__phys_offset;
 
 #ifndef __ASSEMBLY__
 enum fixed_addresses {
+	FIX_EARLYCON_MEM_BASE,
 	FIX_KMAP_BEGIN,
 	FIX_KMAP_END,  /*  check for per-cpuism  */
 	__end_of_fixed_addresses
