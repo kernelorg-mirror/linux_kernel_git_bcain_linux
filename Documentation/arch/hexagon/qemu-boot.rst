@@ -132,6 +132,70 @@ On a successful boot the kernel prints messages to the PL011 UART
 (``ttyAMA1``) and eventually reaches a login prompt from the embedded
 initramfs.
 
+Choosing a UART console
+========================
+
+QEMU's ``virt`` machine exposes two UARTs that can serve as the Linux
+console: the ARM PL011 and the Qualcomm QUP GENI UART. They are
+selected by different ``-append console=`` values and, for the GENI
+UART, an additional ``-chardev``/``-global`` pair on the QEMU command
+line.
+
+PL011 (``ttyAMA1``)
+  The default. QEMU wires the PL011 to whatever chardev is given by
+  ``-serial`` (e.g. ``-serial mon:stdio``), and the kernel's
+  ``amba-pl011`` driver enumerates it as ``ttyAMA1`` (see `Boot`_
+  above for why not ``ttyAMA0``)::
+
+    qemu-system-hexagon \
+        -M virt \
+        -kernel vmlinux \
+        -initrd rootfs.cpio \
+        -append 'console=ttyAMA1 mem=892M' \
+        -m 4G \
+        -nographic \
+        -serial mon:stdio
+
+QUP GENI UART (``ttyMSM0``)
+  Models the Qualcomm QUP-wrapped GENI serial engine found on real
+  SM8150-family hardware, using the ``qcom_geni_serial`` driver. It is
+  not wired up by ``-serial``; instead give it its own chardev and
+  bind it with ``-global qup-geni-uart.chardev=<id>``, and select it
+  on the kernel command line with ``console=ttyMSM0``::
+
+    qemu-system-hexagon \
+        -M virt \
+        -kernel vmlinux \
+        -initrd rootfs.cpio \
+        -append 'console=ttyMSM0 mem=892M' \
+        -m 4G \
+        -display none \
+        -serial none \
+        -global qup-geni-uart.chardev=geni0 \
+        -chardev stdio,id=geni0,mux=on
+
+  The ``qup-geni-uart`` device is implemented in Rust
+  (``rust/hw/char/qup_geni_uart/``) and is only registered when QEMU
+  is built with ``--enable-rust``; add that to the ``configure``
+  invocation in `Prerequisites`_ if it is missing. A QEMU binary built
+  without Rust support silently lacks the device -- passing
+  ``-global qup-geni-uart.chardev=...`` to such a binary produces
+  ``warning: global qup-geni-uart.chardev has invalid class name``,
+  the generated device tree has no GENI node, and the kernel never
+  attaches ``ttyMSM0``.
+
+  ``CONFIG_QCOM_GENI_SE``, ``CONFIG_SERIAL_QCOM_GENI`` and
+  ``CONFIG_SERIAL_QCOM_GENI_CONSOLE`` must be enabled in the kernel
+  config (already the case in ``qemu_defconfig``), and
+  ``HEXAGON_SM8150`` must select ``COMMON_CLK`` -- otherwise
+  ``devm_clk_get()`` falls back to a stub that always fails GENI
+  clock calibration, regardless of what QEMU provides in the device
+  tree.
+
+Both consoles can be present in the same boot; only the one named in
+``console=`` becomes ``/dev/console``, but kernel messages are mirrored
+to every registered console by default.
+
 Boot Sequence
 =============
 
@@ -196,6 +260,9 @@ Option                              Purpose
 ``CONFIG_USE_OF=y``                 Device tree support
 ``CONFIG_SERIAL_AMBA_PL011=y``      PL011 UART driver (QEMU console)
 ``CONFIG_SERIAL_AMBA_PL011_CONSOLE``  PL011 as boot console
+``CONFIG_QCOM_GENI_SE=y``           GENI Serial Engine support (QUP UART)
+``CONFIG_SERIAL_QCOM_GENI=y``       QUP GENI UART driver
+``CONFIG_SERIAL_QCOM_GENI_CONSOLE``  QUP GENI UART as boot console
 ``CONFIG_BLK_DEV_INITRD=y``         Initramfs/initrd support
 ``CONFIG_VIRTIO_MMIO=y``            Virtio over MMIO transport
 ``CONFIG_PAGE_SIZE_64KB=y``         64 KB page size
@@ -211,6 +278,7 @@ Address                 Description
 ======================  ============================================
 ``0x08600000``          VTCM (Vector Tightly Coupled Memory, 256 KB)
 ``0x10000000``          PL011 UART (4 KB)
+``0x10004000``          QUP GENI UART (24 KB)
 ``0x11000000``          Virtio MMIO network (256 B)
 ``0x12000000``          Virtio MMIO block (256 B)
 ``0xa0000000``          Kernel image load address
