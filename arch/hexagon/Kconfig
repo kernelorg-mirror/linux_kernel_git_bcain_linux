@@ -226,6 +226,7 @@ config HEXAGON_SM8150
 	select HEXAGON_PHYS_OFFSET
 	select HEXAGON_H2_PIC
 	select HAVE_DMA_ATTRS
+	select COMMON_CLK
 	help
 	  Support for SM8150
 
