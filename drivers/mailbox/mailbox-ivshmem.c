@@ -2,20 +2,20 @@
 /*
  * ivshmem doorbell mailbox controller
  *
- * A simple mailbox controller for ivshmem-style doorbell registers.
- * Used to signal between QEMU instances sharing memory via a socket-based
- * doorbell mechanism.
+ * A mailbox controller for the ivshmem doorbell registers, as
+ * implemented by QEMU's ivshmem-flat device (see
+ * docs/specs/ivshmem-spec.rst in the QEMU tree).  Used to signal
+ * between VMs sharing memory through an ivshmem-server.
  *
- * MMIO register layout (16 bytes):
- *   0x00: READY    (read-only)  - 1 when peer connected
- *   0x04: STATUS   (read-clear) - 1 when doorbell pending
- *   0x08: reserved
- *   0x0C: DOORBELL (write-only) - write (peer_id << 16 | vector) to signal
+ * MMIO register layout (16 bytes, revision 1 semantics):
+ *   0x00: INTRMASK   - reserved, reads 0
+ *   0x04: INTRSTATUS - reserved, reads 0
+ *   0x08: IVPOSITION (read-only) - this VM's peer id
+ *   0x0C: DOORBELL (write-only)  - write (peer_id << 16 | vector) to signal
  *
- * Under QEMU TCG, L2VIC interrupt delivery can be unreliable (the single-
- * active-VID design means a stuck timer interrupt blocks all other IRQs).
- * To work around this, we poll the STATUS register from a timer in addition
- * to using the hardware IRQ.
+ * There is no latched interrupt status: the doorbell interrupt is a
+ * pulse, so the interrupt must be configured as edge-triggered and any
+ * firing is treated as a notification.
  */
 
 #include <linux/interrupt.h>
@@ -25,13 +25,9 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
-#include <linux/timer.h>
 
-#define IVSHMEM_STATUS_REG	0x04
+#define IVSHMEM_IVPOSITION_REG	0x08
 #define IVSHMEM_DOORBELL_REG	0x0C
-
-/* Poll interval in jiffies (10ms at HZ=100) */
-#define IVSHMEM_POLL_INTERVAL	(HZ / 100 ? : 1)
 
 struct ivshmem_mbox {
 	void __iomem *base;
@@ -40,32 +36,11 @@ struct ivshmem_mbox {
 	int irq;
 	struct mbox_chan chan;
 	struct mbox_controller mbox;
-	struct timer_list poll_timer;
-	bool polling_active;
 };
-
-static void ivshmem_mbox_poll(struct timer_list *t)
-{
-	struct ivshmem_mbox *m = timer_container_of(m, t, poll_timer);
-	u32 status;
-
-	status = readl(m->base + IVSHMEM_STATUS_REG);
-	if (status)
-		mbox_chan_received_data(&m->chan, NULL);
-
-	if (m->polling_active)
-		mod_timer(&m->poll_timer, jiffies + IVSHMEM_POLL_INTERVAL);
-}
 
 static irqreturn_t ivshmem_mbox_irq(int irq, void *data)
 {
 	struct ivshmem_mbox *m = data;
-	u32 status;
-
-	/* Read STATUS register to acknowledge and lower the IRQ */
-	status = readl(m->base + IVSHMEM_STATUS_REG);
-	if (!status)
-		return IRQ_NONE;
 
 	mbox_chan_received_data(&m->chan, NULL);
 	return IRQ_HANDLED;
@@ -85,11 +60,6 @@ static int ivshmem_mbox_startup(struct mbox_chan *chan)
 	struct ivshmem_mbox *m = container_of(chan, struct ivshmem_mbox, chan);
 
 	enable_irq(m->irq);
-
-	/* Start polling as backup for IRQ delivery */
-	m->polling_active = true;
-	mod_timer(&m->poll_timer, jiffies + IVSHMEM_POLL_INTERVAL);
-
 	return 0;
 }
 
@@ -97,8 +67,6 @@ static void ivshmem_mbox_shutdown(struct mbox_chan *chan)
 {
 	struct ivshmem_mbox *m = container_of(chan, struct ivshmem_mbox, chan);
 
-	m->polling_active = false;
-	timer_delete_sync(&m->poll_timer);
 	disable_irq(m->irq);
 }
 
@@ -139,15 +107,18 @@ static int ivshmem_mbox_probe(struct platform_device *pdev)
 	if (irq < 0)
 		return irq;
 
+	/*
+	 * In a two-peer ivshmem setup the peer to signal is the other
+	 * id; allow the device tree to override for larger topologies.
+	 */
 	ret = of_property_read_u32(dev->of_node, "peer-id", &m->peer_id);
 	if (ret)
-		return dev_err_probe(dev, ret, "missing peer-id property\n");
+		m->peer_id = readl(m->base + IVSHMEM_IVPOSITION_REG) ^ 1;
 
 	ret = of_property_read_u32(dev->of_node, "signal-vector",
 				   &m->signal_vector);
 	if (ret)
-		return dev_err_probe(dev, ret,
-				     "missing signal-vector property\n");
+		m->signal_vector = 0;
 
 	m->irq = irq;
 
@@ -158,8 +129,6 @@ static int ivshmem_mbox_probe(struct platform_device *pdev)
 
 	/* IRQ starts disabled; enabled when a client binds via startup() */
 	disable_irq(irq);
-
-	timer_setup(&m->poll_timer, ivshmem_mbox_poll, 0);
 
 	m->mbox.dev = dev;
 	m->mbox.chans = &m->chan;
