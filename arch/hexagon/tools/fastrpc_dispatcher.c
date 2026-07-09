@@ -7,8 +7,29 @@
  * Reads invoke requests from /dev/fastrpc_device, dispatches them to
  * registered test handlers, and writes responses back.
  *
+ * The payload is the metadata buffer built by the AP-side
+ * drivers/misc/fastrpc.c fastrpc_get_args():
+ *
+ *   +----------------------------------------+
+ *   | union fastrpc_remote_arg rpra[nscalars]|  {u64 pv; u64 len;}
+ *   +----------------------------------------+
+ *   | struct fastrpc_invoke_buf list[n]      |  {u32 num; u32 pgidx;}
+ *   +----------------------------------------+
+ *   | struct fastrpc_phy_page pages[n]       |  {u64 addr; u64 size;}
+ *   +----------------------------------------+
+ *   | fdlist / crclist / inline arg data     |
+ *   +----------------------------------------+
+ *
+ * For copy-based arguments (fd == -1), rpra[i].pv is an AP kernel
+ * virtual address; pages[i].addr is the AP-physical, AP-page-aligned
+ * address of the same data.  With the shared-memory window mapped at
+ * the same physical address in both guests, the data for argument i
+ * lives at payload offset:
+ *
+ *   pages[i].addr - msg.addr + (rpra[i].pv & (AP_PAGE_SIZE - 1))
+ *
  * Build:
- *   hexagon-linux-musl-clang -O2 -static -o fastrpc_dispatcher \
+ *   hexagon-unknown-linux-musl-clang -O2 -static -o fastrpc_dispatcher \
  *       arch/hexagon/tools/fastrpc_dispatcher.c
  */
 
@@ -26,9 +47,14 @@
 #define PAGE_SIZE	65536
 #define PAGE_MASK	(~((uint64_t)PAGE_SIZE - 1))
 
+/* Page size of the AP guest, which lays out the payload buffer */
+#define AP_PAGE_SIZE	4096
+
 #define REMOTE_SCALARS_METHOD(sc)	(((sc) >> 24) & 0x1f)
 #define REMOTE_SCALARS_INBUFS(sc)	(((sc) >> 16) & 0xff)
 #define REMOTE_SCALARS_OUTBUFS(sc)	(((sc) >> 8) & 0xff)
+#define REMOTE_SCALARS_INHANDLES(sc)	(((sc) >> 4) & 0xf)
+#define REMOTE_SCALARS_OUTHANDLES(sc)	((sc) & 0xf)
 
 /* Must match kernel driver structures */
 struct fastrpc_user_req {
@@ -44,10 +70,20 @@ struct fastrpc_user_rsp {
 	int32_t retval;
 };
 
-/* Remote argument descriptor (16 bytes) */
+/* Payload metadata, matching drivers/misc/fastrpc.c wire layout */
 struct fastrpc_remote_arg {
-	uint64_t buf;
+	uint64_t pv;
 	uint64_t len;
+};
+
+struct fastrpc_invoke_buf {
+	uint32_t num;
+	uint32_t pgidx;
+};
+
+struct fastrpc_phy_page {
+	uint64_t addr;
+	uint64_t size;
 };
 
 /* Test handle ID */
@@ -59,10 +95,19 @@ struct fastrpc_remote_arg {
 
 static int devmem_fd = -1;
 
+/* A parsed invoke: direct pointers into the mapped payload */
+#define MAX_ARGS	8
+struct parsed_invoke {
+	int nbufs;
+	int inbufs;
+	void *buf[MAX_ARGS];
+	uint64_t len[MAX_ARGS];
+};
+
 /*
- * Map a physical address range into our virtual address space.
- * On QEMU with identity mapping, addr is the physical address of the
- * shared invoke buffer.
+ * Map a physical address range into our virtual address space.  The
+ * shared-memory window is mapped at the same physical address in both
+ * guests, so msg.addr can be used directly.
  */
 static void *map_phys(uint64_t addr, uint64_t size)
 {
@@ -74,7 +119,7 @@ static void *map_phys(uint64_t addr, uint64_t size)
 	if (devmem_fd < 0) {
 		devmem_fd = open(DEV_MEM, O_RDWR | O_SYNC);
 		if (devmem_fd < 0) {
-			perror("open /dev/mem");
+			perror("open " DEV_MEM);
 			return NULL;
 		}
 	}
@@ -82,7 +127,7 @@ static void *map_phys(uint64_t addr, uint64_t size)
 	mapped = mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_SHARED,
 		      devmem_fd, page_base);
 	if (mapped == MAP_FAILED) {
-		perror("mmap /dev/mem");
+		perror("mmap " DEV_MEM);
 		return NULL;
 	}
 
@@ -99,100 +144,105 @@ static void unmap_phys(void *ptr, uint64_t addr, uint64_t size)
 }
 
 /*
- * Handle METHOD_ECHO: copy input buffer to output buffer.
- *
- * Expected layout:
- *   - 1 input buffer (inbufs=1), 1 output buffer (outbufs=1)
- *   - fastrpc_remote_arg[0] = input descriptor
- *   - fastrpc_remote_arg[1] = output descriptor
- *   - Inline data follows the arg descriptors
+ * Locate each buffer argument within the mapped payload.  Only
+ * copy-based buffers are supported: dma-buf arguments would reference
+ * memory outside the shared window.
  */
-static int handle_echo(void *payload, uint64_t size, uint32_t sc)
+static int parse_payload(void *payload, uint64_t phys, uint64_t size,
+			 uint32_t sc, struct parsed_invoke *pi)
 {
-	struct fastrpc_remote_arg *args = payload;
+	struct fastrpc_remote_arg *rpra = payload;
+	struct fastrpc_invoke_buf *list;
+	struct fastrpc_phy_page *pages;
 	int inbufs = REMOTE_SCALARS_INBUFS(sc);
 	int outbufs = REMOTE_SCALARS_OUTBUFS(sc);
-	int nscalars = inbufs + outbufs;
-	uint8_t *base = payload;
-	uint64_t in_off, in_len, out_off;
-	size_t copy_len;
+	int nbufs = inbufs + outbufs;
+	uint64_t meta;
+	int i;
 
-	if (inbufs < 1 || outbufs < 1)
+	if (REMOTE_SCALARS_INHANDLES(sc) || REMOTE_SCALARS_OUTHANDLES(sc))
+		return -ENOSYS;
+	if (nbufs > MAX_ARGS)
+		return -E2BIG;
+
+	meta = (uint64_t)nbufs * (sizeof(*rpra) + sizeof(*list) +
+				  sizeof(*pages));
+	if (meta > size)
 		return -EINVAL;
 
-	if ((uint64_t)nscalars * sizeof(*args) > size)
-		return -EINVAL;
+	list = (struct fastrpc_invoke_buf *)&rpra[nbufs];
+	pages = (struct fastrpc_phy_page *)&list[nbufs];
 
-	/* Input buffer: offset and length relative to payload */
-	in_off = args[0].buf;
-	in_len = args[0].len;
+	pi->nbufs = nbufs;
+	pi->inbufs = inbufs;
 
-	/* Output buffer: offset */
-	out_off = args[1].buf;
+	for (i = 0; i < nbufs; i++) {
+		uint64_t off;
 
-	/* Bounds check */
-	if (in_off + in_len > size || out_off + in_len > size)
-		return -EFAULT;
+		pi->len[i] = rpra[i].len;
+		pi->buf[i] = NULL;
+		if (!rpra[i].len)
+			continue;
 
-	/* Copy input to output */
-	copy_len = in_len < args[1].len ? in_len : args[1].len;
-	memcpy(base + out_off, base + in_off, copy_len);
+		off = pages[i].addr - phys +
+		      (rpra[i].pv & (AP_PAGE_SIZE - 1));
+		if (pages[i].addr < phys || off + rpra[i].len > size)
+			return -EFAULT;
+
+		pi->buf[i] = (char *)payload + off;
+	}
 
 	return 0;
 }
 
-/*
- * Handle METHOD_ADD: read two uint32_t inputs, write their sum.
- *
- * Expected layout:
- *   - 1 input buffer (2 x uint32_t), 1 output buffer (1 x uint32_t)
- */
-static int handle_add(void *payload, uint64_t size, uint32_t sc)
+/* METHOD_ECHO: copy the input buffer to the output buffer */
+static int handle_echo(struct parsed_invoke *pi)
 {
-	struct fastrpc_remote_arg *args = payload;
-	int inbufs = REMOTE_SCALARS_INBUFS(sc);
-	int outbufs = REMOTE_SCALARS_OUTBUFS(sc);
-	int nscalars = inbufs + outbufs;
-	uint8_t *base = payload;
+	size_t len;
+
+	if (pi->inbufs < 1 || pi->nbufs - pi->inbufs < 1)
+		return -EINVAL;
+	if (!pi->buf[0] || !pi->buf[pi->inbufs])
+		return -EINVAL;
+
+	len = pi->len[0] < pi->len[pi->inbufs] ?
+	      pi->len[0] : pi->len[pi->inbufs];
+	memcpy(pi->buf[pi->inbufs], pi->buf[0], len);
+
+	return 0;
+}
+
+/* METHOD_ADD: read two uint32_t inputs, write their sum */
+static int handle_add(struct parsed_invoke *pi)
+{
 	uint32_t a, b, sum;
 
-	if (inbufs < 1 || outbufs < 1)
+	if (pi->inbufs < 1 || pi->nbufs - pi->inbufs < 1)
+		return -EINVAL;
+	if (!pi->buf[0] || pi->len[0] < 2 * sizeof(uint32_t))
+		return -EINVAL;
+	if (!pi->buf[pi->inbufs] || pi->len[pi->inbufs] < sizeof(uint32_t))
 		return -EINVAL;
 
-	if ((uint64_t)nscalars * sizeof(*args) > size)
-		return -EINVAL;
-
-	/* Input: two uint32_t values */
-	if (args[0].len < 2 * sizeof(uint32_t))
-		return -EINVAL;
-	if (args[0].buf + args[0].len > size)
-		return -EFAULT;
-
-	memcpy(&a, base + args[0].buf, sizeof(a));
-	memcpy(&b, base + args[0].buf + sizeof(uint32_t), sizeof(b));
+	memcpy(&a, pi->buf[0], sizeof(a));
+	memcpy(&b, (char *)pi->buf[0] + sizeof(uint32_t), sizeof(b));
 	sum = a + b;
+	memcpy(pi->buf[pi->inbufs], &sum, sizeof(sum));
 
-	/* Output: one uint32_t */
-	if (args[1].len < sizeof(uint32_t))
-		return -EINVAL;
-	if (args[1].buf + sizeof(uint32_t) > size)
-		return -EFAULT;
-
-	memcpy(base + args[1].buf, &sum, sizeof(sum));
-
+	printf("fastrpc_dispatcher: add %u + %u = %u\n", a, b, sum);
 	return 0;
 }
 
-static int dispatch(uint32_t handle, uint32_t sc, void *payload, uint64_t size)
+static int dispatch(uint32_t handle, uint32_t sc, struct parsed_invoke *pi)
 {
 	uint32_t method = REMOTE_SCALARS_METHOD(sc);
 
 	if (handle == TEST_HANDLE) {
 		switch (method) {
 		case METHOD_ECHO:
-			return handle_echo(payload, size, sc);
+			return handle_echo(pi);
 		case METHOD_ADD:
-			return handle_add(payload, size, sc);
+			return handle_add(pi);
 		default:
 			fprintf(stderr, "fastrpc_dispatcher: unknown method %u "
 				"on test handle\n", method);
@@ -253,13 +303,20 @@ int main(int argc, char *argv[])
 					"failed to map payload\n");
 				rsp.retval = -EFAULT;
 			} else {
-				rsp.retval = dispatch(req.handle, req.sc,
-						      payload, req.size);
+				struct parsed_invoke pi;
+
+				rsp.retval = parse_payload(payload, req.addr,
+							   req.size, req.sc,
+							   &pi);
+				if (!rsp.retval)
+					rsp.retval = dispatch(req.handle,
+							      req.sc, &pi);
 				unmap_phys(payload, req.addr, req.size);
 			}
 		} else {
-			/* No payload — dispatch with NULL */
-			rsp.retval = dispatch(req.handle, req.sc, NULL, 0);
+			struct parsed_invoke pi = { 0 };
+
+			rsp.retval = dispatch(req.handle, req.sc, &pi);
 		}
 
 		n = write(fd, &rsp, sizeof(rsp));

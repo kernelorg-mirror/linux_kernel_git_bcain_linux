@@ -281,7 +281,7 @@ static void fastrpc_device_remove(struct rpmsg_device *rpdev)
 }
 
 static const struct rpmsg_device_id fastrpc_device_id_table[] = {
-	{ .name = "fastrpc-cdsp-smd" },
+	{ .name = "fastrpcglink-apps-dsp" },
 	{}
 };
 MODULE_DEVICE_TABLE(rpmsg, fastrpc_device_id_table);
