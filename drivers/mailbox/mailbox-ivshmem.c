@@ -42,6 +42,13 @@ static irqreturn_t ivshmem_mbox_irq(int irq, void *data)
 {
 	struct ivshmem_mbox *m = data;
 
+	/*
+	 * Doorbells rung by the peer before a client bound this channel
+	 * (the peer VM may boot much earlier) have nobody to deliver to.
+	 */
+	if (!READ_ONCE(m->chan.cl))
+		return IRQ_HANDLED;
+
 	mbox_chan_received_data(&m->chan, NULL);
 	return IRQ_HANDLED;
 }
@@ -122,13 +129,11 @@ static int ivshmem_mbox_probe(struct platform_device *pdev)
 
 	m->irq = irq;
 
-	ret = devm_request_irq(dev, irq, ivshmem_mbox_irq, 0,
+	/* IRQ starts disabled; enabled when a client binds via startup() */
+	ret = devm_request_irq(dev, irq, ivshmem_mbox_irq, IRQF_NO_AUTOEN,
 			       dev_name(dev), m);
 	if (ret)
 		return dev_err_probe(dev, ret, "failed to request IRQ\n");
-
-	/* IRQ starts disabled; enabled when a client binds via startup() */
-	disable_irq(irq);
 
 	m->mbox.dev = dev;
 	m->mbox.chans = &m->chan;
