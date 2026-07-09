@@ -23,7 +23,12 @@ static netdev_tx_t rpmsg_net_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	ret = rpmsg_trysend(priv->rpdev->ept, skb->data, skb->len);
 	if (ret) {
-		netif_stop_queue(dev);
+		/*
+		 * The GLINK TX FIFO is transiently full: drop and let the
+		 * upper protocol retransmit.  There is no TX-done signal
+		 * from GLINK to re-wake a stopped queue, so stopping the
+		 * queue here would hang the interface.
+		 */
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
 		return NETDEV_TX_OK;
