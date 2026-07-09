@@ -64,11 +64,19 @@ static int rpmsg_echo_cb(struct rpmsg_device *rpdev, void *data, int len,
 
 	dev_info(&rpdev->dev, "received %d bytes (src: 0x%x)\n", len, src);
 
-	if (priv && !priv->got_echo) {
-		priv->got_echo = true;
-		cancel_delayed_work(&priv->send_work);
-		dev_info(&rpdev->dev,
-			 "ECHO SUCCESS after %d attempts\n", priv->retries);
+	/*
+	 * The initiator side only validates the response; echoing it back
+	 * would ping-pong with the remote echoer forever.
+	 */
+	if (priv) {
+		if (!priv->got_echo) {
+			priv->got_echo = true;
+			cancel_delayed_work(&priv->send_work);
+			dev_info(&rpdev->dev,
+				 "ECHO SUCCESS after %d attempts\n",
+				 priv->retries);
+		}
+		return 0;
 	}
 
 	/* Use trysend — this callback runs under the GLINK recv_lock */
