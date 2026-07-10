@@ -8,3 +8,4 @@ Hexagon Specific Documentation
    :maxdepth: 1
 
    qemu-boot
+   qemu-glink
