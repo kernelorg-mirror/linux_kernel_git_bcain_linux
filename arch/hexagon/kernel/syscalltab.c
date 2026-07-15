@@ -14,7 +14,16 @@
 #define __SYSCALL(nr, call) [nr] = (call),
 #define __SYSCALL_WITH_COMPAT(nr, native, compat)        __SYSCALL(nr, native)
 
-#define sys_mmap2 sys_mmap_pgoff
+/*
+ * mmap2(2)'s offset argument is always in 4096-byte units, independent of the
+ * kernel PAGE_SIZE. Routing sys_mmap2 straight to sys_mmap_pgoff (whose offset
+ * is in PAGE_SIZE units) skipped that conversion, making vm_pgoff PAGE_SIZE/4096
+ * times too large for any non-zero file offset. On the 64KB-page port this is
+ * 16x: file mappings past the first page (e.g. later PT_LOAD segments of shared
+ * libraries larger than PAGE_SIZE) then pointed beyond EOF and took a spurious
+ * SIGBUS on first access, breaking the dynamic loader for many binaries. Use
+ * the real sys_mmap2() (in syscall.c), which converts via >>(PAGE_SHIFT-12).
+ */
 
 SYSCALL_DEFINE6(hexagon_fadvise64_64, int, fd, int, advice,
 		SC_ARG64(offset), SC_ARG64(len))
