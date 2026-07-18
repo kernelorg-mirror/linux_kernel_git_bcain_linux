@@ -27,11 +27,6 @@ void machine_restart(char *cmd)
 	on_each_cpu(__do_vmstop, (void *)restart, 0);
 }
 
-void (*pm_power_off)(void) = NULL;
+void (*pm_power_off)(void) = machine_power_off;
 EXPORT_SYMBOL(pm_power_off);
-
-static void hexagon_pm_power_off(void)
-{
-	on_each_cpu(__do_vmstop, (void *)poweroff, 0);
-}
 
