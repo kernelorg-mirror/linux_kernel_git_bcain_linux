@@ -326,11 +326,11 @@ point. It is loaded by QEMU as the ``-bios`` firmware image, while the
 kernel raw binary is loaded separately by QEMU at a fixed physical
 address (``0xa0000000``) via a ``loader`` device.
 
-Clone the hypervisor repository and check out tag ``h2-bcain-2-july-2026``::
+Clone the hypervisor repository and check out tag ``h2-bcain-18-july-2026``::
 
     git clone https://github.com/androm3da/hexagon-hypervisor.git
     cd hexagon-hypervisor
-    git checkout h2-bcain-2-july-2026
+    git checkout h2-bcain-18-july-2026
 
 Build the H2 hypervisor libraries (required by ``loadlinux``).
 ``NULL_ANGEL_TRAP=1`` disables the angel semihosting handler, which
@@ -365,7 +365,7 @@ invoking make::
 
 The resulting ``linux/loadlinux`` ELF can be passed to QEMU via the
 ``-bios`` flag as shown in the `Boot`_ section above, or copied into
-QEMU's ``pc-bios/hexagon_loadlinux`` (and rebuilt with QEMU) to replace
-the bundled default.  QEMU's own ``roms/Makefile`` provides a
-``hexagon-loadlinux`` target that automates the steps above against
-the ``roms/hexagon-hypervisor`` submodule.
+QEMU's ``pc-bios/hexagon_loadlinux_v${ARCHV}`` (and rebuilt with QEMU)
+to replace the bundled default.  QEMU's own ``roms/Makefile`` provides a
+``hexagon-loadlinux`` target that automates the steps above, for all
+three ARCHVs, against the ``roms/hexagon-hypervisor`` submodule.
