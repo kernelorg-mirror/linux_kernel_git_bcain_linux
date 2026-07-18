@@ -335,16 +335,22 @@ Clone the hypervisor repository and check out tag ``h2-bcain-2-july-2026``::
 Build the H2 hypervisor libraries (required by ``loadlinux``).
 ``NULL_ANGEL_TRAP=1`` disables the angel semihosting handler, which
 otherwise polls for a host response that the QEMU ``virt`` machine
-never provides, causing a silent hang::
+never provides, causing a silent hang.  ``SHUTDOWN_AFTER_GUEST_EXIT=1``
+makes H2 halt every hardware thread once the Linux guest powers off, so
+``qemu-system-hexagon`` actually exits; without it the machine spins
+after ``poweroff`` (under ``NULL_ANGEL_TRAP`` the angel ``SYS_EXIT``
+that would otherwise exit a simulator is a no-op)::
 
     ARCHV=73
-    make USE_PKW=0 ARCHV=$ARCHV TARGET=opt NULL_ANGEL_TRAP=1 -j"$(nproc)"
+    make USE_PKW=0 ARCHV=$ARCHV TARGET=opt \
+        NULL_ANGEL_TRAP=1 SHUTDOWN_AFTER_GUEST_EXIT=1 -j"$(nproc)"
 
 Then build ``loadlinux`` from the ``linux/`` subdirectory.
 ``NO_LOAD=1`` tells ``loadlinux`` not to load the kernel from a file;
 QEMU loads it instead.  ``LINUX_LINK_ADDR`` must match the kernel load
-address (``0xa0000000``).  Pass ``NULL_ANGEL_TRAP=1`` again so the
-bootloader is linked with the null angel stubs.
+address (``0xa0000000``).  Pass ``NULL_ANGEL_TRAP=1`` and
+``SHUTDOWN_AFTER_GUEST_EXIT=1`` again so the bootloader is compiled and
+linked consistently with the libraries above.
 
 The ``linux/makefile`` defaults its build paths to ``../install`` and
 ``../kernel``, but the actual artifacts from the step above land in
@@ -354,7 +360,8 @@ invoking make::
     export INSTALLPATH=$(pwd)/artifacts/v${ARCHV}/opt/install
     export KERNELPATH=$(pwd)/artifacts/v${ARCHV}/opt/build/kernel
     make -C linux USE_PKW=0 ARCHV=$ARCHV NO_LOAD=1 \
-        NULL_ANGEL_TRAP=1 LINUX_LINK_ADDR=0xa0000000 loadlinux
+        NULL_ANGEL_TRAP=1 SHUTDOWN_AFTER_GUEST_EXIT=1 \
+        LINUX_LINK_ADDR=0xa0000000 loadlinux
 
 The resulting ``linux/loadlinux`` ELF can be passed to QEMU via the
 ``-bios`` flag as shown in the `Boot`_ section above, or copied into
