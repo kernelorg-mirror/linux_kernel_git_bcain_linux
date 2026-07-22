@@ -1786,11 +1786,12 @@ bool bpf_jit_needs_zext(void)
 	return true;
 }
 
-struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
+struct bpf_prog *bpf_int_jit_compile(struct bpf_verifier_env *env,
+				     struct bpf_prog *prog)
 {
 	unsigned int prog_size = 0;
-	bool tmp_blinded = false, extra_pass = false;
-	struct bpf_prog *tmp, *orig_prog = prog;
+	bool extra_pass = false;
+	struct bpf_prog *orig_prog = prog;
 	int pass = 0, prev_ninsns = 0, i;
 	struct hexagon_jit_data *jit_data;
 	struct hexagon_jit_context *ctx;
@@ -1798,13 +1799,11 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	if (!prog->jit_requested)
 		return orig_prog;
 
-	tmp = bpf_jit_blind_constants(prog);
-	if (IS_ERR(tmp))
-		return orig_prog;
-	if (tmp != prog) {
-		tmp_blinded = true;
-		prog = tmp;
-	}
+	/*
+	 * Constant blinding is performed by the core (bpf_jit_blind_constants()
+	 * in kernel/bpf/core.c) before this is called, so prog is already the
+	 * blinded program here.
+	 */
 
 	jit_data = prog->aux->jit_data;
 	if (!jit_data) {
@@ -1914,9 +1913,6 @@ out_offset:
 		prog->aux->jit_data = NULL;
 	}
 out:
-	if (tmp_blinded)
-		bpf_jit_prog_release_other(prog, prog == orig_prog ?
-					   tmp : orig_prog);
 	return prog;
 
 out_free_hdr:
