@@ -54,14 +54,27 @@ static void __init setup_hwcap(void)
 {
 	struct vm_rev rev;
 	unsigned long hvx_vlength;
+	unsigned int isa;
 
 	elf_hwcap = 0;
 
 	/* Get revision information for ISA version */
 	rev.raw = __vmgetinfo(vm_info_rev);
 
+	/*
+	 * rev.isa encodes the version as two hex digits: 0x68 for V68, 0x73
+	 * for V73, 0x81 for V81 and so on (this is the low byte of the DSP
+	 * revision register).  Decode those digits into the plain decimal
+	 * version number so the switch below and the printout show "v73"
+	 * rather than the raw 0x73 (=115).
+	 */
+	isa = ((rev.isa >> 4) & 0xf) * 10 + (rev.isa & 0xf);
+
 	/* Set ISA version using enumeration values in 7-bit field (bits 0-6) */
-	switch (rev.isa) {
+	switch (isa) {
+	case 81:
+		elf_hwcap |= HWCAP_HEXAGON_ISA_V81;
+		break;
 	case 79:
 		elf_hwcap |= HWCAP_HEXAGON_ISA_V79;
 		break;
@@ -121,10 +134,9 @@ static void __init setup_hwcap(void)
 			elf_hwcap |= HWCAP_HEXAGON_HVX_LENGTH_128B;
 	}
 
-	printk(KERN_INFO "Hexagon hwcap: 0x%08lx (ISA enum %lu = v%u%s%s%s%s%s)\n",
+	printk(KERN_INFO "Hexagon hwcap: 0x%08lx (v%u%s%s%s%s%s)\n",
 		elf_hwcap,
-		elf_hwcap & HWCAP_HEXAGON_ISA_MASK,
-		rev.isa,
+		isa,
 		(elf_hwcap & HWCAP_HEXAGON_HVX) ? ", HVX" : "",
 		(elf_hwcap & HWCAP_HEXAGON_HVX_LENGTH_128B) ? ", HVX-128B" : "",
 		(elf_hwcap & HWCAP_HEXAGON_HVX_IEEE_FP) ? ", HVX-IEEE-FP" : "",
