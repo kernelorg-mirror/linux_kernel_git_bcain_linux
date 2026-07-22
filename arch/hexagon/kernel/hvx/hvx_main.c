@@ -70,7 +70,7 @@ static void smp_set_hardware(void *info)
 {
 	struct extbits *extbits = (struct extbits *)info;
 
-	set_hardware(extbits->xa, extbits->xe);
+	set_hardware(extbits->xe, extbits->xa);
 }
 
 static void drop_ctxt(struct thread_info *ti)
