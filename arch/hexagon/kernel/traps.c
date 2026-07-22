@@ -21,6 +21,7 @@
 #include <asm/registers.h>
 #include <asm/unistd.h>
 #include <asm/sections.h>
+#include <asm/notify.h>
 #ifdef CONFIG_KGDB
 # include <linux/kgdb.h>
 #endif
@@ -288,6 +289,26 @@ static void cache_error(struct pt_regs *regs)
 }
 
 /*
+ * A coprocessor-unavailable fault (HVX/HMX) is how lazy vector-context
+ * allocation is triggered: the first coprocessor instruction a thread
+ * executes traps here because the extension is not enabled for it.  Offer the
+ * fault to the coprocessor context managers via the thread-event notifier;
+ * one of them claims it (bumping coproc_notify_cnt) and allocates a context,
+ * after which the instruction is retried.  If nothing claims it -- no
+ * coprocessor support is built in, or the thread is genuinely misusing the
+ * coprocessor -- deliver SIGFPE.
+ */
+static void coproc_fault(struct pt_regs *regs)
+{
+	atomic_set(&coproc_notify_cnt, 0);
+
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_FAULT_COPROC);
+
+	if (atomic_read(&coproc_notify_cnt) == 0)
+		force_sig(SIGFPE);
+}
+
+/*
  * General exception handler
  */
 void do_genex(struct pt_regs *regs);
@@ -299,6 +320,16 @@ void do_genex(struct pt_regs *regs)
 	 * or a later local_irq_enable() becomes a silent no-op.
 	 */
 	clear_ie_cached();
+
+	/*
+	 * Notify coprocessor context management (HVX/HMX) that we have
+	 * entered the kernel, so any live vector state for this thread is
+	 * saved and its hardware context released before we run.  This must
+	 * happen on every kernel entry -- exception, syscall and interrupt --
+	 * or a thread's vector registers can be lost across a context switch
+	 * taken from an exception or syscall.
+	 */
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
 
 	/*
 	 * Decode Cause and Dispatch
@@ -351,6 +382,9 @@ void do_genex(struct pt_regs *regs)
 	case HVM_GE_C_TLBMISSW:
 		write_protection_fault(regs);
 		break;
+	case HVM_GE_C_COPROC:
+		coproc_fault(regs);
+		break;
 	default:
 		/* Halt and catch fire */
 		panic("Unrecognized exception 0x%lx\n", pt_cause(regs));
@@ -370,6 +404,9 @@ void do_trap0(struct pt_regs *regs)
 	 * interrupts disabled at the hypervisor.
 	 */
 	clear_ie_cached();
+
+	/* Save/release any live coprocessor context on syscall entry. */
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
 
 	switch (pt_cause(regs)) {
 	case TRAP_SYSCALL:
@@ -455,6 +492,7 @@ void do_machcheck(struct pt_regs *regs);
 void do_machcheck(struct pt_regs *regs)
 {
 	clear_ie_cached();
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
 
 	/* Halt and catch fire */
 	__vmstop(machinecheck);
