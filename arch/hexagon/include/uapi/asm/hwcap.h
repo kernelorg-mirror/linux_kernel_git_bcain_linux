@@ -44,7 +44,8 @@
 #define HWCAP_HEXAGON_ISA_V71	13	/* Hexagon V71 */
 #define HWCAP_HEXAGON_ISA_V73	14	/* Hexagon V73 */
 #define HWCAP_HEXAGON_ISA_V79	15	/* Hexagon V79 */
-/* Future versions can be added as 16, 17, 18, etc. */
+#define HWCAP_HEXAGON_ISA_V81	16	/* Hexagon V81 */
+/* Future versions can be added as 17, 18, 19, etc. */
 
 /* Essential feature flags */
 #define HWCAP_HEXAGON_HVX		(1 << 7)	/* HVX (Hexagon Vector eXtensions) */
