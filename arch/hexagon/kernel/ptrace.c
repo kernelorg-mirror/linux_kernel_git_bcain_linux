@@ -60,13 +60,9 @@ static int genregs_get(struct task_struct *target,
 	membuf_store(&to, pt_elr(regs)); // pc
 	membuf_store(&to, (unsigned long)pt_cause(regs)); // cause
 	membuf_store(&to, pt_badva(regs)); // badva
-#if CONFIG_HEXAGON_ARCH_VERSION >=4
 	membuf_store(&to, regs->cs0);
 	membuf_store(&to, regs->cs1);
 	return membuf_zero(&to, sizeof(unsigned long));
-#else
-	return membuf_zero(&to, 3 * sizeof(unsigned long));
-#endif
 }
 
 static int genregs_set(struct task_struct *target,
@@ -74,7 +70,7 @@ static int genregs_set(struct task_struct *target,
 		   unsigned int pos, unsigned int count,
 		   const void *kbuf, const void __user *ubuf)
 {
-	int ret, ignore_offset;
+	int ret;
 	unsigned long bucket;
 	struct pt_regs *regs = task_pt_regs(target);
 
@@ -108,18 +104,13 @@ static int genregs_set(struct task_struct *target,
 	INEXT(&bucket, cause);
 	INEXT(&bucket, badva);
 
-#if CONFIG_HEXAGON_ARCH_VERSION >=4
 	INEXT(&regs->cs0, cs0);
 	INEXT(&regs->cs1, cs1);
-	ignore_offset = offsetof(struct user_regs_struct, pad1);
-#else
-	ignore_offset = offsetof(struct user_regs_struct, cs0);
-#endif
 
 	/* Ignore the rest, if needed */
 	if (!ret)
 		user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf,
-					  ignore_offset, -1);
+			offsetof(struct user_regs_struct, pad1), -1);
 	else
 		return ret;
 
@@ -151,7 +142,6 @@ static const struct user_regset_view hexagon_user_view = {
 	.e_machine = ELF_ARCH,
 	.ei_osabi = ELF_OSABI,
 	.regsets = hexagon_regsets,
-	.e_flags = ELF_CORE_EFLAGS,
 	.n = ARRAY_SIZE(hexagon_regsets)
 };
 

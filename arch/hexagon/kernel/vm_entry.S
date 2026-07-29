@@ -32,51 +32,6 @@
  * number in the case where we decode a system call (trap0(#1)).
  */
 
-#if CONFIG_HEXAGON_ARCH_VERSION < 4
-#define save_pt_regs()\
- memd(R0 + #_PT_R3130) = R31:30; \
- { memw(R0 + #_PT_R2928) = R28; \
-   R31 = memw(R0 + #_PT_ER_VMPSP); }\
- { memw(R0 + #(_PT_R2928 + 4)) = R31; \
-   R31 = ugp; } \
- { memd(R0 + #_PT_R2726) = R27:26; \
-   R30 = gp ; } \
- memd(R0 + #_PT_R2524) = R25:24; \
- memd(R0 + #_PT_R2322) = R23:22; \
- memd(R0 + #_PT_R2120) = R21:20; \
- memd(R0 + #_PT_R1918) = R19:18; \
- memd(R0 + #_PT_R1716) = R17:16; \
- memd(R0 + #_PT_R1514) = R15:14; \
- memd(R0 + #_PT_R1312) = R13:12; \
- { memd(R0 + #_PT_R1110) = R11:10; \
-   R15 = lc0; } \
- { memd(R0 + #_PT_R0908) = R9:8; \
-   R14 = sa0; } \
- { memd(R0 + #_PT_R0706) = R7:6; \
-   R13 = lc1; } \
- { memd(R0 + #_PT_R0504) = R5:4; \
-   R12 = sa1; } \
- { memd(R0 + #_PT_GPUGP) = R31:30; \
-   R11 = m1; \
-   R2.H = #HI(_THREAD_SIZE); } \
- { memd(R0 + #_PT_LC0SA0) = R15:14; \
-   R10 = m0; \
-   R2.L = #LO(_THREAD_SIZE); } \
- { memd(R0 + #_PT_LC1SA1) = R13:12; \
-   R15 = p3:0; \
-   R2 = neg(R2); } \
- { memd(R0 + #_PT_M1M0) = R11:10; \
-   R14  = usr; \
-   R2 = and(R0,R2); } \
- { memd(R0 + #_PT_PREDSUSR) =  R15:14; \
-   THREADINFO_REG = R2; } \
- { r24 = memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS); \
-   memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS) = R0; \
-   R2 = #-1; } \
- { memw(R0 + #_PT_SYSCALL_NR) = R2; \
-   R30 = #0; }
-#else
-/* V4+ */
 /* the # ## # syntax inserts a literal ## */
 #define save_pt_regs()\
 	{ memd(R0 + #_PT_R3130) = R31:30; \
@@ -113,7 +68,6 @@
 	{ memw(R0 + #_PT_SYSCALL_NR) = R2; \
 		memd(R0 + #_PT_CS1CS0) = R17:16; \
 	  R30 = #0; }
-#endif
 
 /*
  * Restore registers and thread_info.regs state. THREADINFO_REG
@@ -121,41 +75,6 @@
  * preserved. Don't restore R29 (SP) until later.
  */
 
-#if CONFIG_HEXAGON_ARCH_VERSION < 4
-#define restore_pt_regs() \
-	{ memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS) = R24; \
-	  R15:14 = memd(R0 + #_PT_PREDSUSR); } \
-	{ R11:10 = memd(R0 + #_PT_M1M0); \
-	  p3:0 = R15; } \
-	{ R13:12 = memd(R0 + #_PT_LC1SA1); \
-	  usr = R14; } \
-	{ R15:14 = memd(R0 + #_PT_LC0SA0); \
-	  m1 = R11; } \
-	{ R3:2 = memd(R0 + #_PT_R0302); \
-	  m0 = R10; } \
-	{ R5:4 = memd(R0 + #_PT_R0504); \
-	  lc1 = R13; } \
-	{ R7:6 = memd(R0 + #_PT_R0706); \
-	  sa1 = R12; } \
-	{ R9:8 = memd(R0 + #_PT_R0908); \
-	  lc0 = R15; } \
-	{ R11:10 = memd(R0 + #_PT_R1110); \
-	  sa0 = R14; } \
-	{ R13:12 = memd(R0 + #_PT_R1312); \
-	  R15:14 = memd(R0 + #_PT_R1514); } \
-	{ R17:16 = memd(R0 + #_PT_R1716); \
-	  R19:18 = memd(R0 + #_PT_R1918); } \
-	{ R21:20 = memd(R0 + #_PT_R2120); \
-	  R23:22 = memd(R0 + #_PT_R2322); } \
-	{ R25:24 = memd(R0 + #_PT_R2524); \
-	  R27:26 = memd(R0 + #_PT_R2726); } \
-	R31:30 = memd(R0 + #_PT_GPUGP); \
-	{ R28 = memw(R0 + #_PT_R2928); \
-	  ugp = R31; } \
-	{ R31:30 = memd(R0 + #_PT_R3130); \
-	  gp = R30; }
-#else
-/* V4+ */
 #define restore_pt_regs() \
 	{ memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS) = R24; \
 	  R15:14 = memd(R0 + #_PT_PREDSUSR); } \
@@ -186,7 +105,6 @@
 		R28 = memw(R0 + #_PT_R2928); }\
 	{ C11:10 = R31:30; \
 		R31:30 = memd(R0 + #_PT_R3130); }
-#endif
 
 	/*
 	 * Clears off enough space for the rest of pt_regs; evrec is a part
@@ -200,28 +118,6 @@
  * Need to save off R0, R1, R2, R3 immediately.
  */
 
-#if CONFIG_HEXAGON_ARCH_VERSION < 4
-#define	vm_event_entry(CHandler) \
-	{ \
-		R29 = add(R29, #-(_PT_REGS_SIZE)); \
-		memd(R29 + #(_PT_R0100 + -_PT_REGS_SIZE)) = R1:0; \
-	} \
-	{ \
-		memd(R29 +#_PT_R0302) = R3:2; \
-	} \
-	trap1(#HVM_TRAP1_VMGETREGS); \
-	{ \
-		memd(R29 + #_PT_ER_VMEL) = R1:0; \
-		R0 = R29; \
-		R1.L = #LO(CHandler); \
-	} \
-	{ \
-		memd(R29 + #_PT_ER_VMPSP) = R3:2; \
-		R1.H = #HI(CHandler); \
-		jump event_dispatch; \
-	}
-#else
-/* V4+ */
 /* turn on I$ prefetch early */
 /* the # ## # syntax inserts a literal ## */
 #define	vm_event_entry(CHandler) \
@@ -247,7 +143,6 @@
 		memd(R29 + #_PT_ER_VMPSP) = R3:2; \
 		jump event_dispatch; \
 	}
-#endif
 
 .text
 	/*
