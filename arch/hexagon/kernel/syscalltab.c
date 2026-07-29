@@ -14,7 +14,16 @@
 #define __SYSCALL(nr, call) [nr] = (call),
 #define __SYSCALL_WITH_COMPAT(nr, native, compat)        __SYSCALL(nr, native)
 
-#define sys_mmap2 sys_mmap_pgoff
+SYSCALL_DEFINE6(mmap2, unsigned long, addr, unsigned long, len,
+		unsigned long, prot, unsigned long, flags,
+		unsigned long, fd, unsigned long, offset)
+{
+	if (unlikely(offset & (~PAGE_MASK >> 12)))
+		return -EINVAL;
+
+	return ksys_mmap_pgoff(addr, len, prot, flags, fd,
+			       offset >> (PAGE_SHIFT - 12));
+}
 
 SYSCALL_DEFINE6(hexagon_fadvise64_64, int, fd, int, advice,
 		SC_ARG64(offset), SC_ARG64(len))
