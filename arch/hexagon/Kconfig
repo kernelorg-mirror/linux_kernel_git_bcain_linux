@@ -87,10 +87,6 @@ config HEXAGON_COMET
 
 endchoice
 
-config HEXAGON_ARCH_VERSION
-	int "Architecture version"
-	default 2
-
 config CMDLINE
 	string "Default kernel command string"
 	default ""
