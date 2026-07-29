@@ -11,9 +11,10 @@
 #define _ASM_HEXAGON_SETUP_H
 
 #include <linux/init.h>
+#include <linux/types.h>
 #include <uapi/asm/setup.h>
 
-extern char external_cmdline_buffer;
+extern u64 boot_dtb_phys;
 
 void __init setup_arch_memory(void);
 

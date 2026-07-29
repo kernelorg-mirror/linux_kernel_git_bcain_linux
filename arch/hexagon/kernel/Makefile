@@ -23,3 +23,5 @@ obj-y += vm_vectors.o
 obj-$(CONFIG_HAS_DMA) += dma.o
 
 obj-$(CONFIG_STACKTRACE) += stacktrace.o
+
+obj-$(CONFIG_OF) += devtree.o
