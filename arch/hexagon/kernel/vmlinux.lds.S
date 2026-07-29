@@ -21,7 +21,9 @@ See asm-generic/vmlinux.lds.h for expansion of some of these macros.
 See asm-generic/sections.h for seemingly required labels.
 */
 
+#ifndef PAGE_SIZE
 #define PAGE_SIZE _PAGE_SIZE
+#endif
 
 SECTIONS
 {
@@ -30,7 +32,7 @@ SECTIONS
 	__init_begin = .;
 	HEAD_TEXT_SECTION
 	INIT_TEXT_SECTION(PAGE_SIZE)
-	PERCPU_SECTION(L1_CACHE_BYTES)
+
 	__init_end = .;
 
         . = ALIGN(_PAGE_SIZE);
@@ -46,6 +48,18 @@ SECTIONS
 		*(.fixup)
 	}
 	_etext = .;
+
+	/*
+	 * Capture orphan data sections before PERCPU to ensure
+	 * PERCPU starts at a page-aligned address.
+	 * The .modinfo section is normally discarded but needs explicit handling.
+	 */
+	.modinfo : AT(ADDR(.modinfo)) {
+		*(.modinfo)
+	}
+
+	/* PERCPU must be page-aligned for v5.2+ kernel */
+	PERCPU_SECTION(PAGE_SIZE)
 
 	INIT_DATA_SECTION(PAGE_SIZE)
 
