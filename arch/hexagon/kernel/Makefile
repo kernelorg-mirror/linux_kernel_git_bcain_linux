@@ -7,6 +7,8 @@ obj-$(CONFIG_SMP) += smp.o
 obj-y += setup.o irq_cpu.o traps.o syscalltab.o signal.o
 obj-y += process.o trampoline.o reset.o ptrace.o vdso.o
 
+obj-y += irq-hexagon-h2.o
+
 ifeq ($(CONFIG_H2),y)
 obj-y += time-h2.o
 else
