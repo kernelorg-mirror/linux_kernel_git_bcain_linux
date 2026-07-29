@@ -11,25 +11,21 @@
 #include <linux/mmzone.h>
 #include <linux/mm.h>
 #include <linux/seq_file.h>
-#include <linux/console.h>
 #include <linux/of_fdt.h>
+#include <linux/libfdt.h>
 #include <asm/io.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
 #include <asm/processor.h>
 #include <asm/hexagon_vm.h>
 #include <asm/vm_mmu.h>
+#include <asm/prom.h>
 #include <asm/time.h>
 
 char cmd_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 
-int on_simulator;
-
-void calibrate_delay(void)
-{
-	loops_per_jiffy = thread_freq_mhz * 1000000 / HZ;
-}
+u64 boot_dtb_phys;  /* DTB physical address, set by head.S from R1:0 */
 
 /*
  * setup_arch -  high level architectural setup routine
@@ -38,50 +34,40 @@ void calibrate_delay(void)
 
 void __init setup_arch(char **cmdline_p)
 {
-	char *p = &external_cmdline_buffer;
-
 	/*
-	 * These will eventually be pulled in via either some hypervisor
-	 * or devicetree description.  Hardwiring for now.
+	 * The bootloader passes the DTB address in R1:0; the linear map
+	 * only covers RAM at/above PHYS_OFFSET, so a DTB placed below it
+	 * cannot be phys_to_virt()'d.  RAM size is not known this early, so
+	 * also reject a DTB whose linear virtual address would fall outside
+	 * the kernel linear window (PAGE_OFFSET .. top of the address space);
+	 * such an address would otherwise fault when dereferenced.
 	 */
-	pcycle_freq_mhz = 600;
-	thread_freq_mhz = 100;
-	sleep_clk_freq = 32000;
+	if (!boot_dtb_phys || boot_dtb_phys < PHYS_OFFSET ||
+	    boot_dtb_phys - PHYS_OFFSET > (u64)(-PAGE_OFFSET))
+		panic("No usable device tree from bootloader\n");
 
 	/*
 	 * Set up event bindings to handle exceptions and interrupts.
 	 */
 	__vmsetvec(_K_VM_event_vector);
 
-	printk(KERN_INFO "PHYS_OFFSET=0x%08lx\n", PHYS_OFFSET);
+	/*  initial machine setup from flattened device tree  */
+	early_init_devtree(phys_to_virt((unsigned long)boot_dtb_phys));
 
-	/*
-	 * Simulator has a few differences from the hardware.
-	 * For now, check uninitialized-but-mapped memory
-	 * prior to invoking setup_arch_memory().
-	 */
-	if (*(int *)((unsigned long)_end + 8) == 0x1f1f1f1f)
-		on_simulator = 1;
-	else
-		on_simulator = 0;
-
-	if (p[0] != '\0')
-		strscpy(boot_command_line, p, COMMAND_LINE_SIZE);
-	else
+	/*  DTB /chosen/bootargs wins; CONFIG_CMDLINE is the fallback.  */
+	if (!boot_command_line[0])
 		strscpy(boot_command_line, default_command_line,
 			COMMAND_LINE_SIZE);
 
-	/*
-	 * boot_command_line and the value set up by setup_arch
-	 * are both picked up by the init code. If no reason to
-	 * make them different, pass the same pointer back.
-	 */
 	strscpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
 	parse_early_param();
 
 	setup_arch_memory();
+
+	/*  Now is time we unflatten devicetree  */
+	unflatten_device_tree();
 
 #ifdef CONFIG_SMP
 	smp_start_cpus();
