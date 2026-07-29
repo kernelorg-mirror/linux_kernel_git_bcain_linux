@@ -440,7 +440,7 @@ void do_machcheck(struct pt_regs *regs)
 	clear_ie_cached();
 
 	/* Halt and catch fire */
-	__vmstop();
+	__vmstop(machinecheck);
 }
 
 /*
