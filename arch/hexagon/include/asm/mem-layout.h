@@ -59,7 +59,7 @@ extern int max_kernel_seg;
  * supposed to be based on the amount of physical memory available
  */
 
-#define VMALLOC_START ((unsigned long) __va(high_memory + VMALLOC_OFFSET))
+#define VMALLOC_START ((unsigned long) high_memory + VMALLOC_OFFSET)
 
 /* Gap between physical ram and vmalloc space for guard purposes. */
 #define VMALLOC_OFFSET PAGE_SIZE
