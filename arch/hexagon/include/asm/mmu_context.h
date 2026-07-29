@@ -42,7 +42,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		next->context.generation = prev->context.generation;
 	}
 
-	__vmnewmap((void *)next->context.ptbase);
+	__vmnewmap((void *)next->context.ptbase, VM_TRANS_TYPE_TABLE,
+		   VM_TLB_INVALIDATE_FALSE);
 }
 
 /*

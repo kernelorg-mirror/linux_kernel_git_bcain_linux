@@ -65,6 +65,23 @@ enum VM_INT_OPS {
 	hvmi_clear
 };
 
+enum VM_TIMER_OPS {
+	getfreq,
+	getres,
+	gettime,
+	gettimeout,
+	settimeout,
+	deltatimeout
+};
+
+enum VM_STOP_STATUS {
+	none,
+	poweroff,
+	halt,
+	restart,
+	machinecheck
+};
+
 extern void _K_VM_event_vector(void);
 
 void __vmrte(void);
@@ -79,15 +96,18 @@ void clear_ie_cached(void);
 long __vmgetie(void);
 long __vmintop(enum VM_INT_OPS, long, long, long, long);
 long __vmclrmap(void *, unsigned long);
-long __vmnewmap(void *);
+long __vmnewmap(void *, unsigned long type, unsigned long tlb_flush_flag);
 long __vmcache(enum VM_CACHE_OPS op, unsigned long addr, unsigned long len);
 unsigned long long __vmgettime(void);
 long __vmsettime(unsigned long long);
-long __vmstart(void *, void *);
-void __vmstop(void);
+long __vmstart(void *, void *, int relprio);
+void __vmstop(enum VM_STOP_STATUS);
 long __vmwait(void);
 void __vmyield(void);
 long __vmvpid(void);
+#ifdef CONFIG_HEXAGON_H2
+unsigned long long __vmtimerop(enum VM_TIMER_OPS op, unsigned long dummy, unsigned long long timeout);
+#endif
 
 static inline long __vmcache_ickill(void)
 {
@@ -255,8 +275,9 @@ static inline long __vmintop_clear(long i)
 
 #define HVM_GE_C_BUS	0x01
 #define HVM_GE_C_XPROT	0x11
-#define HVM_GE_C_XUSER	0x14
+#define HVM_GE_C_XUSER	0x12
 #define HVM_GE_C_INVI	0x15
+#define HVM_GE_C_COPROC 0x16
 #define HVM_GE_C_PRIVI	0x1B
 #define HVM_GE_C_XMAL	0x1C
 #define HVM_GE_C_WREG	0x1D

@@ -101,6 +101,16 @@ config CMDLINE
 	  minimum, you should specify the memory size and the root device
 	  (e.g., mem=64M root=/dev/nfs).
 
+config HEXAGON_H2
+	bool "H2 hypervisor interface"
+	help
+	  Support for running under the Hexagon H2 hypervisor (as opposed
+	  to bare metal or an older/simpler VM interface). This provides
+	  the trap-based hypercall interface, the H2 interrupt controller,
+	  and the H2 timer that the QEMU "virt" machine and current
+	  hardware targets require. Platforms without an H2 hypervisor
+	  should leave this disabled.
+
 config SMP
 	bool "Multi-Processing support"
 	help
