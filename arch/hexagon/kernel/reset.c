@@ -5,20 +5,26 @@
 
 #include <linux/reboot.h>
 #include <linux/smp.h>
+#include <linux/irqflags.h>
 #include <asm/hexagon_vm.h>
+
+static inline void __do_vmstop(void *info) {
+	__vmstop((long)info);
+}
 
 void machine_power_off(void)
 {
-	smp_send_stop();
-	__vmstop();
+	on_each_cpu(__do_vmstop, (void *)poweroff, 0);
 }
 
 void machine_halt(void)
 {
+	on_each_cpu(__do_vmstop, (void *)halt, 0);
 }
 
 void machine_restart(char *cmd)
 {
+	on_each_cpu(__do_vmstop, (void *)restart, 0);
 }
 
 void (*pm_power_off)(void) = NULL;
