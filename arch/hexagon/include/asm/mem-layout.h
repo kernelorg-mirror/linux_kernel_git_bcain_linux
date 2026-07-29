@@ -72,7 +72,17 @@ extern int max_kernel_seg;
  * Hypervisor occupies the last 16MB page at 0xffxxxxxx
  */
 
-#define FIXADDR_TOP     0xfe000000
+/*
+ * FIXADDR_TOP is *inclusive*: the generic __fix_to_virt() maps index 0 to
+ * FIXADDR_TOP itself, so the fixmap occupies [FIXADDR_START, FIXADDR_TOP].
+ * It therefore has to sit one page below 0xfe000000 rather than at it --
+ * otherwise index 0 lands in the permanent IO mapping region, and, because
+ * 0xfe000000 is PGDIR_SIZE-aligned, in a different PGD entry than
+ * FIXADDR_START. early_fixmap_init() only populates the PGD entry covering
+ * FIXADDR_START, so an index-0 fixmap (FIX_EARLYCON_MEM_BASE, i.e. any
+ * "earlycon" boot) would fault on an unmapped kernel VA.
+ */
+#define FIXADDR_TOP     (0xfe000000UL - PAGE_SIZE)
 #define FIXADDR_SIZE    (__end_of_fixed_addresses << PAGE_SHIFT)
 #define FIXADDR_START   (FIXADDR_TOP - FIXADDR_SIZE)
 
