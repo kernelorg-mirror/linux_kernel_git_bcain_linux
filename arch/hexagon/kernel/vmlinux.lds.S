@@ -5,6 +5,10 @@
  * Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
  */
 
+#include <asm/mem-layout.h>
+
+#define LOAD_OFFSET (PAGE_OFFSET+ELF_LOAD_ADDRESS)
+
 #include <asm-generic/vmlinux.lds.h>
 #include <asm/asm-offsets.h>	/*  Most of the kernel defines are here  */
 #include <asm/mem-layout.h>	/*  except for page_offset  */
