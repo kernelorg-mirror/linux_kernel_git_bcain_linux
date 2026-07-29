@@ -37,14 +37,14 @@ unsigned long highstart_pfn, highend_pfn;
 unsigned long _dflt_cache_att = CACHEDEF;
 
 /*
- * The current "generation" of kernel map, which should not roll
- * over until Hell freezes over.  Actual bound in years needs to be
- * calculated to confirm.
+ * The current "generation" of kernel map.  A single word so that
+ * reads are atomic on a 32-bit machine; switch_mm() compares
+ * generations for inequality, so wrapping is harmless.
  */
 DEFINE_SPINLOCK(kmap_gen_lock);
 
 /*  checkpatch says don't init this to 0.  */
-unsigned long long kmap_generation;
+unsigned long kmap_generation;
 
 void sync_icache_dcache(pte_t pte)
 {
