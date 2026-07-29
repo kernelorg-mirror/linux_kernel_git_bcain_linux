@@ -228,14 +228,10 @@ __head_s_vaddr_target:
 #endif
 
 	/* Time to make the doughnuts.   */
-	call start_kernel
+	call ##start_kernel
 
 	/*
 	 * Should not reach here.
 	 */
 1:
 	jump 1b
-
-.p2align PAGE_SHIFT
-ENTRY(external_cmdline_buffer)
-        .fill _PAGE_SIZE,1,0

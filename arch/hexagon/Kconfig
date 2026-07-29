@@ -85,6 +85,14 @@ choice
 	prompt "System type"
 	default HEXAGON_COMET
 
+config HEXAGON_QEMU
+	bool "QEMU virt machine"
+	select HEXAGON_PHYS_OFFSET
+	select ARM_AMBA
+	select COMMON_CLK
+	help
+	  Support for the QEMU hexagon "virt" machine.
+
 config HEXAGON_COMET
 	bool "Comet Board"
 	help
