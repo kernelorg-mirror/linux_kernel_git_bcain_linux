@@ -17,11 +17,15 @@
 #include <linux/spinlock.h>
 #include <linux/cpu.h>
 #include <linux/mm_types.h>
+#include <linux/irqdomain.h>
 
 #include <asm/time.h>    /*  timer_interrupt  */
 #include <asm/hexagon_vm.h>
 
-#define BASE_IPI_IRQ 26
+DEFINE_PER_CPU(u32, ipi_irq);
+
+/*  Virtual Processor ID storage  */
+DEFINE_PER_CPU(u32, vpid);
 
 /*
  * cpu_possible_mask needs to be filled out prior to setup_per_cpu_areas
@@ -103,11 +107,14 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
 
 		set_bit(msg, &ipi->bits);
 		/*  Possible barrier here  */
-		retval = __vmintop_post(BASE_IPI_IRQ+cpu);
+
+		/*  This is somewhat unsafe, but VPID's pretty much don't change  */
+		/*  Also, what's passed is the hardware IRQ.  */
+		retval = __vmintop_post(CONFIG_BASE_IPI_IRQ+cpu, per_cpu(vpid, cpu));
 
 		if (retval != 0) {
 			printk(KERN_ERR "interrupt %ld not configured?\n",
-				BASE_IPI_IRQ+cpu);
+				CONFIG_BASE_IPI_IRQ+cpu);
 		}
 	}
 
@@ -139,16 +146,38 @@ static void start_secondary(void)
 		: "r" (thread_ptr)
 	);
 
+	cpu = smp_processor_id();
+
+#ifdef CONFIG_HEXAGON_H2
+	per_cpu(vpid, cpu) = __vmvpid();
+#else
+	per_cpu(vpid, cpu) = cpu;
+#endif
+
 	/*  Set the memory struct  */
 	mmgrab(&init_mm);
 	current->active_mm = &init_mm;
 
+	/*
+	 * The new virtual processor inherited the creator's address
+	 * space; install init_mm's explicitly so the VM state matches
+	 * active_mm, invalidating whatever the inherited ASID cached.
+	 */
+	__vmnewmap((void *)init_mm.context.ptbase, VM_TRANS_TYPE_TABLE,
+		   VM_TLB_INVALIDATE_TRUE);
+
 	cpu = smp_processor_id();
 
-	irq = BASE_IPI_IRQ + cpu;
-	if (request_irq(irq, handle_ipi, IRQF_TRIGGER_RISING, "ipi_handler",
-			NULL))
-		pr_err("Failed to request irq %u (ipi_handler)\n", irq);
+	/* Disable all local interrupts first */
+	for (irq = 0; irq < HEXAGON_CPUINTS; irq++)
+		__vmintop_locdis(irq);
+
+	/* Enable and register IPI interrupt */
+	irq = CONFIG_BASE_IPI_IRQ + cpu;
+	__vmintop_globen(irq);
+	if (request_irq(irq_find_mapping(hexagon_irq_domain, irq), handle_ipi,
+			IRQF_TRIGGER_RISING, "ipi_handler", NULL))
+		pr_err("Failed to request hwirq %u (ipi_handler)\n", irq);
 
 	/*  Register the clock_event dummy  */
 	setup_percpu_clockdev();
@@ -196,7 +225,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int i, irq = BASE_IPI_IRQ;
+	int i, irq = CONFIG_BASE_IPI_IRQ;
 
 	/*
 	 * should eventually have some sort of machine
@@ -209,10 +238,18 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 	/*  Also need to register the interrupts for IPI  */
 	if (max_cpus > 1) {
-		if (request_irq(irq, handle_ipi, IRQF_TRIGGER_RISING,
+		__vmintop_globen(irq);
+		if (request_irq(irq_find_mapping(hexagon_irq_domain, irq),
+				handle_ipi, IRQF_TRIGGER_RISING,
 				"ipi_handler", NULL))
-			pr_err("Failed to request irq %d (ipi_handler)\n", irq);
+			pr_err("Failed to request hwirq %d (ipi_handler)\n", irq);
 	}
+
+#ifdef CONFIG_HEXAGON_H2
+	per_cpu(vpid, smp_processor_id()) = __vmvpid();
+#else
+	per_cpu(vpid, smp_processor_id()) = smp_processor_id();
+#endif
 }
 
 void arch_smp_send_reschedule(int cpu)

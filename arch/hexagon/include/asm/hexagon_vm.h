@@ -192,9 +192,9 @@ static inline long __vmintop_status(long i)
 	return __vmintop(hvmi_status, i, 0, 0, 0);
 }
 
-static inline long __vmintop_post(long i)
+static inline long __vmintop_post(long i, long cpu)
 {
-	return __vmintop(hvmi_post, i, 0, 0, 0);
+	return __vmintop(hvmi_post, i, cpu, 0, 0);
 }
 
 static inline long __vmintop_clear(long i)
