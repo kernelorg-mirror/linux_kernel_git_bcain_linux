@@ -10,6 +10,7 @@
 #include <asm/registers.h>
 #include <linux/irq.h>
 #include <linux/hardirq.h>
+#include <linux/irqdomain.h>
 
 /*
  * show_regs - print pt_regs structure
@@ -76,12 +77,15 @@ void show_regs(struct pt_regs *regs)
 void arch_do_IRQ(struct pt_regs *regs)
 {
 	int irq = pt_cause(regs);
+	int virq;
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	clear_ie_cached();
 
 	irq_enter();
-	generic_handle_irq(irq);
+	/*  return of zero here is an error btw  */
+	virq = irq_find_mapping(NULL, irq);
+	generic_handle_irq(virq);
 	irq_exit();
 	set_irq_regs(old_regs);
 }
