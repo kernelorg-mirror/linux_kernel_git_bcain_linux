@@ -6,72 +6,56 @@
  */
 
 #include <linux/interrupt.h>
+#include <linux/irqchip.h>
+#include <linux/irqdomain.h>
+#include <linux/of.h>
+#include <linux/of_irq.h>
+#include <linux/percpu.h>
 #include <asm/irq.h>
 #include <asm/hexagon_vm.h>
 
-static void mask_irq(struct irq_data *data)
+DEFINE_PER_CPU(long, ie_cached);
+
+/*  caching replacement for the old __vmsetie()  */
+
+long vmsetie_cached(long val)
 {
-	__vmintop_locdis((long) data->irq);
+	return __vmsetie_cached(val, this_cpu_ptr(&ie_cached));
 }
 
-static void mask_irq_num(unsigned int irq)
-{
-	__vmintop_locdis((long) irq);
-}
-
-static void unmask_irq(struct irq_data *data)
-{
-	__vmintop_locen((long) data->irq);
-}
-
-/*  This is actually all we need for handle_fasteoi_irq  */
-static void eoi_irq(struct irq_data *data)
-{
-	__vmintop_globen((long) data->irq);
-}
-
-/* Power mamangement wake call. We don't need this, however,
- * if this is absent, then an -ENXIO error is returned to the
- * msm_serial driver, and it fails to correctly initialize.
- * This is a bug in the msm_serial driver, but, for now, we
- * work around it here, by providing this bogus handler.
- * XXX FIXME!!! remove this when msm_serial is fixed.
+/*
+ * sets the ie state, but fudges the cache val because
+ * vmrte can still change ie on us; see vm_entry.S
  */
-static int set_wake(struct irq_data *data, unsigned int on)
+
+void vmsetie_rte_disable(void)
 {
-	return 0;
+	/*  the preempt_enable/disable doesn't help us  */
+	__vmsetie_cached(VM_INT_DISABLE, this_cpu_ptr(&ie_cached));
+	__this_cpu_write(ie_cached, ints_enabled(current_thread_info()->regs));
 }
 
-static struct irq_chip hexagon_irq_chip = {
-	.name		= "HEXAGON",
-	.irq_mask	= mask_irq,
-	.irq_unmask	= unmask_irq,
-	.irq_set_wake	= set_wake,
-	.irq_eoi	= eoi_irq
-};
+void vmsetie_disable(void)
+{
+	__vmsetie_cached(VM_INT_DISABLE, this_cpu_ptr(&ie_cached));
+}
 
-/**
- * The hexagon core comes with a first-level interrupt controller
- * with 32 total possible interrupts.  When the core is embedded
- * into different systems/platforms, it is typically wrapped by
- * macro cells that provide one or more second-level interrupt
- * controllers that are cascaded into one or more of the first-level
- * interrupts handled here. The precise wiring of these other
- * irqs varies from platform to platform, and are set up & configured
- * in the platform-specific files.
- *
- * The first-level interrupt controller is wrapped by the VM, which
- * virtualizes the interrupt controller for us.  It provides a very
- * simple, fast & efficient API, and so the fasteoi handler is
- * appropriate for this case.
- */
+long vmgetie_cached(void)
+{
+	return __this_cpu_read(ie_cached);
+}
+
+void load_ie_cache(void)
+{
+	__this_cpu_write(ie_cached, __vmgetie());
+}
+
+void clear_ie_cached(void)
+{
+	__this_cpu_write(ie_cached, 0);
+}
+
 void __init init_IRQ(void)
 {
-	int irq;
-
-	for (irq = 0; irq < HEXAGON_CPUINTS; irq++) {
-		mask_irq_num(irq);
-		irq_set_chip_and_handler(irq, &hexagon_irq_chip,
-						 handle_fasteoi_irq);
-	}
+	irqchip_init();
 }
