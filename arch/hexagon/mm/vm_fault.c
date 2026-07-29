@@ -13,6 +13,7 @@
 
 #include <asm/traps.h>
 #include <asm/vm_fault.h>
+#include <asm/mem-layout.h>
 #include <linux/uaccess.h>
 #include <linux/mm.h>
 #include <linux/sched/signal.h>
@@ -30,6 +31,25 @@
 #define FLT_LOAD        0
 #define FLT_STORE       1
 
+/*
+ * Kernel mappings above VMALLOC_START are created in init_mm and the
+ * caller's active pgd; other address spaces pick them up lazily, at
+ * switch_mm() via the kernel map generation, or here on first touch.
+ * Faults in interrupt context are legitimate for these addresses.
+ */
+static int vmalloc_fault(unsigned long address)
+{
+	unsigned int index = pgd_index(address);
+	pgd_t *pgd_k = init_mm.pgd + index;
+	pgd_t *pgd = current->active_mm->pgd + index;
+
+	if (pmd_none(*(pmd_t *)pgd_k))
+		return -1;
+	if (!pmd_none(*(pmd_t *)pgd))
+		return -1;	/* entry present; the fault is genuine */
+	*pgd = *pgd_k;
+	return 0;
+}
 
 /*
  * Canonical page fault handler
@@ -43,6 +63,12 @@ static void do_page_fault(unsigned long address, long cause, struct pt_regs *reg
 	vm_fault_t fault;
 	const struct exception_table_entry *fixup;
 	unsigned int flags = FAULT_FLAG_DEFAULT;
+
+	if (unlikely(!user_mode(regs) && address >= VMALLOC_START)) {
+		if (vmalloc_fault(address) == 0)
+			return;
+		goto no_context;
+	}
 
 	/*
 	 * If we're in an interrupt or have no user context,
