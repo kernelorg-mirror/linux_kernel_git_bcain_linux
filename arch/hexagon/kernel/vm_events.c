@@ -78,6 +78,8 @@ void arch_do_IRQ(struct pt_regs *regs)
 	int irq = pt_cause(regs);
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
+	clear_ie_cached();
+
 	irq_enter();
 	generic_handle_irq(irq);
 	irq_exit();
