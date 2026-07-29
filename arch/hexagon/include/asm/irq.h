@@ -6,15 +6,15 @@
 #ifndef _ASM_IRQ_H_
 #define _ASM_IRQ_H_
 
-/* Number of first-level interrupts associated with the CPU core. */
+#ifdef CONFIG_HEXAGON_H2
+#define HEXAGON_CPUINTS 160
+#else
 #define HEXAGON_CPUINTS 32
+#endif
 
 /*
  * Must define NR_IRQS before including <asm-generic/irq.h>
- * 64 == the two SIRC's, 176 == the two gpio's
- *
- * IRQ configuration is still in flux; defining this to a comfortably
- * large number.
+ * On old platform (?) 64 == the two SIRC's, 176 == the two gpio's
  */
 #define NR_IRQS 512
 
@@ -22,5 +22,16 @@
 
 struct pt_regs;
 void arch_do_IRQ(struct pt_regs *);
+void vmsetie_rte_disable(void);
+void vmsetie_disable(void);
+
+/*  First-level (hvm-pic) domain, for hwirq -> virq lookups  */
+extern struct irq_domain *hexagon_irq_domain;
+
+#include <linux/of.h>
+
+/*  H2 "pic" initialization at init_IRQ time  */
+int __init hexagon_pic_of_init(struct device_node *node,
+				struct device_node *parent);
 
 #endif
