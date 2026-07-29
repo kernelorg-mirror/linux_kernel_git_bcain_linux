@@ -16,7 +16,7 @@
 
 #include <asm-generic/pgalloc.h>
 
-extern unsigned long long kmap_generation;
+extern unsigned long kmap_generation;
 
 /*
  * Page table creation interface
@@ -40,6 +40,14 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 
 	/* Physical version is what is passed to virtual machine on switch */
 	mm->context.ptbase = __pa(pgd);
+
+	/*
+	 * The VM keys ASIDs by page table base and keeps per-ASID
+	 * TLB state cached across map switches.  If this pgd page was
+	 * previously another mm's pgd, the VM would resume that stale
+	 * ASID state, so the first switch to this mm must invalidate.
+	 */
+	mm->context.need_invalidate = 1;
 
 	return pgd;
 }
