@@ -7,6 +7,12 @@ KBUILD_DEFCONFIG = comet_defconfig
 KBUILD_CFLAGS += -G0
 LDFLAGS_vmlinux += -G0
 
+# The packetizer emits invalid encodings for some of the kernel's inline
+# assembly, so it and new-value jumps have to stay off.
+# FIXME: gate this on clang-min-version, and eventually drop it, once
+# https://github.com/llvm/llvm-project/issues/178338 is fixed and released.
+KBUILD_CFLAGS += -mllvm --disable-packetizer -mllvm -disable-nvjump
+
 # Do not use single-byte enums; these will overflow.
 KBUILD_CFLAGS += -fno-short-enums
 
