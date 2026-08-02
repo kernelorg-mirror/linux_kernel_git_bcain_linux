@@ -5,9 +5,17 @@
  * Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
  */
 
+#include <asm/mem-layout.h>	/*  for PAGE_OFFSET  */
+
+/*
+ * The kernel is linked at PAGE_OFFSET but loaded at PHYS_OFFSET, so the
+ * program headers have to carry physical addresses relative to zero and
+ * head.S relocates from there.
+ */
+#define LOAD_OFFSET PAGE_OFFSET
+
 #include <asm-generic/vmlinux.lds.h>
 #include <asm/asm-offsets.h>	/*  Most of the kernel defines are here  */
-#include <asm/mem-layout.h>	/*  except for page_offset  */
 #include <asm/cache.h>		/*  and now we're pulling cache line size  */
 #include <asm/thread_info.h>	/*  and we need THREAD_SIZE too */
 
