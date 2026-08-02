@@ -65,6 +65,13 @@ static const char *ex_name(int ex)
 		return "Precise bus error";
 	case HVM_GE_C_CACHE:
 		return "Cache error";
+	case HVM_GE_C_TLBMISSX_0:
+	case HVM_GE_C_TLBMISSX_1:
+		return "TLB miss execute";
+	case HVM_GE_C_TLBMISSR:
+		return "TLB miss read";
+	case HVM_GE_C_TLBMISSW:
+		return "TLB miss write";
 
 	case 0xdb:
 		return "Debugger trap";
@@ -333,6 +340,16 @@ void do_genex(struct pt_regs *regs)
 		break;
 	case HVM_GE_C_CACHE:
 		cache_error(regs);
+		break;
+	case HVM_GE_C_TLBMISSX_0:
+	case HVM_GE_C_TLBMISSX_1:
+		execute_protection_fault(regs);
+		break;
+	case HVM_GE_C_TLBMISSR:
+		read_protection_fault(regs);
+		break;
+	case HVM_GE_C_TLBMISSW:
+		write_protection_fault(regs);
 		break;
 	default:
 		/* Halt and catch fire */

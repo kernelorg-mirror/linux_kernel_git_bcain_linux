@@ -294,6 +294,13 @@ static inline long __vmintop_clear(long i)
 #define HVM_GE_C_WUSER	0x25
 #define HVM_GE_C_CACHE	0x28
 
+/* Extended TLB miss cause codes; earlier ones might be deprecated */
+#define HVM_GE_C_TLBMISSX_0		0x60
+#define HVM_GE_C_TLBMISSX_1		0x61
+#define HVM_GE_C_TLBMISSX_ICINVA	0x62
+#define HVM_GE_C_TLBMISSR		0x70
+#define HVM_GE_C_TLBMISSW		0x71
+
 /*
  * Cause codes for Machine Check
  */
