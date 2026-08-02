@@ -37,6 +37,7 @@
 #define HVM_TRAP1_VMVPID		20
 #define HVM_TRAP1_VMSETREGS		21
 #define HVM_TRAP1_VMGETREGS		22
+#define HVM_TRAP1_VMTIMEROP		24
 
 #ifndef __ASSEMBLY__
 
@@ -63,6 +64,18 @@ enum VM_INT_OPS {
 	hvmi_post,
 	hvmi_clear
 };
+
+enum VM_TIMER_OPS {
+	getfreq,
+	getres,
+	gettime,
+	gettimeout,
+	settimeout,
+	deltatimeout
+};
+
+/*  A timeout of "forever" tells the VM there is no deadline.  */
+#define HVM_TIMER_FOREVER	(~0ULL)
 
 enum VM_STOP_STATUS {
 	none,
@@ -95,6 +108,10 @@ void __vmstop(enum VM_STOP_STATUS);
 long __vmwait(void);
 void __vmyield(void);
 long __vmvpid(void);
+#ifdef CONFIG_HEXAGON_H2
+unsigned long long __vmtimerop(enum VM_TIMER_OPS op, unsigned long unused,
+			       unsigned long long timeout);
+#endif
 
 static inline long __vmcache_ickill(void)
 {

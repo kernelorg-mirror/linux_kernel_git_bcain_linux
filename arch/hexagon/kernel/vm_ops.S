@@ -149,3 +149,7 @@ ENTRY(__vmsetregs)
 ENTRY(__vmgetregs)
 	trap1(#HVM_TRAP1_VMGETREGS);
 	jumpr	R31;
+
+ENTRY(__vmtimerop)
+	trap1(#HVM_TRAP1_VMTIMEROP);
+	jumpr	R31;
