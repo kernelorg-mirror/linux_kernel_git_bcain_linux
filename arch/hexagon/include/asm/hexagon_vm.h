@@ -255,7 +255,7 @@ static inline long __vmintop_clear(long i)
 
 #define HVM_GE_C_BUS	0x01
 #define HVM_GE_C_XPROT	0x11
-#define HVM_GE_C_XUSER	0x14
+#define HVM_GE_C_XUSER	0x12
 #define HVM_GE_C_INVI	0x15
 #define HVM_GE_C_PRIVI	0x1B
 #define HVM_GE_C_XMAL	0x1C
