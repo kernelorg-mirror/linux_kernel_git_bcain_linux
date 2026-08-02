@@ -25,6 +25,10 @@ KBUILD_CFLAGS += -mlong-calls
 # KBUILD_LDFLAGS_MODULE += -shared
 KBUILD_CFLAGS_MODULE += -mlong-calls
 
+# The kernel is linked at a fixed address, and the GOT-relative sequences the
+# default PIC model produces are not resolvable this early in boot.
+KBUILD_CFLAGS += -fno-pic
+
 KBUILD_CFLAGS += $(cflags-y)
 KBUILD_AFLAGS += $(aflags-y)
 KBUILD_LDFLAGS += $(ldflags-y)
