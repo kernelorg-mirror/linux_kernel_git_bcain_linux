@@ -156,9 +156,14 @@ unsigned long __get_wchan(struct task_struct *p)
 int do_work_pending(struct pt_regs *regs, u32 thread_info_flags);
 int do_work_pending(struct pt_regs *regs, u32 thread_info_flags)
 {
-	if (!(thread_info_flags & _TIF_WORK_MASK)) {
+	/*
+	 * The event exit path re-reads the flags after enabling interrupts,
+	 * so arriving here with nothing set is legitimate -- the work has
+	 * been dealt with in the meantime.  Do not enable interrupts just to
+	 * find that out.
+	 */
+	if (!(thread_info_flags & _TIF_WORK_MASK))
 		return 0;
-	}  /* shortcut -- no work to be done */
 
 	local_irq_enable();
 
@@ -177,7 +182,5 @@ int do_work_pending(struct pt_regs *regs, u32 thread_info_flags)
 		return 1;
 	}
 
-	/* Should not even reach here */
-	panic("%s: bad thread_info flags 0x%08x\n", __func__,
-		thread_info_flags);
+	return 0;
 }
