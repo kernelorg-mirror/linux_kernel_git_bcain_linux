@@ -38,6 +38,13 @@ extern unsigned long	__phys_offset;
 #define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
 #define ARCH_PFN_OFFSET	PHYS_PFN_OFFSET
 
+/*
+ * The linear map head.S builds: LOWMEM_PAGES first-level entries, each
+ * covering 4MB, starting at PAGE_OFFSET.  Nothing above it is mapped.
+ */
+#define LOWMEM_PAGES			0xe0
+#define LOWMEM_SIZE			(LOWMEM_PAGES << 22)
+
 #define TASK_SIZE			(PAGE_OFFSET)
 
 /*  not sure how these are used yet  */
