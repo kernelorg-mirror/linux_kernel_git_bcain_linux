@@ -132,6 +132,19 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
+config HEXAGON_BASE_IPI_IRQ
+	int "Base IPI IRQ" if SMP
+	default 0
+	help
+	  The first of the NR_CPUS hardware interrupts used to send IPIs;
+	  each CPU takes the next one up.  The H2 hypervisor reserves the
+	  low range of interrupts for per-CPU use, which is what makes them
+	  usable this way.
+
+	  The range must not overlap the interrupts devices claim.  On the
+	  QEMU virt machine the timer takes 12, so anything from 0 leaves
+	  room for the four CPUs that machine provides.
+
 source "kernel/Kconfig.hz"
 
 endmenu

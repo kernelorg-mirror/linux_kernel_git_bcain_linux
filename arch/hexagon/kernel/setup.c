@@ -20,6 +20,9 @@
 #include <asm/vm_mmu.h>
 #include <asm/prom.h>
 #include <asm/time.h>
+#include <linux/percpu.h>
+
+DECLARE_PER_CPU(u32, vpid);
 
 char cmd_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
@@ -109,6 +112,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	seq_printf(m, "BogoMips\t: %lu.%02lu\n",
 		(loops_per_jiffy * HZ) / 500000,
 		((loops_per_jiffy * HZ) / 5000) % 100);
+	seq_printf(m, "VPID\t\t: 0x%08x\n", per_cpu(vpid, cpu));
 	seq_printf(m, "\n");
 	return 0;
 }
