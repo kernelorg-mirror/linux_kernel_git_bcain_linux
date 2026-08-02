@@ -38,6 +38,7 @@ config HEXAGON
 	select GENERIC_CPU_DEVICES
 	select ARCH_WANT_LD_ORPHAN_WARN
 	select TRACE_IRQFLAGS_SUPPORT
+	select IRQ_DOMAIN
 	help
 	  Qualcomm Hexagon is a processor architecture designed for high
 	  performance and low power across a wide variety of applications.

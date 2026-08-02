@@ -10,6 +10,7 @@
 #include <asm/registers.h>
 #include <linux/irq.h>
 #include <linux/hardirq.h>
+#include <linux/irqdomain.h>
 
 /*
  * show_regs - print pt_regs structure
@@ -75,13 +76,14 @@ void show_regs(struct pt_regs *regs)
 
 void arch_do_IRQ(struct pt_regs *regs)
 {
-	int irq = pt_cause(regs);
+	unsigned long hwirq = pt_cause(regs);
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	clear_ie_cached();
 
 	irq_enter();
-	generic_handle_irq(irq);
+	if (generic_handle_domain_irq(hexagon_irq_domain, hwirq))
+		pr_err_ratelimited("unmapped interrupt %lu\n", hwirq);
 	irq_exit();
 	set_irq_regs(old_regs);
 }
