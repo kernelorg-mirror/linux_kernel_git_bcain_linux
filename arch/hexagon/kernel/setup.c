@@ -24,8 +24,6 @@
 char cmd_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 
-int on_simulator;
-
 void calibrate_delay(void)
 {
 	loops_per_jiffy = thread_freq_mhz * 1000000 / HZ;
@@ -54,16 +52,6 @@ void __init setup_arch(char **cmdline_p)
 	__vmsetvec(_K_VM_event_vector);
 
 	printk(KERN_INFO "PHYS_OFFSET=0x%08lx\n", PHYS_OFFSET);
-
-	/*
-	 * Simulator has a few differences from the hardware.
-	 * For now, check uninitialized-but-mapped memory
-	 * prior to invoking setup_arch_memory().
-	 */
-	if (*(int *)((unsigned long)_end + 8) == 0x1f1f1f1f)
-		on_simulator = 1;
-	else
-		on_simulator = 0;
 
 	if (p[0] != '\0')
 		strscpy(boot_command_line, p, COMMAND_LINE_SIZE);
