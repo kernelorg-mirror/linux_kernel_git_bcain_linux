@@ -10,13 +10,18 @@
 
 #ifdef __KERNEL__
 
+#include <asm/page.h>
+
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #include <asm/registers.h>
-#include <asm/page.h>
 #endif
 
-#define THREAD_SHIFT		12
+/*  If the shift is less than the kernel page size, use the page size.  */
+
+#define ARCH_THREAD_SHIFT	13
+#define THREAD_SHIFT		(PAGE_SHIFT > ARCH_THREAD_SHIFT ? \
+				 PAGE_SHIFT : ARCH_THREAD_SHIFT)
 #define THREAD_SIZE		(1<<THREAD_SHIFT)
 #define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
 

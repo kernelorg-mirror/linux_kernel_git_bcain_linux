@@ -21,21 +21,23 @@ See asm-generic/vmlinux.lds.h for expansion of some of these macros.
 See asm-generic/sections.h for seemingly required labels.
 */
 
+#ifndef PAGE_SIZE
 #define PAGE_SIZE _PAGE_SIZE
+#endif
 
 SECTIONS
 {
-	. = PAGE_OFFSET;
+	. = LOAD_OFFSET;
 
 	__init_begin = .;
 	HEAD_TEXT_SECTION
 	INIT_TEXT_SECTION(PAGE_SIZE)
-	PERCPU_SECTION(L1_CACHE_BYTES)
+
 	__init_end = .;
 
         . = ALIGN(_PAGE_SIZE);
 	_stext = .;
-	.text : AT(ADDR(.text)) {
+	.text : AT(ADDR(.text) - LOAD_OFFSET) {
 		_text = .;
 		TEXT_TEXT
 		IRQENTRY_TEXT
@@ -46,6 +48,18 @@ SECTIONS
 		*(.fixup)
 	}
 	_etext = .;
+
+	/*
+	 * The percpu section has to start on a page boundary, so any orphan
+	 * data section that would otherwise be placed between here and there
+	 * has to be given a home first -- ARCH_WANT_LD_ORPHAN_WARN makes the
+	 * linker say so.  .modinfo is the only one.
+	 */
+	.modinfo : AT(ADDR(.modinfo) - LOAD_OFFSET) {
+		*(.modinfo)
+	}
+
+	PERCPU_SECTION(PAGE_SIZE)
 
 	INIT_DATA_SECTION(PAGE_SIZE)
 
