@@ -75,11 +75,18 @@ static void __init paging_init(void)
 	init_mm.context.ptbase = __pa(init_mm.pgd);
 }
 
+/*
+ * The architecture has no way to map part of the linear map uncached on
+ * demand, so it selects DMA_GLOBAL_POOL and dma_alloc_coherent() is served
+ * from a carve-out whose first-level entries are rewritten uncached below.
+ * It cannot be zero: dma_init_global_coherent() rejects an empty region,
+ * and every coherent allocation would then fail.
+ */
 #ifndef DMA_RESERVE
 #define DMA_RESERVE		(4)
 #endif
 
-#define DMA_CHUNKSIZE		(1<<22)
+#define DMA_CHUNKSIZE		SZ_4M
 #define DMA_RESERVED_BYTES	(DMA_RESERVE * DMA_CHUNKSIZE)
 
 /*
@@ -148,8 +155,6 @@ void __init setup_arch_memory(void)
 
 	/*  this is pointer arithmetic; each entry covers 4MB  */
 	segtable = segtable + (PAGE_OFFSET >> 22);
-
-	/*  this actually only goes to the end of the first gig  */
 	segtable_end = segtable + (1<<(30-22));
 
 	/*
@@ -176,15 +181,6 @@ void __init setup_arch_memory(void)
 
 	printk(KERN_INFO "segtable = %p (should be equal to _K_io_map)\n",
 		segtable);
-
-#if 0
-	/*  Other half of the early device table from vm_init_segtable. */
-	printk(KERN_INFO "&_K_init_devicetable = 0x%08x\n",
-		(unsigned long) _K_init_devicetable-PAGE_OFFSET);
-	*segtable = ((u32) (unsigned long) _K_init_devicetable-PAGE_OFFSET) |
-		__HVM_PDE_S_4KB;
-	printk(KERN_INFO "*segtable = 0x%08x\n", *segtable);
-#endif
 
 	/*
 	 *  The bootmem allocator seemingly just lives to feed memory
