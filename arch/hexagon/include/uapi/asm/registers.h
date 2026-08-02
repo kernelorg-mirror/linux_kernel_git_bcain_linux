@@ -187,7 +187,7 @@ struct pt_regs {
 		long long int r3130;
 	};
 	/* VM dispatch pushes event record onto stack - we can build on it */
-	struct hvm_event_record hvmer;
+	struct hvm_event_record hvmer __attribute__((aligned(8)));
 };
 
 /* Defines to conveniently access the values  */
