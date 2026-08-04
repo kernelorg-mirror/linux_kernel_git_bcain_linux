@@ -23,8 +23,10 @@
  */
 #define bootmem_startpg (PFN_UP(((unsigned long) _end) - PAGE_OFFSET + PHYS_OFFSET))
 
-unsigned long bootmem_lastpg;	/*  Should be set by platform code  */
 unsigned long __phys_offset;	/*  physical kernel offset >> 12  */
+
+/*  Default RAM size; the "mem=" parameter overrides it.  */
+unsigned long bootmem_lastpg = PFN_DOWN(SZ_256M);
 
 /*  Set as variable to limit PMD copies  */
 int max_kernel_seg = 0x303;
