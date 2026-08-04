@@ -21,6 +21,7 @@
 
 #include <asm/time.h>    /*  timer_interrupt  */
 #include <asm/hexagon_vm.h>
+#include <asm/scs.h>
 
 DEFINE_PER_CPU(u32, ipi_irq);
 
@@ -127,7 +128,7 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
  * to point to current thread info
  */
 
-static void start_secondary(void)
+static void __noscs start_secondary(void)
 {
 	unsigned long thread_ptr;
 	unsigned int cpu, irq;
@@ -145,6 +146,13 @@ static void start_secondary(void)
 		:
 		: "r" (thread_ptr)
 	);
+
+	/*
+	 * Hand this CPU the idle task's shadow call stack before making any
+	 * call at all -- every one of them is instrumented.  This function is
+	 * __noscs so that its own prologue does not run first.
+	 */
+	scs_load_thread_info((struct thread_info *)thread_ptr);
 
 	cpu = smp_processor_id();
 

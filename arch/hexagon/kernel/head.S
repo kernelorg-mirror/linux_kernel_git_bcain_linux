@@ -256,6 +256,16 @@ __head_s_vaddr_target:
 	/*  Fixme:  THREADINFO_REG can't be R2 because of that memset thing. */
 	{r29 = add(r29,r0); THREADINFO_REG = r29; }
 
+#ifdef CONFIG_SHADOW_CALL_STACK
+	/*
+	 * Point the shadow call stack pointer at the boot task's shadow
+	 * stack.  It has to be live before the first instrumented call
+	 * below, and matches INIT_SCS in <asm/thread_info.h>.  The array
+	 * has an initialiser, so it survives the bss zeroing that follows.
+	 */
+	SCSP_REG = ##init_shadow_call_stack;
+#endif
+
 	/*  Hack:  zero bss; */
 	{ r0.L = #LO(__bss_start);  r1 = #0; r2.l = #LO(__bss_stop); }
 	{ r0.H = #HI(__bss_start);           r2.h = #HI(__bss_stop); }

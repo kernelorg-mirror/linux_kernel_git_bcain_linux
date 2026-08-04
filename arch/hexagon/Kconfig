@@ -10,6 +10,7 @@ config HEXAGON
 	select ARCH_HAS_SYSCALL_WRAPPER
 	select ARCH_SUPPORTS_CFI
 	select ARCH_USES_CFI_TRAPS if CFI
+	select ARCH_SUPPORTS_SHADOW_CALL_STACK
 	select DMA_GLOBAL_POOL
 	# Other pending projects/to-do items.
 	# select HAVE_REGS_AND_STACK_ACCESS_API

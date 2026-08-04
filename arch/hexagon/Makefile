@@ -50,6 +50,16 @@ TIR_NAME := r19
 KBUILD_CFLAGS += -ffixed-$(TIR_NAME) -DTHREADINFO_REG=$(TIR_NAME) -D__linux__
 KBUILD_AFLAGS += -DTHREADINFO_REG=$(TIR_NAME)
 
+# Shadow call stack pointer register.  r18 is clang's default choice for
+# Hexagon, but name it explicitly: the value has to be reserved, and the
+# assembly in head.S/vm_entry.S/vm_switch.S has to agree with the compiler.
+# r19 is not available -- it is the thread-info register above.
+ifdef CONFIG_SHADOW_CALL_STACK
+SCSP_REG := r18
+KBUILD_CFLAGS += -mscs-reg=$(SCSP_REG) -ffixed-$(SCSP_REG) -DSCSP_REG=$(SCSP_REG)
+KBUILD_AFLAGS += -DSCSP_REG=$(SCSP_REG)
+endif
+
 # Disable HexagonConstExtenders pass for LLVM versions prior to 19.1.0
 # https://github.com/llvm/llvm-project/issues/99714
 ifneq ($(call clang-min-version, 190100),y)

@@ -10,6 +10,7 @@
 #include <asm/hexagon_vm.h>
 #include <asm/thread_info.h>
 #include <asm/notify.h>
+#include <asm/scs.h>
 
 /*
  * Entry into guest-mode Linux under Hexagon Virtual Machine.
@@ -155,6 +156,30 @@
 
 event_dispatch:
 	save_pt_regs()
+
+#ifdef CONFIG_SHADOW_CALL_STACK
+	/*
+	 * Entering from user mode, the shadow call stack pointer holds
+	 * whatever userspace left in the register, so re-point it at this
+	 * task's kernel shadow stack.  thread_info.scs_sp is right for that:
+	 * every kernel frame was unwound before we last returned to user
+	 * mode, so it still reads back the base recorded at switch time.
+	 *
+	 * A nested event taken in kernel mode must keep the running pointer:
+	 * the interrupted kernel frames are still live on the shadow stack,
+	 * and thread_info.scs_sp is stale until the next __switch_to.
+	 *
+	 * R2 is scratch here -- save_pt_regs() has already spilled it.
+	 */
+	R2 = memw(R29 + #_PT_ER_VMEST);
+	{
+		P0 = tstbit(R2, #HVM_VMEST_UM_SFT);
+		if (!P0.new) jump:nt 1f;
+	}
+	scs_load_current
+1:
+#endif
+
 	/*
 	 * Note:  every event handler needs to clear the IE cache bit,
 	 * preferably early.
