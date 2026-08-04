@@ -87,15 +87,11 @@ typedef unsigned long elf_fpregset_t;
  * Bypass the whole "regsets" thing for now and use the define.
  */
 
-#if CONFIG_HEXAGON_ARCH_VERSION >= 4
 #define CS_COPYREGS(DEST,REGS) \
 do {\
 	DEST.cs0 = REGS->cs0;\
 	DEST.cs1 = REGS->cs1;\
 } while (0)
-#else
-#define CS_COPYREGS(DEST,REGS)
-#endif
 
 #define ELF_CORE_COPY_REGS(DEST, REGS)	\
 do {					\
