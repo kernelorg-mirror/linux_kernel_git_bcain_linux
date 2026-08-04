@@ -17,6 +17,8 @@
 
 	__INIT
 ENTRY(stext)
+	R27 = R0  /*  DTB phys addr low, from bootloader R0  */
+	R28 = R1  /*  DTB phys addr high, save before clobbered  */
 	/*
 	 * VMM will already have set up true vector page, MMU, etc.
 	 * To set up initial kernel identity map, we have to pass
@@ -213,6 +215,11 @@ __head_s_vaddr_target:
 	r2 = sub(r2,r0);
 	call memset;
 
+	R0.H = #HI(boot_dtb_phys);
+	R0.L = #LO(boot_dtb_phys);
+	memw(R0) = R27;     //  save DTB phys addr low
+	memw(R0+#4) = R28;  //  save DTB phys addr high
+
 	/*  Set PHYS_OFFSET; should be in R25 */
 #ifdef CONFIG_HEXAGON_PHYS_OFFSET
 	r0.l = #LO(__phys_offset);
@@ -228,7 +235,3 @@ __head_s_vaddr_target:
 	 */
 1:
 	jump 1b
-
-.p2align PAGE_SHIFT
-ENTRY(external_cmdline_buffer)
-        .fill _PAGE_SIZE,1,0

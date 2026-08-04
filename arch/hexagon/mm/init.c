@@ -8,6 +8,8 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/memblock.h>
+#include <linux/of_fdt.h>
+#include <linux/sizes.h>
 #include <asm/atomic.h>
 #include <linux/highmem.h>
 #include <asm/tlb.h>
@@ -134,6 +136,15 @@ void __init setup_arch_memory(void)
 	/* Reserve kernel text/data/bss */
 	memblock_reserve(PHYS_OFFSET,
 			 (bootmem_startpg - ARCH_PFN_OFFSET) << PAGE_SHIFT);
+
+	/*
+	 * The DTB sits in our RAM until it is unflattened, and the ranges it
+	 * describes as reserved belong to firmware for as long as we run.
+	 * Keep the allocator away from both.
+	 */
+	early_init_fdt_reserve_self();
+	early_init_fdt_scan_reserved_mem();
+
 	/*
 	 * Reserve the top DMA_RESERVE bytes of RAM for DMA (uncached)
 	 * memory allocation
