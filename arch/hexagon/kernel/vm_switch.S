@@ -6,6 +6,7 @@
  */
 
 #include <asm/asm-offsets.h>
+#include <asm/scs.h>
 
 .text
 
@@ -37,6 +38,14 @@
  */
 
 __switch_to:
+	/*
+	 * Stash "prev"'s shadow call stack pointer while THREADINFO_REG still
+	 * points at it.  The register itself also rides along in the switch
+	 * stack below (it is callee-saved), but the copy in thread_info is
+	 * what a freshly forked task and a kernel entry from user mode pick
+	 * up, so it has to be kept current.
+	 */
+	scs_save_current
 	/*
 	 * Push callee-saves onto "prev" stack.
 	 * Here, we're sneaky because the LR and FP
@@ -75,6 +84,13 @@ __switch_to:
 	    THREADINFO_REG = memw(R1 + #_TASK_THREAD_INFO);
 	    R31:30 = memd(R29+#_SWITCH_FP);
 	}
+	/*
+	 * THREADINFO_REG now names "next", so this picks up its shadow call
+	 * stack pointer.  For a task that has run before this reloads what
+	 * the switch stack just restored; for one that has not, it is the
+	 * only thing that puts a valid pointer in the register.
+	 */
+	scs_load_current
 	{
 	    R29 = add(R29,#_SWITCH_STACK_SIZE);
 	    jumpr R31;

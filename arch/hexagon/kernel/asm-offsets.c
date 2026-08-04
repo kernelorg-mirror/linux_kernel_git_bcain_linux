@@ -69,6 +69,10 @@ int main(void)
 	OFFSET(_THREAD_INFO_FLAGS, thread_info, flags);
 	OFFSET(_THREAD_INFO_PT_REGS, thread_info, regs);
 	OFFSET(_THREAD_INFO_SP, thread_info, sp);
+#ifdef CONFIG_SHADOW_CALL_STACK
+	OFFSET(_THREAD_INFO_SCS_SP, thread_info, scs_sp);
+#endif
+
 	DEFINE(_THREAD_SIZE, THREAD_SIZE);
 	BLANK();
 

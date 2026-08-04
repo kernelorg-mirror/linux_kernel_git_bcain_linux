@@ -45,6 +45,10 @@ struct thread_info {
 	/* Points to the current pt_regs frame  */
 	struct pt_regs		*regs;
 	struct extinfo		extensions;
+#ifdef CONFIG_SHADOW_CALL_STACK
+	void			*scs_base;
+	void			*scs_sp;
+#endif
 	/*
 	 * saved kernel sp at switch_to time;
 	 * not sure if this is used (it's not in the VM model it seems;
@@ -61,6 +65,14 @@ struct thread_info {
 
 #ifndef __ASSEMBLY__
 
+#ifdef CONFIG_SHADOW_CALL_STACK
+#define INIT_SCS				\
+	.scs_base	= init_shadow_call_stack, \
+	.scs_sp		= init_shadow_call_stack,
+#else
+#define INIT_SCS
+#endif
+
 #define INIT_THREAD_INFO(tsk)                   \
 {                                               \
 	.task           = &tsk,                 \
@@ -69,6 +81,7 @@ struct thread_info {
 	.preempt_count  = 1,                    \
 	.sp = 0,				\
 	.regs = NULL,			\
+	INIT_SCS				\
 }
 
 /* Tacky preprocessor trickery */
