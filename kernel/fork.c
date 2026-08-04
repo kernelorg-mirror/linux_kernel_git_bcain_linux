@@ -935,10 +935,6 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 #endif
 	account_kernel_stack(tsk, 1);
 
-	err = scs_prepare(tsk, node);
-	if (err)
-		goto free_stack;
-
 #ifdef CONFIG_SECCOMP
 	/*
 	 * We must handle setting up seccomp filters once we're under
@@ -952,6 +948,18 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	RCU_INIT_POINTER(tsk->exec_state, NULL);
 
 	setup_thread_stack(tsk, orig);
+
+	/*
+	 * Must run after setup_thread_stack(): on architectures that keep
+	 * thread_info in the stack (!CONFIG_THREAD_INFO_IN_TASK) that copies
+	 * orig's thread_info wholesale over tsk's, which would clobber the
+	 * scs_base/scs_sp this records and leave the child sharing -- and
+	 * corrupting -- its parent's shadow call stack.
+	 */
+	err = scs_prepare(tsk, node);
+	if (err)
+		goto free_stack;
+
 	clear_user_return_notifier(tsk);
 	clear_tsk_need_resched(tsk);
 	set_task_stack_end_magic(tsk);
