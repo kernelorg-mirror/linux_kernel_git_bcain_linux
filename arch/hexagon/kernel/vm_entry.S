@@ -153,7 +153,14 @@
 
 event_dispatch:
 	save_pt_regs()
-	callr	r1
+	/*
+	 * Note:  every event handler needs to clear the IE cache bit,
+	 * preferably early.
+	 */
+	{
+		callr	r1
+		R17.H = #HI(vmsetie_rte_disable);
+	}
 
 	/*
 	 * Coming back from the C-world, our thread info pointer
@@ -166,8 +173,9 @@ event_dispatch:
 	 */
 
 #ifdef CONFIG_PREEMPTION
-	R0 = #VM_INT_DISABLE
-	trap1(#HVM_TRAP1_VMSETIE)
+	R16.L = #LO(vmsetie_disable);
+	R16.H = #HI(vmsetie_disable);
+	callr R16
 #endif
 
 	/*  "Nested control path" -- if the previous mode was kernel  */
@@ -176,40 +184,46 @@ event_dispatch:
 		R26.L = #LO(do_work_pending);
 	}
 	{
+		R16.L = #LO(vmsetie_disable);
+		R17.L = #LO(vmsetie_rte_disable);
+	}
+	{
 		P0 = tstbit(R0, #HVM_VMEST_UM_SFT);
 		if (!P0.new) jump:nt restore_all;
 		R26.H = #HI(do_work_pending);
-		R0 = #VM_INT_DISABLE;
+		R16.H = #HI(vmsetie_disable);
 	}
 
 	/*
 	 * Check also the return from fork/system call, normally coming back from
 	 * user mode
 	 *
-	 * R26 needs to have do_work_pending, and R0 should have VM_INT_DISABLE
+	 * R26 needs to have do_work_pending, and R16 should have vmsetie_disable
+	 * And R17 might need to be reloaded with vmsetie_rte_disable in the fork
+	 * case.
 	 */
 
 check_work_pending:
 	/*  Disable interrupts while checking TIF  */
-	trap1(#HVM_TRAP1_VMSETIE)
+	callr R16
+
 	{
 		R0 = R29;  /*  regs should still be at top of stack  */
 		R1 = memw(THREADINFO_REG + #_THREAD_INFO_FLAGS);
 		callr R26;
+		R17.H = #HI(vmsetie_rte_disable);
 	}
 
 	{
 		P0 = cmp.eq(R0, #0); if (!P0.new) jump:nt check_work_pending;
-		R0 = #VM_INT_DISABLE;
+		R17.L = #LO(vmsetie_rte_disable);
 	}
 
 restore_all:
 	/*
 	 * Disable interrupts, if they weren't already, before reg restore.
-	 * R0 gets preloaded with #VM_INT_DISABLE before we get here.
 	 */
-	trap1(#HVM_TRAP1_VMSETIE)
-
+	callr R17
 	/*  do the setregs here for VM 0.5  */
 	/*  R29 here should already be pointing at pt_regs  */
 	{
@@ -254,11 +268,12 @@ ret_from_fork:
 	{
 		call schedule_tail
 		R26.H = #HI(do_work_pending);
+		R16.H = #HI(vmsetie_disable);
 	}
 	{
 		P0 = cmp.eq(R24, #0);
 		R26.L = #LO(do_work_pending);
-		R0 = #VM_INT_DISABLE;
+		R16.L = #LO(vmsetie_disable);
 	}
 	if (P0) jump check_work_pending
 	{
@@ -267,5 +282,4 @@ ret_from_fork:
 	}
 	{
 		jump check_work_pending
-		R0 = #VM_INT_DISABLE;
 	}

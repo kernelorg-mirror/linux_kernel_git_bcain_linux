@@ -159,6 +159,8 @@ static void start_secondary(void)
 
 	set_cpu_online(cpu, true);
 
+	load_ie_cache();
+
 	local_irq_enable();
 
 	cpu_startup_entry(CPUHP_AP_ONLINE_IDLE);

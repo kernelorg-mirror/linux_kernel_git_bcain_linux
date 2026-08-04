@@ -25,9 +25,72 @@ ENTRY(__vmsetvec)
 	trap1(#HVM_TRAP1_VMSETVEC);
 	jumpr	R31;
 
-ENTRY(__vmsetie)
+/*
+ * long __vmsetie_cached(long newval, long *cache)
+ *
+ * Set the VM's interrupt-enable state and this CPU's cached copy of it
+ * together, and return the previous state.  The two must not be allowed to
+ * disagree, so the cache is updated under a memw_locked reservation: an
+ * interrupt taken in the middle of the sequence breaks the reservation and
+ * the update is retried.
+ *
+ * R16 holds the new value and R17 the address of the cache throughout; both
+ * are callee-saved, so they survive the hypercall.
+ */
+ENTRY(__vmsetie_cached)
+	{
+	  allocframe(#8);
+	  memd(SP+#-16) = R17:16;
+	  R17:16 = R1:0;
+	}
+.Lretry:
+	r2 = memw_locked(r17);
+	{
+	  p0 = cmp.eq(r2, r16);
+	  if (p0.new) jump:t .Lnochange;
+	}
+	{
+	  p0 = cmp.eq(r2, #0);
+	  if (!p0.new) jump:t .Lints_were_enabled;
+	}
+.Lints_were_disabled:	/* 0->1 */
+	/*
+	 * Interrupts are currently off, so nothing but the hypervisor can
+	 * have interrupted us -- and that only costs us the reservation.
+	 */
+	memw_locked(r17, p0) = r16;
+	if (!p0) jump .Lretry;
 	trap1(#HVM_TRAP1_VMSETIE);
-	jumpr	R31;
+	jump .Lout;			/* R0 already holds the old value */
+.Lints_were_enabled:	/* 1->0 */
+	/*
+	 * The old value is already in R0, which is just as well: the hypercall
+	 * is free to trample every caller-saved register.
+	 */
+	trap1(#HVM_TRAP1_VMSETIE);
+	/*
+	 * Interrupts are off from here on, so whatever raced with us has
+	 * already run.  Force the cache to the value we just installed,
+	 * retrying only for a spontaneously lost reservation.
+	 */
+.Lforce_change:
+	memw_locked(r17, p0) = r16;
+	if (p0) jump .Lout;
+	r2 = memw_locked(r17);
+	jump .Lforce_change;
+.Lnochange:
+	/*
+	 * The cache already reads back as the requested value, but a racing
+	 * update may still be holding a reservation on it; take the store
+	 * anyway so that it loses and retries against the settled value.
+	 */
+	memw_locked(r17, p0) = r16;
+	if (!p0) jump .Lretry
+.Lout:
+	{
+	  R17:16 = memd(SP+#0);
+	  dealloc_return;
+	}
 
 ENTRY(__vmgetie)
 	trap1(#HVM_TRAP1_VMGETIE);

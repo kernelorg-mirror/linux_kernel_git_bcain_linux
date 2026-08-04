@@ -6,6 +6,7 @@
  */
 
 #include <linux/dma-mapping.h>
+#include <linux/export.h>
 #include <asm/hexagon_vm.h>
 #include <asm/io.h>
 #include <linux/uaccess.h>
@@ -15,7 +16,6 @@ EXPORT_SYMBOL(__clear_user_hexagon);
 EXPORT_SYMBOL(raw_copy_from_user);
 EXPORT_SYMBOL(raw_copy_to_user);
 EXPORT_SYMBOL(__vmgetie);
-EXPORT_SYMBOL(__vmsetie);
 EXPORT_SYMBOL(__vmyield);
 EXPORT_SYMBOL(memcpy);
 EXPORT_SYMBOL(memset);

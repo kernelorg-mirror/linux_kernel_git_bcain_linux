@@ -69,7 +69,13 @@ extern void _K_VM_event_vector(void);
 
 void __vmrte(void);
 long __vmsetvec(void *);
-long __vmsetie(long);
+
+void load_ie_cache(void);
+long vmgetie_cached(void);
+long vmsetie_cached(long newval);
+long __vmsetie_cached(long newval, long *cache);
+void clear_ie_cached(void);
+
 long __vmgetie(void);
 long __vmintop(enum VM_INT_OPS, long, long, long, long);
 long __vmclrmap(void *, unsigned long);

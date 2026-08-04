@@ -5,73 +5,69 @@
  * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
  */
 
+#include <linux/export.h>
 #include <linux/interrupt.h>
+#include <linux/irqchip.h>
+#include <linux/irqdomain.h>
+#include <linux/of.h>
+#include <linux/of_irq.h>
+#include <linux/percpu.h>
 #include <asm/irq.h>
 #include <asm/hexagon_vm.h>
 
-static void mask_irq(struct irq_data *data)
-{
-	__vmintop_locdis((long) data->irq);
-}
+DEFINE_PER_CPU(long, ie_cached);
 
-static void mask_irq_num(unsigned int irq)
-{
-	__vmintop_locdis((long) irq);
-}
-
-static void unmask_irq(struct irq_data *data)
-{
-	__vmintop_locen((long) data->irq);
-}
-
-/*  This is actually all we need for handle_fasteoi_irq  */
-static void eoi_irq(struct irq_data *data)
-{
-	__vmintop_globen((long) data->irq);
-}
-
-/* Power mamangement wake call. We don't need this, however,
- * if this is absent, then an -ENXIO error is returned to the
- * msm_serial driver, and it fails to correctly initialize.
- * This is a bug in the msm_serial driver, but, for now, we
- * work around it here, by providing this bogus handler.
- * XXX FIXME!!! remove this when msm_serial is fixed.
+/*
+ * Caching replacement for the old __vmsetie().  Every local_irq_*() goes
+ * through here, so the hypercall is only made when the state actually
+ * changes.
  */
-static int set_wake(struct irq_data *data, unsigned int on)
+long vmsetie_cached(long val)
 {
-	return 0;
+	return __vmsetie_cached(val, this_cpu_ptr(&ie_cached));
+}
+EXPORT_SYMBOL(vmsetie_cached);
+
+/*
+ * Disable interrupts on the way to a vmrte, which restores the interrupt
+ * state from the event record; leave the cache holding what vmrte is about
+ * to install rather than what we just set.
+ */
+void vmsetie_rte_disable(void)
+{
+	__vmsetie_cached(VM_INT_DISABLE, this_cpu_ptr(&ie_cached));
+	__this_cpu_write(ie_cached, ints_enabled(current_thread_info()->regs));
 }
 
-static struct irq_chip hexagon_irq_chip = {
-	.name		= "HEXAGON",
-	.irq_mask	= mask_irq,
-	.irq_unmask	= unmask_irq,
-	.irq_set_wake	= set_wake,
-	.irq_eoi	= eoi_irq
-};
+void vmsetie_disable(void)
+{
+	__vmsetie_cached(VM_INT_DISABLE, this_cpu_ptr(&ie_cached));
+}
 
-/**
- * The hexagon core comes with a first-level interrupt controller
- * with 32 total possible interrupts.  When the core is embedded
- * into different systems/platforms, it is typically wrapped by
- * macro cells that provide one or more second-level interrupt
- * controllers that are cascaded into one or more of the first-level
- * interrupts handled here. The precise wiring of these other
- * irqs varies from platform to platform, and are set up & configured
- * in the platform-specific files.
- *
- * The first-level interrupt controller is wrapped by the VM, which
- * virtualizes the interrupt controller for us.  It provides a very
- * simple, fast & efficient API, and so the fasteoi handler is
- * appropriate for this case.
+long vmgetie_cached(void)
+{
+	return __this_cpu_read(ie_cached);
+}
+EXPORT_SYMBOL(vmgetie_cached);
+
+/*  Resynchronize the cache with the VM, for a CPU that has just come up.  */
+void load_ie_cache(void)
+{
+	__this_cpu_write(ie_cached, __vmgetie());
+}
+
+/*
+ * The VM disables guest interrupts when it delivers an event, so every
+ * event handler has to call this before anything reads or updates the
+ * cache -- otherwise a later local_irq_enable() sees no change to make
+ * and the hypercall is skipped.
  */
+void clear_ie_cached(void)
+{
+	__this_cpu_write(ie_cached, 0);
+}
+
 void __init init_IRQ(void)
 {
-	int irq;
-
-	for (irq = 0; irq < HEXAGON_CPUINTS; irq++) {
-		mask_irq_num(irq);
-		irq_set_chip_and_handler(irq, &hexagon_irq_chip,
-						 handle_fasteoi_irq);
-	}
+	irqchip_init();
 }
