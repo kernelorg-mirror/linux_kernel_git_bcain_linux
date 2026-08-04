@@ -96,6 +96,18 @@ config CMDLINE
 	  minimum, you should specify the memory size and the root device
 	  (e.g., mem=64M root=/dev/nfs).
 
+config HEXAGON_H2
+	bool "H2 hypervisor interface"
+	help
+	  The H2 hypervisor revises the Hexagon VM call ABI: vmnewmap takes a
+	  translation type and a TLB-invalidate flag, vmstart takes a relative
+	  priority, vmstop takes a stop status, and timer services move from
+	  the fixed pcycle counter to the vmtimerop hypercall.  It also
+	  presents 160 first-level interrupts rather than 32.
+
+	  Say Y if the kernel will run under an H2 hypervisor.  A guest built
+	  for one interface cannot boot on the other.
+
 config SMP
 	bool "Multi-Processing support"
 	help

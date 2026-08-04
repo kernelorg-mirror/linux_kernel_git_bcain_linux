@@ -105,7 +105,6 @@ ENTRY(__vmclrmap)
 	jumpr	R31;
 
 ENTRY(__vmnewmap)
-	r1 = #VM_NEWMAP_TYPE_PGTABLES;
 	trap1(#HVM_TRAP1_VMNEWMAP);
 	jumpr	R31;
 
