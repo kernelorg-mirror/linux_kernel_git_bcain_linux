@@ -15,6 +15,7 @@ else
 obj-y += time.o
 endif
 
+obj-$(CONFIG_CFI)     += cfi.o
 obj-$(CONFIG_KGDB)    += kgdb.o
 obj-$(CONFIG_HEXAGON_PMU) += perf_event.o
 obj-$(CONFIG_HEXAGON_H2_INFO) += h2info.o
