@@ -85,6 +85,19 @@ choice
 	prompt "System type"
 	default HEXAGON_COMET
 
+config HEXAGON_QEMU
+	bool "QEMU virt machine"
+	select HEXAGON_PHYS_OFFSET
+	select HEXAGON_H2
+	select ARM_AMBA
+	help
+	  Support for the "virt" machine QEMU emulates for hexagon.  It runs
+	  an H2 hypervisor, describes itself with a device tree passed in
+	  R1:0, has RAM at 0xa0000000, and provides a PL011 console and
+	  virtio-mmio devices.
+
+	  Say Y here to boot the kernel under qemu-system-hexagon -M virt.
+
 config HEXAGON_COMET
 	bool "Comet Board"
 	help
