@@ -30,44 +30,28 @@
 #include <asm/mman.h>
 #include <asm/registers.h>
 
-asmlinkage int sys_mmap(unsigned long addr, size_t len,
-			unsigned long prot, unsigned long flags,
-			unsigned long fd, off_t off);
-asmlinkage long sys_mmap2(unsigned long addr, size_t len,
-			unsigned long prot, unsigned long flags,
-			unsigned long fd, unsigned long pgoff);
-
 //  I think this might be deprecated.
 
-asmlinkage int sys_mmap(unsigned long addr, size_t len,
-			unsigned long prot, unsigned long flags,
-			unsigned long fd, off_t off)
+SYSCALL_DEFINE6(mmap, unsigned long, addr, size_t, len,
+		unsigned long, prot, unsigned long, flags,
+		unsigned long, fd, off_t, off)
 {
-	int retval = -EINVAL;
-
 	if (off & ~PAGE_MASK)
-		goto out;
+		return -EINVAL;
 
-	retval = sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
-out:
-	return retval;
+	return ksys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
 }
 
 unsigned long straight_mmap2;  // as opposed to the "bent" one
 
-asmlinkage long sys_mmap2(unsigned long addr, size_t len,
-			unsigned long prot, unsigned long flags,
-			unsigned long fd, unsigned long pgoff)
+SYSCALL_DEFINE6(mmap2, unsigned long, addr, size_t, len,
+		unsigned long, prot, unsigned long, flags,
+		unsigned long, fd, unsigned long, pgoff)
 {
-	long ret = -EINVAL;
-
-	if (!straight_mmap2) {
+	if (!straight_mmap2)
 		pgoff >>= PAGE_SHIFT-12;
-	}
 
-	ret = sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff);
-
-	return ret;
+	return ksys_mmap_pgoff(addr, len, prot, flags, fd, pgoff);
 }
 
 

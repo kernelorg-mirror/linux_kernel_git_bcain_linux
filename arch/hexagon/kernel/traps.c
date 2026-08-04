@@ -15,6 +15,7 @@
 #include <linux/syscalls.h>
 #include <linux/signal.h>
 #include <linux/ptrace.h>
+#include <asm/cfi.h>
 #include <asm/traps.h>
 #include <asm/vm_fault.h>
 #include <asm/syscall.h>
@@ -252,6 +253,22 @@ static void misaligned_instruction(struct pt_regs *regs)
  */
 static void misaligned_data_load(struct pt_regs *regs)
 {
+	/*
+	 * A failed KCFI check lands here: clang traps it with a deliberately
+	 * misaligned doubleword load, so check the __kcfi_traps table before
+	 * treating this as an ordinary misaligned access.
+	 */
+	switch (handle_cfi_failure(regs)) {
+	case BUG_TRAP_TYPE_WARN:
+		/* Permissive mode; the ELR is already past the check. */
+		return;
+	case BUG_TRAP_TYPE_BUG:
+		die("Oops - CFI", regs, 0);
+		return;
+	default:
+		break;
+	}
+
 	die_if_kernel("Misaligned Data Load", regs, 0);
 	force_sig(SIGBUS);
 }
@@ -443,8 +460,7 @@ void do_trap0(struct pt_regs *regs)
 		if ((unsigned long) regs->syscall_nr >= __NR_syscalls) {
 			regs->r00 = -ENOSYS;
 		} else {
-			syscall = (syscall_fn)
-				  (sys_call_table[regs->syscall_nr]);
+			syscall = sys_call_table[regs->syscall_nr];
 
 			/* Check for unimplemented syscall (NULL entry in table) */
 			if (!syscall) {
@@ -452,9 +468,7 @@ void do_trap0(struct pt_regs *regs)
 				break;
 			}
 
-			regs->r00 = syscall(regs->r00, regs->r01,
-				   regs->r02, regs->r03,
-				   regs->r04, regs->r05);
+			regs->r00 = syscall(regs);
 		}
 
 		/* allow strace to get the syscall return state  */

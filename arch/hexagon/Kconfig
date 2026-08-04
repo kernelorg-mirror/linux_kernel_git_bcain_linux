@@ -7,6 +7,9 @@ config HEXAGON
 	select ARCH_32BIT_OFF_T
 	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
 	select ARCH_NO_PREEMPT
+	select ARCH_HAS_SYSCALL_WRAPPER
+	select ARCH_SUPPORTS_CFI
+	select ARCH_USES_CFI_TRAPS if CFI
 	select DMA_GLOBAL_POOL
 	# Other pending projects/to-do items.
 	# select HAVE_REGS_AND_STACK_ACCESS_API

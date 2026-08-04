@@ -12,13 +12,17 @@
 #include <linux/err.h>
 #include <asm/ptrace.h>
 
-typedef long (*syscall_fn)(unsigned long, unsigned long,
-	unsigned long, unsigned long,
-	unsigned long, unsigned long);
+/*
+ * Every entry of sys_call_table has this type, so the indirect call in
+ * do_trap0() needs no cast -- which is what lets KCFI check it.  The
+ * per-syscall wrappers in <asm/syscall_wrapper.h> unpack pt_regs into the
+ * arguments the syscall itself declares.
+ */
+typedef long (*syscall_fn)(const struct pt_regs *regs);
 
 #include <asm-generic/syscalls.h>
 
-extern void *sys_call_table[];
+extern syscall_fn sys_call_table[];
 
 static inline long syscall_get_nr(struct task_struct *task,
 				  struct pt_regs *regs)

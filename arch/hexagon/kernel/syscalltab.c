@@ -11,7 +11,14 @@
 
 #include <asm/syscall.h>
 
-#define __SYSCALL(nr, call) [nr] = (call),
+/*
+ * Two levels of indirection so that the argument is macro-expanded before it
+ * is pasted: the redirects below (sys_fadvise64_64, sys_sync_file_range) are
+ * plain #defines, and an operand of ## is not expanded.
+ */
+#define __SC_ENTRY(call)	__SC_ENTRY_(call)
+#define __SC_ENTRY_(call)	__hexagon_##call
+
 #define __SYSCALL_WITH_COMPAT(nr, native, compat)        __SYSCALL(nr, native)
 
 /*
@@ -34,6 +41,20 @@ SYSCALL_DEFINE6(hexagon_fadvise64_64, int, fd, int, advice,
 
 #define sys_sync_file_range sys_sync_file_range2
 
-void *sys_call_table[__NR_syscalls] = {
+/* Not defined using SYSCALL_DEFINE0 to avoid error injection */
+asmlinkage long __hexagon_sys_ni_syscall(const struct pt_regs *__unused);
+asmlinkage long __hexagon_sys_ni_syscall(const struct pt_regs *__unused)
+{
+	return -ENOSYS;
+}
+
+#define __SYSCALL(nr, call) asmlinkage long __SC_ENTRY(call)(const struct pt_regs *);
+#include <asm/syscall_table_32.h>
+#undef __SYSCALL
+
+#define __SYSCALL(nr, call) [nr] = __SC_ENTRY(call),
+
+syscall_fn sys_call_table[__NR_syscalls] = {
+	[0 ... __NR_syscalls - 1] = __hexagon_sys_ni_syscall,
 #include <asm/syscall_table_32.h>
 };
