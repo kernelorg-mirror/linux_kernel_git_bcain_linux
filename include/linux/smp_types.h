@@ -28,7 +28,17 @@ enum {
  *
  * flush_smp_call_function_queue() only reads the type from
  * __call_single_node::u_flags as a regular load, the above
- * (anonymous) enum defines all the bits of this word.
+ * (anonymous) enum defines all the bits of this word.  A compiler may
+ * merge that load with the adjacent llist.next load into a single
+ * access, because every node on the queue is read through a
+ * call_single_data_t *, and that type's declared over-alignment
+ * entitles it to do so.  struct __call_single_node is kept aligned to
+ * 8 so the merge is always a plain double word -- the widest scalar
+ * access architectures such as hexagon can perform, regardless of how
+ * much wider call_single_data_t's own alignment is (16 on 32-bit).
+ * Embedders such as task_struct::wake_entry (CSD_TYPE_TTWU) would
+ * otherwise only guarantee pointer alignment, which faults on
+ * strict-alignment architectures.
  *
  * Other bits are not modified until the type is known.
  *
@@ -64,6 +74,6 @@ struct __call_single_node {
 #ifdef CONFIG_64BIT
 	u16 src, dst;
 #endif
-};
+} __aligned(8);
 
 #endif /* __LINUX_SMP_TYPES_H */
