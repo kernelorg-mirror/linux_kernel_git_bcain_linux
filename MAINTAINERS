@@ -22209,6 +22209,7 @@ M:	Brian Cain <brian.cain@oss.qualcomm.com>
 L:	linux-hexagon@vger.kernel.org
 S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/bcain/linux.git
+F:	Documentation/devicetree/bindings/interrupt-controller/qcom,h2-pic.yaml
 F:	Documentation/devicetree/bindings/timer/qcom,h2-timer.yaml
 F:	arch/hexagon/
 

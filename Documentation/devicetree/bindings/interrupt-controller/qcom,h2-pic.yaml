@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/interrupt-controller/qcom,h2-pic.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm Hexagon H2 hypervisor interrupt controller
+
+maintainers:
+  - Brian Cain <brian.cain@oss.qualcomm.com>
+
+description: >
+  First-level interrupt controller as presented to a guest by the Hexagon H2
+  hypervisor.  The hypervisor virtualizes the controller entirely: masking,
+  unmasking and end-of-interrupt are vmintop hypercalls and the pending
+  interrupt is reported in the event record, so the node carries no register
+  block.
+
+properties:
+  compatible:
+    items:
+      - const: qcom,h2-pic
+      - const: qcom,hvm-pic
+    description: >
+      qcom,hvm-pic is a generic fallback for any Hexagon hypervisor PIC:
+      it lets a driver bind against the interrupt controller a future H2
+      revision presents without gaining a new specific compatible string
+      for every revision.  The in-tree driver currently matches only the
+      specific qcom,h2-pic string.
+
+  '#address-cells':
+    const: 0
+
+  '#interrupt-cells':
+    const: 2
+    description: >
+      The first cell is the hardware interrupt number, the second the
+      trigger type as defined in interrupt-controller/irq.h.
+
+  interrupt-controller: true
+
+required:
+  - compatible
+  - '#address-cells'
+  - '#interrupt-cells'
+  - interrupt-controller
+
+additionalProperties: false
+
+examples:
+  - |
+    interrupt-controller {
+        compatible = "qcom,h2-pic", "qcom,hvm-pic";
+        interrupt-controller;
+        #address-cells = <0>;
+        #interrupt-cells = <2>;
+    };
