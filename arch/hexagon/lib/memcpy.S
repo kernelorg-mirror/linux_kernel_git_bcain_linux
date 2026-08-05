@@ -180,6 +180,9 @@
 	.p2align 4
         .global memcpy
         .type memcpy, @function
+        .global __memcpy
+        .type __memcpy, @function
+__memcpy:
 memcpy:
 {
 	p2 = cmp.eq(len, #0);		/*  =0 */
