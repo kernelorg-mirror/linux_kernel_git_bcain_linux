@@ -300,3 +300,7 @@ HEXAGON_OPT_FUNC_BEGIN memset
 		jump .L14
 HEXAGON_OPT_FUNC_FINISH memset
 #endif
+
+	.global __memset
+	.type __memset, @function
+	.set __memset, memset

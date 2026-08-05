@@ -12,6 +12,7 @@
 #include <asm/vm_mmu.h>
 #include <asm/page.h>
 #include <asm/hexagon_vm.h>
+#include <asm/kasan.h>
 
 #ifdef CONFIG_HEXAGON_SPLIT_2GB
 //  2GB split has more kernel entries
@@ -217,6 +218,37 @@ __head_s_vaddr_target:
 	{
 		memw(R1 ++ #4) = R0
 	}:endloop0
+
+#ifdef CONFIG_KASAN
+	/*
+	 * Map the KASAN shadow window.  All of its 4MB page directory entries
+	 * point at the same 4MB region, so the whole shadow reads as zero --
+	 * "addressable" -- which is what lets the instrumented code in
+	 * start_kernel() run at all.  kasan_init() gives the part covering the
+	 * linear map real backing later; see arch/hexagon/mm/kasan_init.c.
+	 *
+	 * The region lives in .bss, which the memset below zeroes, so nothing
+	 * reads a stale shadow: the first instrumented instruction is in
+	 * start_kernel(), after that.
+	 */
+#define KASAN_PDE_BITS ( __HVM_PTE_R | __HVM_PTE_W			\
+		       | __HEXAGON_C_WB_L2 << 6				\
+		       | __HVM_PDE_S_4MB)
+	r0 = ##kasan_early_shadow_area
+	r1 = ##PAGE_OFFSET
+	r0 = sub(r0, r1)
+	r0 = add(r0, r25)	/* VA -> PA, r25 holds PHYS_OFFSET */
+	r1 = #KASAN_PDE_BITS
+	r0 = add(r0, r1)	/* the PDE value, the same for every entry */
+
+	r1 = ##(KASAN_SHADOW_START >> 22)
+	r1 = asl(r1, #2)	/* entry index -> byte offset */
+	r2 = ##swapper_pg_dir
+	r1 = add(r1, r2)
+	loop0(1f, #(KASAN_SHADOW_SIZE >> 22))
+1:
+	{ memw(r1 ++ #4) = r0 }:endloop0
+#endif
 
 	r0 = r24
 	r1 = #VM_TRANS_TYPE_TABLE

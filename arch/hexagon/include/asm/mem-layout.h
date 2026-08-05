@@ -107,8 +107,15 @@ extern int max_kernel_seg;
 /*
  * 2 pages of guard gap between where vmalloc area ends
  * and pkmap_base begins.
+ *
+ * With KASAN the shadow is carved out of the top of the kernel map, just
+ * below the fixmap, so vmalloc has to stop below it instead.
  */
+#ifdef CONFIG_KASAN
+#define VMALLOC_END (KASAN_SHADOW_START-PAGE_SIZE*2)
+#else
 #define VMALLOC_END (PKMAP_BASE-PAGE_SIZE*2)
+#endif
 #endif /*  !__ASSEMBLY__  */
 
 #endif /* _ASM_HEXAGON_MEM_LAYOUT_H */

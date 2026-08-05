@@ -9,6 +9,7 @@ config HEXAGON
 	select ARCH_NO_PREEMPT
 	select ARCH_HAS_SYSCALL_WRAPPER
 	select ARCH_HAS_UBSAN
+	select HAVE_ARCH_KASAN if !HEXAGON_SPLIT_2GB
 	select ARCH_SUPPORTS_CFI
 	select ARCH_USES_CFI_TRAPS if CFI
 	select ARCH_SUPPORTS_SHADOW_CALL_STACK
@@ -48,6 +49,17 @@ config HEXAGON
 	help
 	  Qualcomm Hexagon is a processor architecture designed for high
 	  performance and low power across a wide variety of applications.
+
+config KASAN_SHADOW_OFFSET
+	hex
+	depends on KASAN
+	default 0xde400000
+	help
+	  KASAN maps an address to its shadow byte with
+	  (addr >> 3) + KASAN_SHADOW_OFFSET.  The value here places the
+	  shadow of the kernel map at KASAN_SHADOW_START; the two are
+	  derived from each other in <asm/kasan.h>, so they must be changed
+	  together.
 
 config HEXAGON_PHYS_OFFSET
 	def_bool y

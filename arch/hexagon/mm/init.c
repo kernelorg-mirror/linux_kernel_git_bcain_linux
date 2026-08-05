@@ -15,6 +15,7 @@
 #include <linux/highmem.h>
 #include <asm/tlb.h>
 #include <asm/sections.h>
+#include <asm/kasan.h>
 #include <asm/platform.h>
 #include <asm/setup.h>
 #include <asm/vm_mmu.h>
@@ -186,6 +187,24 @@ void __init setup_arch_memory(void)
 		~((BIG_KERNEL_PAGE_SIZE) - 1));
 #endif
 
+#ifdef CONFIG_KASAN
+	/*
+	 * The shadow is carved out of the top of the kernel map, so the linear
+	 * map must stop short of it -- and leave vmalloc somewhere to live.
+	 */
+	{
+		unsigned long maxpg = ARCH_PFN_OFFSET +
+			((KASAN_SHADOW_START - SZ_128M - PAGE_OFFSET) >>
+			 PAGE_SHIFT);
+
+		if (bootmem_lastpg > maxpg) {
+			pr_notice("KASAN: capping RAM at %luMB to fit the shadow\n",
+				  (maxpg - ARCH_PFN_OFFSET) >> (20 - PAGE_SHIFT));
+			bootmem_lastpg = maxpg;
+		}
+	}
+#endif
+
 	memblock_add(PHYS_OFFSET,
 		     (bootmem_lastpg - ARCH_PFN_OFFSET) << PAGE_SHIFT);
 
@@ -247,6 +266,21 @@ void __init setup_arch_memory(void)
 
 	printk(KERN_INFO "clearing segtable from %p to %p\n", segtable,
 		segtable_end);
+#ifdef CONFIG_KASAN
+	/*
+	 * Skip the shadow window.  head.S pointed those entries at the early
+	 * all-zero region and instrumented code has been reading through them
+	 * since start_kernel(); invalidating them here would fault on the very
+	 * next memory access.
+	 */
+	{
+		u32 *pgd = (u32 *)&swapper_pg_dir[0];
+
+		while (segtable < pgd + (KASAN_SHADOW_START >> 22))
+			*(segtable++) = __HVM_PDE_S_INVALID;
+		segtable = pgd + (KASAN_SHADOW_END >> 22);
+	}
+#endif
 	while (segtable < (segtable_end-8))
 		*(segtable++) = __HVM_PDE_S_INVALID;
 	/* stop the pointer at the device I/O 4MB page  */
@@ -272,6 +306,13 @@ void __init setup_arch_memory(void)
 
 	//  Seems like a good place to touch teh memory
 	//early_memtest(PFN_PHYS(bootmem_startpg) + bootmap_size, max_low_pfn << PAGE_SHIFT);
+
+	/*
+	 * Back the shadow of the linear map with real memory, while memblock
+	 * still has everything.  Until this runs the whole shadow is the
+	 * shared all-zero region head.S mapped, so nothing is reported.
+	 */
+	kasan_init();
 
 	paging_init();  /*  See Gorman Book, 2.3  */
 
