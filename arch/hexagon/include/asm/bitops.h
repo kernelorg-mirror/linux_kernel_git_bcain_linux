@@ -28,7 +28,8 @@
  * @nr:  bit number to clear
  * @addr:  pointer to memory
  */
-static inline int test_and_clear_bit(int nr, volatile void *addr)
+static __always_inline bool
+arch_test_and_clear_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	int oldval;
 
@@ -52,7 +53,8 @@ static inline int test_and_clear_bit(int nr, volatile void *addr)
  * @nr:  bit number to set
  * @addr:  pointer to memory
  */
-static inline int test_and_set_bit(int nr, volatile void *addr)
+static __always_inline bool
+arch_test_and_set_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	int oldval;
 
@@ -78,7 +80,8 @@ static inline int test_and_set_bit(int nr, volatile void *addr)
  * @nr:  bit number to set
  * @addr:  pointer to memory
  */
-static inline int test_and_change_bit(int nr, volatile void *addr)
+static __always_inline bool
+arch_test_and_change_bit(unsigned long nr, volatile unsigned long *addr)
 {
 	int oldval;
 
@@ -103,19 +106,22 @@ static inline int test_and_change_bit(int nr, volatile void *addr)
  * Rewrite later to save a cycle or two.
  */
 
-static inline void clear_bit(int nr, volatile void *addr)
+static __always_inline void
+arch_clear_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	test_and_clear_bit(nr, addr);
+	arch_test_and_clear_bit(nr, addr);
 }
 
-static inline void set_bit(int nr, volatile void *addr)
+static __always_inline void
+arch_set_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	test_and_set_bit(nr, addr);
+	arch_test_and_set_bit(nr, addr);
 }
 
-static inline void change_bit(int nr, volatile void *addr)
+static __always_inline void
+arch_change_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	test_and_change_bit(nr, addr);
+	arch_test_and_change_bit(nr, addr);
 }
 
 
@@ -130,38 +136,38 @@ static inline void change_bit(int nr, volatile void *addr)
 static __always_inline void
 arch___clear_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	test_and_clear_bit(nr, addr);
+	arch_test_and_clear_bit(nr, addr);
 }
 
 static __always_inline void
 arch___set_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	test_and_set_bit(nr, addr);
+	arch_test_and_set_bit(nr, addr);
 }
 
 static __always_inline void
 arch___change_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	test_and_change_bit(nr, addr);
+	arch_test_and_change_bit(nr, addr);
 }
 
 /*  Apparently, at least some of these are allowed to be non-atomic  */
 static __always_inline bool
 arch___test_and_clear_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	return test_and_clear_bit(nr, addr);
+	return arch_test_and_clear_bit(nr, addr);
 }
 
 static __always_inline bool
 arch___test_and_set_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	return test_and_set_bit(nr, addr);
+	return arch_test_and_set_bit(nr, addr);
 }
 
 static __always_inline bool
 arch___test_and_change_bit(unsigned long nr, volatile unsigned long *addr)
 {
-	return test_and_change_bit(nr, addr);
+	return arch_test_and_change_bit(nr, addr);
 }
 
 static __always_inline bool
@@ -291,7 +297,8 @@ static inline __attribute_const__ unsigned long __fls(unsigned long word)
 }
 
 #include <asm-generic/bitops/lock.h>
-#include <asm-generic/bitops/non-instrumented-non-atomic.h>
+#include <asm-generic/bitops/instrumented-atomic.h>
+#include <asm-generic/bitops/instrumented-non-atomic.h>
 
 #include <asm-generic/bitops/fls64.h>
 #include <asm-generic/bitops/sched.h>
