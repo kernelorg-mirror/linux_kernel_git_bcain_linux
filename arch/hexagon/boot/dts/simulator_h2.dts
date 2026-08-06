@@ -1,0 +1,57 @@
+/dts-v1/;
+
+/*
+ * Minimal DTB for a Linux guest running under the H2 hypervisor,
+ * hosted on hexagon-sim (via hexagon-hypervisor's semihosting
+ * loadlinux path) instead of qemu-system-hexagon.
+ *
+ * The H2 PIC and H2 timer are hypervisor-virtualized (trap-based, not
+ * MMIO), so they are identical regardless of the underlying execution
+ * engine and are carried over unchanged from sm8150.dts. Devices that
+ * depend on QEMU's own device emulation (PL011 UART, virtio-mmio net
+ * and block) are dropped: console I/O goes through the Angel
+ * semihosting console instead (no DT node needed), and the root
+ * filesystem is an initramfs built into the kernel image rather than
+ * a virtio-block device.
+ *
+ * Guest RAM size is set by the "mem=" kernel command line parameter,
+ * not by the "memory" node below (reg is a placeholder, matching the
+ * convention already used by sm8150.dts).
+ */
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	memory { device_type = "memory"; reg = <0 0>; };
+};
+
+/ {
+	chosen {
+		bootargs = "";
+	};
+};
+
+/ {
+	model = "Hexagon H2 Simulator";
+	compatible = "qcom,hexagon-simulator";
+
+	soc: soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		interrupt-parent = <&PIC0>;
+
+		PIC0: interrupt-controller@0 {
+			compatible = "qcom,h2-pic";
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+		gpt@AB000000 {
+			compatible = "qcom,h2-timer";
+			reg = <0xab000000 0x1000>;
+			interrupts = <12 0>; /* interrupts CPU directly; rising edge triggered */
+		};
+	};
+};

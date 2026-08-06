@@ -1,0 +1,73 @@
+/dts-v1/;
+
+/*
+ * QEMU-facing variant of simulator_h2.dts, used only to gather a BOLT
+ * profile of the hexagon_sim_defconfig kernel under qemu-system-hexagon
+ * (which has no Angel/semihosting support, so the Angel HVC console the
+ * hexagon-sim/hypervisor leg uses would never produce output or even
+ * boot cleanly there). Adds a PL011 UART node and overrides /chosen so
+ * this DTB's own bootargs win over CONFIG_CMDLINE's "console=hvc0" when
+ * passed externally via "-dtb" (see the boot_dtb_phys handling in
+ * arch/hexagon/kernel/setup.c). Not built by the kernel itself -- it
+ * has no Kconfig board tied to it; compile standalone with dtc and pass
+ * via QEMU's "-dtb".
+ *
+ * This must stay layout-identical (same vmlinux) to the build used for
+ * the hexagon-sim icache measurement -- only the DTB passed at boot
+ * differs, so the profile gathered here applies to the exact binary
+ * BOLT optimizes.
+ */
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	memory { device_type = "memory"; reg = <0 0>; };
+};
+
+/ {
+	chosen {
+		bootargs = "console=ttyAMA0 debug mem=64M rdinit=/init";
+		stdout-path = &uart0;
+	};
+};
+
+/ {
+	model = "Hexagon H2 Simulator (QEMU profiling variant)";
+	compatible = "qcom,hexagon-simulator";
+
+	soc: soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		interrupt-parent = <&PIC0>;
+
+		PIC0: interrupt-controller@0 {
+			compatible = "qcom,h2-pic";
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+		gpt@AB000000 {
+			compatible = "qcom,h2-timer";
+			reg = <0xab000000 0x1000>;
+			interrupts = <12 0>;
+		};
+
+		uart0: uart@10000000 {
+			compatible = "arm,pl011", "arm,primecell";
+			interrupt-parent = <&PIC0>;
+			interrupts = <47 0>;
+			clock-frequency = <24000000>;
+			clocks = <&xtal24mhz>, <&xtal24mhz>;
+			clock-names = "uartclk", "apb_pclk";
+			reg = <0x10000000 0x1000>;
+		};
+	};
+
+	xtal24mhz: xtal24mhz@24M {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <24000000>;
+	};
+};
