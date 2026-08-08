@@ -18,7 +18,7 @@
 #include <asm/platform/sirc.h>
 
 static const char *qemu_dt_compat[] __initconst = {
-	"qcom,hexagon-virt",
+	"qemu,hexagon-virt",
 	NULL
 };
 
