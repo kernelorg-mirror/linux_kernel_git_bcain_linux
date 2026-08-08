@@ -7,6 +7,10 @@ KBUILD_DEFCONFIG = comet_defconfig
 KBUILD_CFLAGS += -G0
 LDFLAGS_vmlinux += -G0
 
+# Workaround for the packetizer generating invalid instruction encodings.
+# https://github.com/llvm/llvm-project/issues/178338
+KBUILD_CFLAGS += -mllvm --disable-packetizer -mllvm -disable-nvjump
+
 # Do not use single-byte enums; these will overflow.
 KBUILD_CFLAGS += -fno-short-enums
 
