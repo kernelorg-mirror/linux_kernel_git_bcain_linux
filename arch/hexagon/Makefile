@@ -19,7 +19,7 @@ KBUILD_CFLAGS += -mlong-calls
 # KBUILD_LDFLAGS_MODULE += -shared
 KBUILD_CFLAGS_MODULE += -mlong-calls
 
-KBUILD_CFLAGS += $(cflags-y)
+KBUILD_CFLAGS += $(cflags-y) -fno-pic
 KBUILD_AFLAGS += $(aflags-y)
 KBUILD_LDFLAGS += $(ldflags-y)
 
