@@ -932,8 +932,25 @@ void __meminit memmap_init_range(unsigned long size, int nid, unsigned long zone
 		 * over the place during system boot.
 		 */
 		if (pageblock_aligned(pfn)) {
-			init_pageblock_migratetype(page, migratetype,
-					isolate_pageblock);
+			/*
+			 * With FLATMEM the pageblock bitmap hangs off the
+			 * zone and may be missing for zones that were never
+			 * fully initialized (e.g. ZONE_MOVABLE with no
+			 * spanned pages on hexagon); SPARSEMEM keeps it in
+			 * the memory section, which always exists here.
+			 */
+			bool have_bitmap = true;
+#ifdef CONFIG_FLATMEM
+			struct zone *z = page_zone(page);
+
+			have_bitmap = z->pageblock_flags;
+			if (!have_bitmap)
+				pr_warn_once("memmap_init_range: skipping pageblock init for pfn 0x%lx (zone %s has no pageblock_flags)\n",
+					     pfn, z->name);
+#endif
+			if (likely(have_bitmap))
+				init_pageblock_migratetype(page, migratetype,
+						isolate_pageblock);
 			cond_resched();
 		}
 		pfn++;
