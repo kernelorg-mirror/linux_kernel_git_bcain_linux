@@ -70,8 +70,19 @@ struct thread_info {
 #define qstr(s) #s
 #define QUOTED_THREADINFO_REG qqstr(THREADINFO_REG)
 
-register struct thread_info *__current_thread_info asm(QUOTED_THREADINFO_REG);
-#define current_thread_info()  __current_thread_info
+/*
+ * The thread-info register changes under us at every context switch, so the
+ * read must not be treated as a pure expression the compiler may hoist or
+ * reuse across a call to switch_to().
+ */
+static inline struct thread_info *current_thread_info(void)
+{
+	struct thread_info *ti;
+
+	asm volatile("%0 = " QUOTED_THREADINFO_REG : "=r"(ti));
+
+	return ti;
+}
 
 #endif /* __ASSEMBLY__ */
 
