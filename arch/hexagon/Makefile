@@ -25,11 +25,9 @@ KBUILD_CFLAGS_MODULE += -mlong-calls
 
 cflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
 aflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
-ldflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
 
 KBUILD_CFLAGS += $(cflags-y)
 KBUILD_AFLAGS += $(aflags-y)
-KBUILD_LDFLAGS += $(ldflags-y)
 
 # Thread-info register will be r19.  This value is not configureable;
 # it is hard-coded in several files.
