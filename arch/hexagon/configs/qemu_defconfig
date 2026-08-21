@@ -1,4 +1,5 @@
 CONFIG_HEXAGON_QEMU=y
+CONFIG_HEXAGON_ARCH_VERSION=68
 # lpj= is required: calibrate_delay() cannot be trusted this early against
 # the H2 virtualized timer under TCG, so a measured loops_per_jiffy is
 # baked in rather than calibrated at boot.
