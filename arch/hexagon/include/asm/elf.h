@@ -87,11 +87,15 @@ typedef unsigned long elf_fpregset_t;
  * Bypass the whole "regsets" thing for now and use the define.
  */
 
+#if CONFIG_HEXAGON_ARCH_VERSION >= 4
 #define CS_COPYREGS(DEST,REGS) \
 do {\
 	DEST.cs0 = REGS->cs0;\
 	DEST.cs1 = REGS->cs1;\
 } while (0)
+#else
+#define CS_COPYREGS(DEST,REGS)
+#endif
 
 #define ELF_CORE_COPY_REGS(DEST, REGS)	\
 do {					\
@@ -155,6 +159,18 @@ do {					\
 #define ELF_CLASS	ELFCLASS32
 #define ELF_DATA	ELFDATA2LSB
 #define ELF_ARCH	EM_HEXAGON
+
+#if CONFIG_HEXAGON_ARCH_VERSION == 2
+#define ELF_CORE_EFLAGS 0x1
+#endif
+
+#if CONFIG_HEXAGON_ARCH_VERSION == 3
+#define ELF_CORE_EFLAGS 0x2
+#endif
+
+#if CONFIG_HEXAGON_ARCH_VERSION == 4
+#define ELF_CORE_EFLAGS 0x3
+#endif
 
 /*
  * Some architectures have ld.so set up a pointer to a function
