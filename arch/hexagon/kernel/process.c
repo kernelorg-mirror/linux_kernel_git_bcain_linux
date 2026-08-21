@@ -16,6 +16,7 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/resume_user_mode.h>
+#include <asm/hexagon_vm.h>
 
 /*
  * Program thread launch.  Often defined as a macro in processor.h,
@@ -33,6 +34,15 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
 	/* We might want to also zero all Processor registers here */
 	pt_set_usermode(regs);
 	pt_set_elr(regs, pc);
+	/*
+	 * set user visible sp in case ptrace stops and frisks the process
+	 * before it can issue the first return-to-userspace
+	 */
+	regs->r29 = sp;
+	/*
+	 * need to revisit all these pt_set_ret_sp's; might do away with them
+	 * and just pull from r29 for vmrte in vm_entry.S
+	 */
 	pt_set_rte_sp(regs, sp);
 }
 
