@@ -168,7 +168,7 @@ do {					\
 #define ELF_CORE_EFLAGS 0x2
 #endif
 
-#if CONFIG_HEXAGON_ARCH_VERSION == 4
+#if CONFIG_HEXAGON_ARCH_VERSION >= 4
 #define ELF_CORE_EFLAGS 0x3
 #endif
 
