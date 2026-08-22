@@ -55,7 +55,6 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	__vmsetvec(_K_VM_event_vector);
 
-	printk(KERN_INFO "PHYS_OFFSET=0x%08lx\n", PHYS_OFFSET);
 	/*  initial machine setup from flattened device tree  */
 	early_init_devtree(phys_to_virt((unsigned long)boot_dtb_phys));
 
