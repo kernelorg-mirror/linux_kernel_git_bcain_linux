@@ -12,6 +12,7 @@
 #include <linux/mm.h>
 #include <linux/seq_file.h>
 #include <linux/of_fdt.h>
+#include <linux/of_clk.h>
 #include <linux/libfdt.h>
 #include <asm/io.h>
 #include <asm/sections.h>
@@ -71,6 +72,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/*  Now is time we unflatten devicetree  */
 	unflatten_device_tree();
+	of_clk_init(NULL);
 
 #ifdef CONFIG_SMP
 	smp_start_cpus();

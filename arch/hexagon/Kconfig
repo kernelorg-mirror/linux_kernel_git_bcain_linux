@@ -90,6 +90,7 @@ config HEXAGON_QEMU
 	bool "QEMU virt machine"
 	select HEXAGON_PHYS_OFFSET
 	select ARM_AMBA
+	select COMMON_CLK
 	select HEXAGON_H2
 	help
 	  Support for the QEMU hexagon "virt" machine.
