@@ -18,6 +18,10 @@
 
 #define PAGE_OFFSET			_AC(0xc0000000, UL)
 
+#ifndef ELF_LOAD_ADDRESS
+#define ELF_LOAD_ADDRESS			_AC(0x00000000, UL)
+#endif
+
 /*
  * Compiling for a platform that needs a crazy physical offset
  * (like if the memory starts at 1GB and up) means we need

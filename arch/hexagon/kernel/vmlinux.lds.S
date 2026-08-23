@@ -5,6 +5,10 @@
  * Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
  */
 
+#include <asm/mem-layout.h>
+
+#define LOAD_OFFSET (PAGE_OFFSET+ELF_LOAD_ADDRESS)
+
 #include <asm-generic/vmlinux.lds.h>
 #include <asm/asm-offsets.h>	/*  Most of the kernel defines are here  */
 #include <asm/mem-layout.h>	/*  except for page_offset  */
@@ -27,7 +31,7 @@ See asm-generic/sections.h for seemingly required labels.
 
 SECTIONS
 {
-	. = PAGE_OFFSET;
+	. = LOAD_OFFSET;
 
 	__init_begin = .;
 	HEAD_TEXT_SECTION
@@ -37,7 +41,7 @@ SECTIONS
 
         . = ALIGN(_PAGE_SIZE);
 	_stext = .;
-	.text : AT(ADDR(.text)) {
+	.text : AT(ADDR(.text) - LOAD_OFFSET) {
 		_text = .;
 		TEXT_TEXT
 		IRQENTRY_TEXT
@@ -54,7 +58,7 @@ SECTIONS
 	 * PERCPU starts at a page-aligned address.
 	 * The .modinfo section is normally discarded but needs explicit handling.
 	 */
-	.modinfo : AT(ADDR(.modinfo)) {
+	.modinfo : AT(ADDR(.modinfo) - LOAD_OFFSET) {
 		*(.modinfo)
 	}
 
