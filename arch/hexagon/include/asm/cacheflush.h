@@ -74,6 +74,13 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 
 extern void hexagon_inv_dcache_range(unsigned long start, unsigned long end);
 extern void hexagon_clean_dcache_range(unsigned long start, unsigned long end);
+extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
+
+#define flush_cache_vmap flush_cache_vmap
+static inline void flush_cache_vmap(unsigned long start, unsigned long end)
+{
+	flush_tlb_kernel_range(start, end);
+}
 
 #include <asm-generic/cacheflush.h>
 
