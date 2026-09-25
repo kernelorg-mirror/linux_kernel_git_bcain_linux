@@ -16,6 +16,14 @@ config NET_VENDOR_QUALCOMM
 
 if NET_VENDOR_QUALCOMM
 
+config QCOM_SNULL
+	tristate "Qualcomm DSP shared-memory Ethernet"
+	depends on OF
+	help
+	  This enables Ethernet over shared memory between a Qualcomm SoC's
+	  compute DSP and its application processor, as set up by the
+	  "qcom,snull-eth" devicetree node.  Say Y on the DSP side.
+
 config QCA7000
 	tristate
 	help
