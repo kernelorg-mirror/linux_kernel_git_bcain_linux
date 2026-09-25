@@ -129,5 +129,9 @@
 			qcom,hvx-max-ctxts = <2>;
 			qcom,hvx-vlength = <7>;
 		};
+
+		hmx {
+			compatible = "qcom,hexagon-hmx";
+		};
 	};
 };
