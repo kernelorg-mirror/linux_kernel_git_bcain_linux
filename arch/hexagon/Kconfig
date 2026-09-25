@@ -174,4 +174,6 @@ source "kernel/Kconfig.hz"
 
 source "arch/hexagon/kernel/hvx/Kconfig"
 
+source "arch/hexagon/kernel/hmx/Kconfig"
+
 endmenu

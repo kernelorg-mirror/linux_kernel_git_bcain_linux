@@ -25,6 +25,7 @@ obj-y += vm_vectors.o
 obj-$(CONFIG_HAS_DMA) += dma.o
 
 obj-y += hvx/
+obj-y += hmx/
 
 obj-$(CONFIG_STACKTRACE) += stacktrace.o
 

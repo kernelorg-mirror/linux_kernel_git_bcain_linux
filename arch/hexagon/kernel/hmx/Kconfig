@@ -1,0 +1,7 @@
+config HEXAGON_HMX
+	tristate "Hexagon HMX Module"
+	help
+	  Modular support for Hexagon HMX (Hexagon Matrix eXtension)
+	  instructions.  Provides coprocessor context management via
+	  the thread notification framework, enabling/disabling HMX
+	  hardware access on a per-thread basis through HWCONFIG.

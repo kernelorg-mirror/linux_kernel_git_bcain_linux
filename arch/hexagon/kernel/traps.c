@@ -62,6 +62,9 @@ static const char *ex_name(int ex)
 	case HVM_GE_C_INVI:
 	case HVM_GE_C_PRIVI:
 		return "Illegal instruction";
+	case HVM_GE_C_COPROC:
+	case HVM_GE_C_COPROC2:
+		return "Coprocessor not enabled";
 	case HVM_GE_C_BUS:
 		return "Precise bus error";
 	case HVM_GE_C_CACHE:
@@ -385,6 +388,7 @@ void do_genex(struct pt_regs *regs)
 		write_protection_fault(regs);
 		break;
 	case HVM_GE_C_COPROC:
+	case HVM_GE_C_COPROC2:
 		coproc_fault(regs);
 		break;
 	default:
