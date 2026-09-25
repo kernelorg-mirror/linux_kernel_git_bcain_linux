@@ -95,6 +95,18 @@ config HEXAGON_QEMU
 	help
 	  Support for the QEMU hexagon "virt" machine.
 
+config HEXAGON_QCS6490_CDSP
+	bool "Qualcomm QCS6490 Compute DSP"
+	select HEXAGON_PHYS_OFFSET
+	select ARM_AMBA
+	select COMMON_CLK
+	select HEXAGON_H2
+	help
+	  Support for the Hexagon v68 compute DSP of the Qualcomm QCS6490,
+	  running as a guest of the H2 hypervisor.  The console is the
+	  PL011 that QEMU's qcs6490-cdsp machine adds for this purpose; the
+	  hardware has no UART.
+
 config HEXAGON_COMET
 	bool "Comet Board"
 	help
