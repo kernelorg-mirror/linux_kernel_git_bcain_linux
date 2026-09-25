@@ -9,6 +9,7 @@
 #include <asm/mem-layout.h>   /*  sigh, except for page_offset  */
 #include <asm/hexagon_vm.h>
 #include <asm/thread_info.h>
+#include <asm/notify.h>
 
 /*
  * Entry into guest-mode Linux under Hexagon Virtual Machine.
@@ -329,6 +330,15 @@ restore_all:
 	 * Disable interrupts, if they weren't already, before reg restore.
 	 */
 	callr R17
+	/*  let the coprocessor managers set up for the thread we return to  */
+	{
+		R17 = ##(atomic_thread_notify);
+		R0 = R19;
+	}
+	{
+		callr R17;
+		R1 = ##(THREAD_EVENT_RESTOREALL);
+	}
 	/*  do the setregs here for VM 0.5  */
 	/*  R29 here should already be pointing at pt_regs  */
 	{

@@ -15,6 +15,7 @@
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #include <asm/registers.h>
+#include <asm/extensions.h>
 #endif
 
 /*  If the shift is less than the kernel page size, use the page size.  */
@@ -43,6 +44,7 @@ struct thread_info {
 	 */
 	/* Points to the current pt_regs frame  */
 	struct pt_regs		*regs;
+	struct extinfo		extensions;
 	/*
 	 * saved kernel sp at switch_to time;
 	 * not sure if this is used (it's not in the VM model it seems;

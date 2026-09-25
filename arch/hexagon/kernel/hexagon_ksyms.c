@@ -9,6 +9,7 @@
 #include <linux/export.h>
 #include <asm/hexagon_vm.h>
 #include <asm/io.h>
+#include <asm/notify.h>
 #include <linux/uaccess.h>
 
 /* Additional functions */
@@ -20,6 +21,10 @@ EXPORT_SYMBOL(vmgetie_cached);
 EXPORT_SYMBOL(vmsetie_cached);
 EXPORT_SYMBOL(__vmyield);
 EXPORT_SYMBOL(__vmhwconfig);
+EXPORT_SYMBOL(blocking_thread_register_notify);
+EXPORT_SYMBOL(blocking_thread_unregister_notify);
+EXPORT_SYMBOL(atomic_thread_register_notify);
+EXPORT_SYMBOL(atomic_thread_unregister_notify);
 EXPORT_SYMBOL(memcpy);
 EXPORT_SYMBOL(memset);
 

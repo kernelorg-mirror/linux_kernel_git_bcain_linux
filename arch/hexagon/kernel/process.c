@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/resume_user_mode.h>
 #include <asm/hexagon_vm.h>
+#include <asm/notify.h>
 
 /*
  * Program thread launch.  Often defined as a macro in processor.h,
@@ -114,6 +115,9 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 	if (clone_flags & CLONE_SETTLS)
 		childregs->ugp = tls;
 
+	memset(&ti->extensions, 0, sizeof(ti->extensions));
+	atomic_thread_notify(ti, THREAD_EVENT_COPY);
+
 	/*
 	 * Parent sees new pid -- not necessary, not even possible at
 	 * this point in the fork process
@@ -127,6 +131,14 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
  */
 void flush_thread(void)
 {
+}
+
+/*
+ * The last arch hook for a task that is going away.
+ */
+void release_thread(struct task_struct *dead_task)
+{
+	atomic_thread_notify(task_thread_info(dead_task), THREAD_EVENT_RELEASE);
 }
 
 /*
@@ -182,6 +194,16 @@ int do_work_pending(struct pt_regs *regs, u32 thread_info_flags)
 		resume_user_mode_work(regs);
 		return 1;
 	}
+
+	/*
+	 * Nothing else is pending, so this is the point to give a thread that
+	 * uses a coprocessor the context it needs to go back to user mode.  That
+	 * may sleep, and be interrupted by a signal.
+	 */
+	blocking_thread_notify(current_thread_info(), THREAD_EVENT_DOWORK);
+	if (read_thread_flags() & (_TIF_NEED_RESCHED | _TIF_SIGPENDING |
+				   _TIF_NOTIFY_SIGNAL | _TIF_NOTIFY_RESUME))
+		return 1;
 
 	return 0;
 

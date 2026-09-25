@@ -8,6 +8,7 @@
 #include <linux/kernel.h>
 #include <linux/sched/debug.h>
 #include <asm/registers.h>
+#include <asm/notify.h>
 #include <linux/irq.h>
 #include <linux/hardirq.h>
 #include <linux/irqdomain.h>
@@ -81,6 +82,7 @@ void arch_do_IRQ(struct pt_regs *regs)
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	clear_ie_cached();
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
 
 	irq_enter();
 	/*  return of zero here is an error btw  */
