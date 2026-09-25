@@ -11,6 +11,7 @@
 #include <linux/mmzone.h>
 #include <linux/mm.h>
 #include <linux/seq_file.h>
+#include <linux/initrd.h>
 #include <linux/of_fdt.h>
 #include <linux/of_clk.h>
 #include <linux/libfdt.h>
@@ -69,6 +70,8 @@ void __init setup_arch(char **cmdline_p)
 	parse_early_param();
 
 	setup_arch_memory();
+
+	reserve_initrd_mem();
 
 	/*  Now is time we unflatten devicetree  */
 	unflatten_device_tree();
