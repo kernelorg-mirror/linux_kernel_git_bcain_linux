@@ -15,7 +15,7 @@
 
 #define SEGTABLE_ENTRIES #0x0e0
 
-	__INIT
+	__HEAD
 ENTRY(stext)
 	R27 = R0  /*  DTB phys addr low, from bootloader R0  */
 	R28 = R1  /*  DTB phys addr high, save before clobbered  */
