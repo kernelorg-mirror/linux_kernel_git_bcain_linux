@@ -111,6 +111,14 @@ extern unsigned long _dflt_cache_att;
  */
 #define CACHEDEF	(CACHE_DEFAULT << 6)
 
+/*
+ * A userspace mapping of device registers, such as /dev/mem opened O_SYNC,
+ * must not be cached: a cached access fills a whole line, which a register
+ * block cannot serve.
+ */
+#define pgprot_noncached(prot) \
+	__pgprot((pgprot_val(prot) & ~__HVM_PTE_C) | (__HEXAGON_C_DEV << 6))
+
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];  /* located in head.S */
 
 /*  HUGETLB not working currently  */
