@@ -54,6 +54,15 @@ config RPMSG_QCOM_GLINK_RPM
 	  which serves as a channel for communication with the RPM in GLINK
 	  enabled systems.
 
+config RPMSG_QCOM_GLINK_SHMEM
+	tristate "Qualcomm GLINK Shared-memory Driver"
+	depends on OF
+	select RPMSG_QCOM_GLINK
+	help
+	  Say y here to enable support for the GLINK communication protocol
+	  over a window of shared memory, with a pair of IPC doorbells, for
+	  processors that share DDR but have no SMEM or IPCC between them.
+
 config RPMSG_QCOM_GLINK_SMEM
 	tristate "Qualcomm SMEM Glink driver"
 	select RPMSG_QCOM_GLINK

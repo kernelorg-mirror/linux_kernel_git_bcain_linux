@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/remoteproc/qcom,glink-shmem-edge.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm GLINK edge over shared memory
+
+maintainers:
+  - Brian Cain <brian.cain@oss.qualcomm.com>
+
+description:
+  A GLINK edge whose two FIFOs live in windows of shared memory, one per
+  direction, and whose peer is kicked by writing a bit of a doorbell
+  register.  Unlike the SMEM based edge it needs no SMEM, IPCC or hwspinlock.
+  Each window starts with a 16 byte header, the FIFO head at offset 0, the
+  FIFO tail at offset 4 and the magic 0x4d534c47 at offset 8, and the FIFO
+  fills the rest of the window.
+
+properties:
+  compatible:
+    const: qcom,glink-shmem-edge
+
+  reg:
+    items:
+      - description: window this side receives from
+      - description: window this side transmits to
+      - description: block holding the doorbell register that kicks the peer
+
+  interrupts:
+    maxItems: 1
+    description: raised by the peer's doorbell
+
+  qcom,ipc-offset:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: offset of the doorbell register in the third reg region
+
+  qcom,ipc-bits:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: value written to the doorbell register to kick the peer
+
+  qcom,shmem-init:
+    type: boolean
+    description:
+      This side initializes both windows.  Without it the windows must
+      already have been initialized by the peer.
+
+  qcom,intentless:
+    type: boolean
+    description: use GLINK's intentless mode; both sides must agree
+
+patternProperties:
+  "^[a-z][a-z0-9-]*$":
+    type: object
+    description: a channel of the edge
+    properties:
+      qcom,glink-channels:
+        $ref: /schemas/types.yaml#/definitions/string-array
+        description: name of the channel
+      qcom,glink-auto-open:
+        type: boolean
+        description:
+          Open the channel from this side once the version negotiation is
+          done, for a peer that does not open it itself.
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - qcom,ipc-offset
+  - qcom,ipc-bits
+
+additionalProperties: false
+
+examples:
+  - |
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+
+        glink-edge@d7c00000 {
+            compatible = "qcom,glink-shmem-edge";
+            reg = <0 0xd7c00000 0 0x10000>,
+                  <0 0xd7c10000 0 0x10000>,
+                  <0 0x0a380000 0 0x10000>;
+            interrupts = <91 0>;
+            qcom,ipc-offset = <0x8000>;
+            qcom,ipc-bits = <0x20>;
+            qcom,shmem-init;
+            qcom,intentless;
+
+            ip-bridge {
+                qcom,glink-channels = "IP_BRIDGE";
+                qcom,glink-auto-open;
+            };
+        };
+    };
