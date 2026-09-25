@@ -86,6 +86,27 @@ enum VM_STOP_STATUS {
 	machinecheck
 };
 
+/* The operations of the hypervisor's hwconfig call. */
+typedef enum {
+	HWCONFIG_L2CACHE,
+	HWCONFIG_PARTITIONS,
+	HWCONFIG_PREFETCH,
+	HWCONFIG_EXTBITS,
+	HWCONFIG_VLENGTH,
+	HWCONFIG_EXTPOWER,
+	HWCONFIG_GETL2REG,
+	HWCONFIG_SETL2REG,
+	HWCONFIG_L2LOCKA,
+	HWCONFIG_L2UNLOCK,
+	HWCONFIG_HWINTOP,
+	HWCONFIG_GETCLADEREG,
+	HWCONFIG_SETCLADEREG,
+	HWCONFIG_HWTHREADS_NUM,
+	HWCONFIG_HWTHREADS_MASK,
+	HWCONFIG_ECC,
+	HWCONFIG_HMXBITS,
+} hwconfig_type_t;
+
 extern void _K_VM_event_vector(void);
 
 void __vmrte(void);
@@ -112,6 +133,7 @@ long __vmvpid(void);
 #ifdef CONFIG_HEXAGON_H2
 unsigned long long __vmtimerop(enum VM_TIMER_OPS op, unsigned long dummy, unsigned long long timeout);
 unsigned long __vmgetinfo(unsigned long op, unsigned long unit, unsigned long entry);
+long __vmhwconfig(hwconfig_type_t op, unsigned long a, unsigned long b, unsigned long c);
 #endif
 
 static inline long __vmcache_ickill(void)

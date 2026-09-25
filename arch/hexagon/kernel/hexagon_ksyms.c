@@ -19,6 +19,7 @@ EXPORT_SYMBOL(__vmgetie);
 EXPORT_SYMBOL(vmgetie_cached);
 EXPORT_SYMBOL(vmsetie_cached);
 EXPORT_SYMBOL(__vmyield);
+EXPORT_SYMBOL(__vmhwconfig);
 EXPORT_SYMBOL(memcpy);
 EXPORT_SYMBOL(memset);
 
