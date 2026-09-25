@@ -87,19 +87,27 @@
 		};
 
 		/*
-		 * Ethernet to the application processor: two 64K windows of
-		 * shared memory (ours to receive into, then ours to transmit
-		 * from), and the IPC doorbell in the DSP subsystem's private
-		 * registers.  The application processor clears the windows.
+		 * GLINK to the application processor, over two 64K windows of
+		 * shared memory (the one we read, then the one we write) and
+		 * the IPC doorbells between the two.  This side starts first,
+		 * so it initializes the windows.  The application processor
+		 * opens no channels, so we open the one for IP.
 		 */
-		snull@d7c00000 {
-			compatible = "qcom,snull-eth";
+		glink-edge@d7c00000 {
+			compatible = "qcom,glink-shmem-edge";
 			reg = <0 0xd7c00000 0x10000>,
 			      <0 0xd7c10000 0x10000>,
 			      <0 0x0a380000 0x10000>;
 			interrupts = <91 0>;
-			qcom,snull-irq-offset = <0x8000>;
-			qcom,snull-irq-bitset = <0x20>;
+			qcom,ipc-offset = <0x8000>;
+			qcom,ipc-bits = <0x20>;
+			qcom,shmem-init;
+			qcom,intentless;
+
+			ip-bridge {
+				qcom,glink-channels = "IP_BRIDGE";
+				qcom,glink-auto-open;
+			};
 		};
 
 		vtcm@9c00000 {
