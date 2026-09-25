@@ -233,11 +233,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	 */
 
 	/*  Right now, let's just fake it. */
-	for (i = 0; i < max_cpus; i++)
-		set_cpu_present(i, true);
+	for_each_possible_cpu(i)
+		if (i < max_cpus)
+			set_cpu_present(i, true);
 
 	/*  Also need to register the interrupts for IPI  */
-	if (max_cpus > 1) {
+	if (num_possible_cpus() > 1 && max_cpus > 1) {
 		__vmintop_globen(irq);
 		if (request_irq(irq_find_mapping(hexagon_irq_domain, irq),
 				handle_ipi, IRQF_TRIGGER_RISING,
@@ -277,8 +278,22 @@ void arch_send_call_function_ipi_mask(const struct cpumask *mask)
 
 void smp_start_cpus(void)
 {
+	unsigned int ncpus = NR_CPUS;
 	int i;
 
-	for (i = 0; i < NR_CPUS; i++)
+#ifdef CONFIG_HEXAGON_H2
+	/*
+	 * The hypervisor gives the guest a VCPU for each hardware thread it
+	 * is running, and reports them as a mask.
+	 */
+	ncpus = min_t(unsigned int, ncpus,
+		      hweight32(__vmgetinfo(HVM_INFO_HTHREADS, 0, 0)));
+	if (!ncpus)
+		ncpus = 1;
+#endif
+
+	pr_info("%u CPUs (of at most %d)\n", ncpus, NR_CPUS);
+
+	for (i = 0; i < ncpus; i++)
 		set_cpu_possible(i, true);
 }

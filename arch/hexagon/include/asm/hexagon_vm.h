@@ -38,6 +38,10 @@
 #define HVM_TRAP1_VMSETREGS		21
 #define HVM_TRAP1_VMGETREGS		22
 #define HVM_TRAP1_VMTIMEROP		24
+#define HVM_TRAP1_VMGETINFO		26
+
+/* The info codes of the H2 hypervisor that the kernel uses. */
+#define HVM_INFO_HTHREADS		19	/* mask of the running hardware threads */
 
 #ifndef __ASSEMBLY__
 
@@ -107,6 +111,7 @@ void __vmyield(void);
 long __vmvpid(void);
 #ifdef CONFIG_HEXAGON_H2
 unsigned long long __vmtimerop(enum VM_TIMER_OPS op, unsigned long dummy, unsigned long long timeout);
+unsigned long __vmgetinfo(unsigned long op, unsigned long unit, unsigned long entry);
 #endif
 
 static inline long __vmcache_ickill(void)
