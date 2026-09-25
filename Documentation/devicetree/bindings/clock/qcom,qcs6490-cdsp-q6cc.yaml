@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/clock/qcom,qcs6490-cdsp-q6cc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm QCS6490 CDSP core clock
+
+maintainers:
+  - Brian Cain <brian.cain@oss.qualcomm.com>
+
+description:
+  The clock controller of the QCS6490 CDSP's Turing QDSP6 subsystem, seen by a
+  Linux that runs on the DSP.  The core comes out of reset on the 19.2 MHz
+  reference clock; the driver starts the subsystem's PLL and moves the core
+  clock onto it, unless something has done so already.  The core clock is the
+  clock the node provides.
+
+properties:
+  compatible:
+    const: qcom,qcs6490-cdsp-q6cc
+
+  reg:
+    maxItems: 1
+
+  '#clock-cells':
+    const: 0
+
+  qcom,pll-l-val:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: PLL multiplier, of the 19.2 MHz reference clock
+
+  qcom,pll-cal-l-val:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: PLL multiplier used while the PLL calibrates
+
+required:
+  - compatible
+  - reg
+  - '#clock-cells'
+  - qcom,pll-l-val
+  - qcom,pll-cal-l-val
+
+additionalProperties: false
+
+examples:
+  - |
+    clock-controller@a340000 {
+        compatible = "qcom,qcs6490-cdsp-q6cc";
+        reg = <0x0a340000 0x10000>;
+        #clock-cells = <0>;
+        qcom,pll-l-val = <0x31>;
+        qcom,pll-cal-l-val = <0x44>;
+    };
