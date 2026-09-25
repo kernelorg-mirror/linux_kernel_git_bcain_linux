@@ -86,6 +86,15 @@
 			interrupts = <12 0>;
 		};
 
+		/* The core clock of the DSP: PLL and core clock select. */
+		q6cc: clock-controller@a340000 {
+			compatible = "qcom,qcs6490-cdsp-q6cc";
+			reg = <0 0x0a340000 0x10000>;
+			#clock-cells = <0>;
+			qcom,pll-l-val = <0x31>;
+			qcom,pll-cal-l-val = <0x44>;
+		};
+
 		/*
 		 * GLINK to the application processor, over two 64K windows of
 		 * shared memory (the one we read, then the one we write) and
