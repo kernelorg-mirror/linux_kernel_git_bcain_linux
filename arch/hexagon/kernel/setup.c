@@ -73,8 +73,13 @@ void __init setup_arch(char **cmdline_p)
 
 	reserve_initrd_mem();
 
-	/*  Now is time we unflatten devicetree  */
-	unflatten_device_tree();
+	/*
+	 * Now is time we unflatten devicetree.  The bootloader's DTB sits
+	 * inside the kernel image's init pages on some platforms, and the
+	 * unflattened tree keeps pointing into the blob for its property
+	 * names and values, so move the blob out of the way first.
+	 */
+	unflatten_and_copy_device_tree();
 	of_clk_init(NULL);
 
 #ifdef CONFIG_SMP
