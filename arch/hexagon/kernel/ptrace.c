@@ -17,6 +17,7 @@
 #include <linux/elf.h>
 
 #include <asm/user.h>
+#include <asm/hvx.h>
 
 #if arch_has_single_step()
 /*  Both called from ptrace_resume  */
@@ -131,8 +132,47 @@ static int genregs_set(struct task_struct *target,
 	return 0;
 }
 
+/*
+ * The HVX registers of a thread that has used them: 32 vector registers and
+ * the vector predicates.
+ */
+static int fpregs_get(struct task_struct *target,
+		      const struct user_regset *regset,
+		      struct membuf to)
+{
+	struct thread_info *ti = task_thread_info(target);
+
+	if (!ti->extensions.hvx)
+		return -EIO;
+
+	return membuf_write(&to, ti->extensions.hvx->vregs,
+			    sizeof(struct user_fpregs_struct));
+}
+
+static int fpregs_set(struct task_struct *target,
+		      const struct user_regset *regset,
+		      unsigned int pos, unsigned int count,
+		      const void *kbuf, const void __user *ubuf)
+{
+	struct thread_info *ti = task_thread_info(target);
+
+	if (!ti->extensions.hvx)
+		return -EIO;
+
+	return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+				  ti->extensions.hvx->vregs, 0,
+				  sizeof(struct user_fpregs_struct));
+}
+
+static int fpregs_active(struct task_struct *target,
+			 const struct user_regset *regset)
+{
+	return task_thread_info(target)->extensions.hvx != NULL;
+}
+
 enum hexagon_regset {
 	REGSET_GENERAL,
+	REGSET_FPU,
 };
 
 static const struct user_regset hexagon_regsets[] = {
@@ -143,6 +183,15 @@ static const struct user_regset hexagon_regsets[] = {
 		.align = sizeof(unsigned long),
 		.regset_get = genregs_get,
 		.set = genregs_set,
+	},
+	[REGSET_FPU] = {
+		USER_REGSET_NOTE_TYPE(PRFPREG),
+		.n = sizeof(struct user_fpregs_struct) / sizeof(HVX_Vector),
+		.size = sizeof(HVX_Vector),
+		.align = sizeof(HVX_Vector),
+		.regset_get = fpregs_get,
+		.set = fpregs_set,
+		.active = fpregs_active,
 	},
 };
 

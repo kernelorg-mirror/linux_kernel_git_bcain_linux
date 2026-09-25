@@ -29,6 +29,10 @@ int main(void)
 	DEFINE(_PAGE_SHIFT, PAGE_SHIFT);
 	BLANK();
 
+	COMMENT("Hexagon HVX_Vectors definitions");
+	OFFSET(_PT_VECPREDSAVE, HVX_Vectors, vecpredsave);
+	OFFSET(_PT_V0, HVX_Vectors, v0);
+
 	COMMENT("Hexagon pt_regs definitions");
 	OFFSET(_PT_SYSCALL_NR, pt_regs, syscall_nr);
 	OFFSET(_PT_GPUGP, pt_regs, gpugp);

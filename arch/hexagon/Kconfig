@@ -172,4 +172,6 @@ config BASE_IPI_IRQ
 
 source "kernel/Kconfig.hz"
 
+source "arch/hexagon/kernel/hvx/Kconfig"
+
 endmenu
