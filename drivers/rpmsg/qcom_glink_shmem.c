@@ -23,13 +23,16 @@
  * initializes must be the one that is started first and restarted last.
  */
 
+#include <linux/debugfs.h>
 #include <linux/io.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/platform_device.h>
+#include <linux/seq_file.h>
 #include <linux/sizes.h>
+#include <linux/sysfs.h>
 
 #include "qcom_glink_native.h"
 
@@ -68,6 +71,12 @@ struct qcom_glink_shmem {
 	void __iomem *ipc;
 	u32 ipc_offset;
 	u32 ipc_bits;
+	bool intentless;
+
+	/* statistics, for debugging */
+	atomic64_t nr_irqs;
+	atomic64_t nr_kicks;
+	struct dentry *debugfs;
 
 	int irq;
 };
@@ -199,6 +208,7 @@ static void glink_shmem_tx_kick(struct qcom_glink_pipe *np)
 	/* The head update must be visible before the doorbell. */
 	wmb();
 
+	atomic64_inc(&shmem->nr_kicks);
 	iowrite32(shmem->ipc_bits, shmem->ipc + shmem->ipc_offset);
 }
 
@@ -206,6 +216,7 @@ static irqreturn_t qcom_glink_shmem_intr(int irq, void *data)
 {
 	struct qcom_glink_shmem *shmem = data;
 
+	atomic64_inc(&shmem->nr_irqs);
 	qcom_glink_native_rx(shmem->glink);
 
 	return IRQ_HANDLED;
@@ -279,6 +290,69 @@ static int glink_shmem_read_doorbell(struct device_node *np,
 	return ret;
 }
 
+/*
+ * State for debugging: where each FIFO's head and tail are (a tail that is
+ * behind its head is data the reader has not taken), the doorbell, and how
+ * often the peer and this side have rung one.
+ */
+static void shmem_pipe_show(struct seq_file *m, const char *dir,
+			    struct glink_shmem_pipe *pipe)
+{
+	seq_printf(m, "%s: magic %#x, head %u, tail %u, size %zu\n", dir,
+		   ioread32(pipe->base + SHMEM_MAGIC), pipe_head(pipe),
+		   pipe_tail(pipe), pipe->native.length);
+}
+
+static int shmem_state_show(struct seq_file *m, void *unused)
+{
+	struct qcom_glink_shmem *shmem = m->private;
+
+	shmem_pipe_show(m, "rx", &shmem->rx);
+	shmem_pipe_show(m, "tx", &shmem->tx);
+	seq_printf(m, "doorbell: offset %#x, bits %#x\n", shmem->ipc_offset,
+		   shmem->ipc_bits);
+	seq_printf(m, "irq: %d, received %lld\n", shmem->irq,
+		   atomic64_read(&shmem->nr_irqs));
+	seq_printf(m, "kicks sent: %lld\n", atomic64_read(&shmem->nr_kicks));
+	seq_printf(m, "intentless: %d\n", shmem->intentless);
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(shmem_state);
+
+static void shmem_debugfs_remove(void *dir)
+{
+	debugfs_remove_recursive(dir);
+}
+
+#define SHMEM_ATTR(_name, _fmt, _val)					\
+static ssize_t _name##_show(struct device *dev,				\
+			    struct device_attribute *attr, char *buf)	\
+{									\
+	struct qcom_glink_shmem *shmem = dev_get_drvdata(dev);		\
+									\
+	return sysfs_emit(buf, _fmt "\n", _val);			\
+}									\
+static DEVICE_ATTR_RO(_name)
+
+SHMEM_ATTR(rx_head, "%u", pipe_head(&shmem->rx));
+SHMEM_ATTR(rx_tail, "%u", pipe_tail(&shmem->rx));
+SHMEM_ATTR(tx_head, "%u", pipe_head(&shmem->tx));
+SHMEM_ATTR(tx_tail, "%u", pipe_tail(&shmem->tx));
+SHMEM_ATTR(irqs, "%lld", atomic64_read(&shmem->nr_irqs));
+SHMEM_ATTR(kicks, "%lld", atomic64_read(&shmem->nr_kicks));
+
+static struct attribute *shmem_attrs[] = {
+	&dev_attr_rx_head.attr,
+	&dev_attr_rx_tail.attr,
+	&dev_attr_tx_head.attr,
+	&dev_attr_tx_tail.attr,
+	&dev_attr_irqs.attr,
+	&dev_attr_kicks.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(shmem);
+
 static int qcom_glink_shmem_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -333,17 +407,25 @@ static int qcom_glink_shmem_probe(struct platform_device *pdev)
 	if (ret)
 		return dev_err_probe(&pdev->dev, ret, "failed to request IRQ\n");
 
+	shmem->intentless = intentless ||
+			    of_property_read_bool(np, "qcom,intentless");
 	shmem->glink = qcom_glink_native_probe(&pdev->dev,
 					       GLINK_FEATURE_INTENT_REUSE,
 					       &shmem->rx.native,
 					       &shmem->tx.native,
-					       intentless ||
-					       of_property_read_bool(np, "qcom,intentless"));
+					       shmem->intentless);
 	if (IS_ERR(shmem->glink))
 		return dev_err_probe(&pdev->dev, PTR_ERR(shmem->glink),
 				     "failed to start GLINK\n");
 
 	platform_set_drvdata(pdev, shmem);
+
+	shmem->debugfs = debugfs_create_dir(dev_name(&pdev->dev), NULL);
+	debugfs_create_file("state", 0444, shmem->debugfs, shmem,
+			    &shmem_state_fops);
+	devm_add_action_or_reset(&pdev->dev, shmem_debugfs_remove,
+				 shmem->debugfs);
+
 	/*
 	 * The peer may have queued data before we could take the interrupt.
 	 * Take it now, before the interrupt can run the same code on another
@@ -381,6 +463,7 @@ static struct platform_driver qcom_glink_shmem_driver = {
 	.driver = {
 		.name = "qcom_glink_shmem",
 		.of_match_table = qcom_glink_shmem_of_match,
+		.dev_groups = shmem_groups,
 	},
 };
 module_platform_driver(qcom_glink_shmem_driver);
