@@ -110,6 +110,7 @@ typedef enum {
 
 extern void _K_VM_event_vector(void);
 
+long __vmversion(void);
 void __vmrte(void);
 long __vmsetvec(void *);
 

@@ -146,3 +146,7 @@ ENTRY(__vmhwconfig)
 ENTRY(__vmpmucfg)
 	trap1(#HVM_TRAP1_VMPMUCONFIG);
 	jumpr	R31;
+
+ENTRY(__vmversion)
+	trap1(#HVM_TRAP1_VMVERSION);
+	jumpr	R31;

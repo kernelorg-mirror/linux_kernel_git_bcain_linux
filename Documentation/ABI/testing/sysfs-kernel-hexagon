@@ -1,0 +1,56 @@
+What:		/sys/kernel/hexagon/arch
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		The architecture version of the Hexagon core the kernel runs
+		on, as the hypervisor reports it, for example "v68".
+
+What:		/sys/kernel/hexagon/vm_version
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		The version of the hypervisor's virtual machine interface.
+
+What:		/sys/kernel/hexagon/hthreads
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		The number of hardware threads the hypervisor is running, and
+		their mask.
+
+What:		/sys/kernel/hexagon/timer_freq_hz
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		The frequency of the hypervisor's timer, as it reports it.
+
+What:		/sys/kernel/hexagon/info/<name>
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		One value of the hypervisor's info call, in hex: its build id,
+		boot flags, the core's revision, the TLB and cache sizes, the
+		base addresses of the subsystem, interrupt controller and timer,
+		the coprocessors' contexts and vector length, and so on.  The
+		names are those of the info call's codes.
+
+What:		/sys/kernel/hexagon/pmu/{evtcfg,evtcfg1,cfg,stid0,stid1}
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		The configuration registers of the core's performance
+		monitoring unit, in hex.
+
+What:		/sys/kernel/hexagon/cpus/cpu<N>
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		The hypervisor's virtual CPU number that CPU N runs on, and
+		whether the CPU is online.

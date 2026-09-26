@@ -136,6 +136,15 @@ config HEXAGON_PMU
 	  Support for the core's performance counters in perf, through the
 	  hypervisor: a PMU named "hexagon", counting the whole core.
 
+config HEXAGON_H2_INFO
+	bool "Hypervisor and core information in sysfs and debugfs"
+	depends on HEXAGON_H2
+	default y
+	help
+	  Export what the hypervisor tells a guest about itself and the core it
+	  runs on, and the state of the core's performance monitoring unit, in
+	  /sys/kernel/hexagon and, with debugfs, /sys/kernel/debug/hexagon.
+
 config HEXAGON_H2
 	bool "H2 hypervisor interface"
 	help
