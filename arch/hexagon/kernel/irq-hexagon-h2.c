@@ -56,7 +56,8 @@ int __init hexagon_pic_of_init(struct device_node *node,
 	load_ie_cache();
 
 	/*  Not sure what the correct host data for this is yet  */
-	hexagon_irq_domain = irq_domain_add_linear(node, HEXAGON_CPUINTS,
+	hexagon_irq_domain = irq_domain_create_linear(of_fwnode_handle(node),
+						 HEXAGON_CPUINTS,
 			&irq_domain_simple_ops, &hexagon_irq_chip);
 	if (!hexagon_irq_domain) {
 		WARN(1, "Cannot allocate irq_domain\n");
