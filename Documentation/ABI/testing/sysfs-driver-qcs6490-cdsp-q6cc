@@ -1,0 +1,25 @@
+What:		/sys/devices/platform/.../<addr>.clock-controller/core_rate_hz
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		The frequency of the QCS6490 CDSP's core clock, worked out from
+		the registers of its clock controller.
+
+What:		/sys/devices/platform/.../<addr>.clock-controller/core_source
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		What the core clock runs from: "xo" for the reference clock,
+		"pll", or "other".
+
+What:		/sys/devices/platform/.../<addr>.clock-controller/pll_{rate_hz,locked,mode,l_val,cal_l_val,alpha_val}
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		The state of the core's PLL: its frequency (0 if it is not
+		locked), whether it is locked, and its mode, multiplier,
+		calibration multiplier and alpha registers.  Debugfs has the
+		registers as a whole, and a decoded summary.
