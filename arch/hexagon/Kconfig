@@ -128,6 +128,14 @@ config CMDLINE
 	  minimum, you should specify the memory size and the root device
 	  (e.g., mem=64M root=/dev/nfs).
 
+config HEXAGON_PMU
+	bool "Hexagon performance monitoring unit (perf)"
+	depends on HEXAGON_H2 && PERF_EVENTS
+	default y
+	help
+	  Support for the core's performance counters in perf, through the
+	  hypervisor: a PMU named "hexagon", counting the whole core.
+
 config HEXAGON_H2
 	bool "H2 hypervisor interface"
 	help

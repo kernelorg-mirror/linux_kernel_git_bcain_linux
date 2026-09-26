@@ -16,6 +16,7 @@ obj-y += time.o
 endif
 
 obj-$(CONFIG_KGDB)    += kgdb.o
+obj-$(CONFIG_HEXAGON_PMU) += perf_event.o
 obj-$(CONFIG_MODULES) += module.o hexagon_ksyms.o
 
 # Modules required to work with the Hexagon Virtual Machine
