@@ -15,8 +15,10 @@
 
 #define SEGTABLE_ENTRIES #0x0e0
 
-	__INIT
+	__HEAD
 ENTRY(stext)
+	R27 = R0  /*  DTB phys addr low, from bootloader R0  */
+	R28 = R1  /*  DTB phys addr high, save before clobbered  */
 	/*
 	 * VMM will already have set up true vector page, MMU, etc.
 	 * To set up initial kernel identity map, we have to pass
@@ -90,6 +92,10 @@ ENTRY(stext)
 	memw(r0 ++ #4) = r1
 	{ r1 = add(r1, r2); } :endloop0
 
+#define PTE_BITS_16MB ( __HVM_PTE_R | __HVM_PTE_W | __HVM_PTE_X	\
+		  | __HEXAGON_C_WB_L2 << 6			\
+		  | __HVM_PDE_S_16MB)
+
 	/*  Also need to overwrite the initial 0xc0000000 entries  */
 	/*  PAGE_OFFSET >> (4MB shift - 4 bytes per entry shift)  */
 	R1.H = #HI(PAGE_OFFSET >> (22 - 2))
@@ -100,12 +106,22 @@ ENTRY(stext)
 	r2.h = #0xffc0;
 	r2.l = #0x0000;		/* round back down to 4MB boundary  */
 	r1 = and(r1,r2);	/* for huge page */
-	r2 = #PTE_BITS
+	r2 = #PTE_BITS_16MB
 	r1 = add(r1,r2);
 	r2.h = #0x0040
-	r2.l = #0x0000		/* 4MB increments */
+	r2.l = #0x0000		/* 4MB increments even though we're using 16MB pages */
 
-	loop0(1f,SEGTABLE_ENTRIES);
+	loop0(1f,SEGTABLE_ENTRIES-4);  //  hack -- pull up short on the last 4 to allow 4MB granularity and hijinx
+1:
+	memw(r0 ++ #4) = r1;
+	{ r1 = add(r1,r2); } :endloop0
+
+	//  reset r2 back to 4MB pages
+	r1 = lsr(r1, #3);
+	r1 = asl(r1, #3);
+	r1 = add(r1, #__HVM_PDE_S_4MB);
+
+	loop0(1f, #4);
 1:
 	memw(r0 ++ #4) = r1;
 	{ r1 = add(r1,r2); } :endloop0
@@ -119,7 +135,8 @@ ENTRY(stext)
 	 * vm_ops.S
 	 */
 	r1 = #VM_TRANS_TYPE_TABLE
-	call	__vmnewmap;
+	r2 = #VM_TLB_INVALIDATE_TRUE
+	call	##__vmnewmap;
 
 	/*  Jump into virtual address range.  */
 
@@ -155,12 +172,13 @@ __head_s_vaddr_target:
 
 	r0 = r24
 	r1 = #VM_TRANS_TYPE_TABLE
-	call __vmnewmap
+	r2 = #VM_TLB_INVALIDATE_TRUE
+	call ##__vmnewmap
 
 	/*  Go ahead and install the trap0 return so angel calls work  */
 	r0.h = #hi(_K_provisional_vec)
 	r0.l = #lo(_K_provisional_vec)
-	call __vmsetvec
+	call ##__vmsetvec
 
 	/*
 	 * OK, at this point we should start to be much more careful,
@@ -195,7 +213,12 @@ __head_s_vaddr_target:
 	{ r0.H = #HI(__bss_start);           r2.h = #HI(__bss_stop); }
 
 	r2 = sub(r2,r0);
-	call memset;
+	call ##memset;
+
+	R0.H = #HI(boot_dtb_phys);
+	R0.L = #LO(boot_dtb_phys);
+	memw(R0) = R27;     //  save DTB phys addr low
+	memw(R0+#4) = R28;  //  save DTB phys addr high
 
 	/*  Set PHYS_OFFSET; should be in R25 */
 #ifdef CONFIG_HEXAGON_PHYS_OFFSET
@@ -205,14 +228,10 @@ __head_s_vaddr_target:
 #endif
 
 	/* Time to make the doughnuts.   */
-	call start_kernel
+	call ##start_kernel
 
 	/*
 	 * Should not reach here.
 	 */
 1:
 	jump 1b
-
-.p2align PAGE_SHIFT
-ENTRY(external_cmdline_buffer)
-        .fill _PAGE_SIZE,1,0

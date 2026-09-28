@@ -39,6 +39,9 @@ config HEXAGON
 	select GENERIC_CPU_DEVICES
 	select ARCH_WANT_LD_ORPHAN_WARN
 	select TRACE_IRQFLAGS_SUPPORT
+	select IRQ_DOMAIN
+	select OF
+	select OF_EARLY_FLATTREE
 	help
 	  Qualcomm Hexagon is a processor architecture designed for high
 	  performance and low power across a wide variety of applications.
@@ -63,6 +66,9 @@ config NO_IOPORT_MAP
 config GENERIC_CSUM
 	def_bool y
 
+config GENERIC_CALIBRATE_DELAY
+	def_bool y
+
 config GENERIC_HWEIGHT
 	def_bool y
 
@@ -79,6 +85,27 @@ menu "Machine selection"
 choice
 	prompt "System type"
 	default HEXAGON_COMET
+
+config HEXAGON_QEMU
+	bool "QEMU virt machine"
+	select HEXAGON_PHYS_OFFSET
+	select ARM_AMBA
+	select COMMON_CLK
+	select HEXAGON_H2
+	help
+	  Support for the QEMU hexagon "virt" machine.
+
+config HEXAGON_QCS6490_CDSP
+	bool "Qualcomm QCS6490 Compute DSP"
+	select HEXAGON_PHYS_OFFSET
+	select ARM_AMBA
+	select COMMON_CLK
+	select HEXAGON_H2
+	help
+	  Support for the Hexagon v68 compute DSP of the Qualcomm QCS6490,
+	  running as a guest of the H2 hypervisor.  The console is the
+	  PL011 that QEMU's qcs6490-cdsp machine adds for this purpose; the
+	  hardware has no UART.
 
 config HEXAGON_COMET
 	bool "Comet Board"
@@ -101,6 +128,33 @@ config CMDLINE
 	  minimum, you should specify the memory size and the root device
 	  (e.g., mem=64M root=/dev/nfs).
 
+config HEXAGON_PMU
+	bool "Hexagon performance monitoring unit (perf)"
+	depends on HEXAGON_H2 && PERF_EVENTS
+	default y
+	help
+	  Support for the core's performance counters in perf, through the
+	  hypervisor: a PMU named "hexagon", counting the whole core.
+
+config HEXAGON_H2_INFO
+	bool "Hypervisor and core information in sysfs and debugfs"
+	depends on HEXAGON_H2
+	default y
+	help
+	  Export what the hypervisor tells a guest about itself and the core it
+	  runs on, and the state of the core's performance monitoring unit, in
+	  /sys/kernel/hexagon and, with debugfs, /sys/kernel/debug/hexagon.
+
+config HEXAGON_H2
+	bool "H2 hypervisor interface"
+	help
+	  Support for running under the Hexagon H2 hypervisor (as opposed
+	  to bare metal or an older/simpler VM interface). This provides
+	  the trap-based hypercall interface, the H2 interrupt controller,
+	  and the H2 timer that the QEMU "virt" machine and current
+	  hardware targets require. Platforms without an H2 hypervisor
+	  should leave this disabled.
+
 config SMP
 	bool "Multi-Processing support"
 	help
@@ -119,6 +173,24 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
+config BASE_IPI_IRQ
+	int "Base IPI IRQ" if SMP
+	default 0
+	help
+	  The base IRQ used for IPI calls.  Each CPU increments by one,
+	  although the newer hypervisor API specifies the lower range of
+	  interrupts to be percpu anyways.
+
+	  The range BASE..BASE+NR_CPUS-1 must not overlap interrupts
+	  claimed by devices; the H2 timer guest interrupt is 12, which
+	  the previous default of 8 aliased once five CPUs were enabled.
+
+	  Todo:  Maybe make this a devtree thing instead?
+
 source "kernel/Kconfig.hz"
+
+source "arch/hexagon/kernel/hvx/Kconfig"
+
+source "arch/hexagon/kernel/hmx/Kconfig"
 
 endmenu

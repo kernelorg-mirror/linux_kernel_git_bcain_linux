@@ -630,4 +630,12 @@ config NET_FAILOVER
 	  a VM with direct attached VF by failing over to the paravirtual
 	  datapath when the VF is unplugged.
 
+config RPMSG_NET
+	tristate "IP networking over RPMSG"
+	depends on RPMSG
+	help
+	  Transports raw IP packets over the "IP_BRIDGE" channel of an RPMSG
+	  link (e.g. GLINK), as a point-to-point "dspN" network interface,
+	  for communication with a DSP.
+
 endif # NETDEVICES

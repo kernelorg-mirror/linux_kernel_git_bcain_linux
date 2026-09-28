@@ -148,6 +148,17 @@ config UIO_HV_GENERIC
 
 	  If you compile this as a module, it will be called uio_hv_generic.
 
+config UIO_HEXAGON_VTCM
+	tristate "Hexagon VTCM UIO driver"
+	depends on HEXAGON && (HEXAGON_HVX || HEXAGON_HMX)
+	help
+	  Userspace I/O interface for Hexagon VTCM (Vector TCM), the memory
+	  that HVX and HMX programs work in.  A process may open it only
+	  after it has used HVX or HMX.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called uio_hexagon_vtcm.
+
 config UIO_DFL
 	tristate "Generic driver for DFL (Device Feature List) bus"
 	depends on FPGA_DFL

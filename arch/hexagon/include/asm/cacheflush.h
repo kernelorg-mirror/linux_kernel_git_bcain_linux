@@ -58,12 +58,9 @@ extern void flush_cache_all_hexagon(void);
  * clean the cache when the PTE is set.
  *
  */
-static inline void update_mmu_cache_range(struct vm_fault *vmf,
+void update_mmu_cache_range(struct vm_fault *vmf,
 		struct vm_area_struct *vma, unsigned long address,
-		pte_t *ptep, unsigned int nr)
-{
-	/*  generic_ptrace_pokedata doesn't wind up here, does it?  */
-}
+		pte_t *ptep, unsigned int nr);
 
 #define update_mmu_cache(vma, addr, ptep) \
 	update_mmu_cache_range(NULL, vma, addr, ptep, 1)
@@ -77,6 +74,13 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 
 extern void hexagon_inv_dcache_range(unsigned long start, unsigned long end);
 extern void hexagon_clean_dcache_range(unsigned long start, unsigned long end);
+extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
+
+#define flush_cache_vmap flush_cache_vmap
+static inline void flush_cache_vmap(unsigned long start, unsigned long end)
+{
+	flush_tlb_kernel_range(start, end);
+}
 
 #include <asm-generic/cacheflush.h>
 

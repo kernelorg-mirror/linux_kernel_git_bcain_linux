@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/timer/qcom,h2-timer.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm Hexagon H2 hypervisor timer
+
+maintainers:
+  - Brian Cain <brian.cain@oss.qualcomm.com>
+
+description: >
+  Timer presented to a guest by the Hexagon H2 hypervisor.  The guest reads
+  the counter and arms the deadline through the vmtimerop hypercall rather
+  than through the register block, so a driver needs only the interrupt the
+  hypervisor raises when the deadline expires.  The register block belongs
+  to the underlying general purpose timer and is never mapped by a guest,
+  so the node carries no reg.
+
+properties:
+  compatible:
+    items:
+      - const: qcom,h2-timer
+      - const: qcom,hvm-timer
+    description: >
+      qcom,hvm-timer is a generic fallback for any Hexagon hypervisor
+      timer: it lets a driver bind against the timer a future H2 revision
+      presents without gaining a new specific compatible string for every
+      revision.  The in-tree driver currently matches only the specific
+      qcom,h2-timer string.
+
+  interrupts:
+    maxItems: 1
+
+required:
+  - compatible
+  - interrupts
+
+additionalProperties: false
+
+examples:
+  - |
+    timer {
+        compatible = "qcom,h2-timer", "qcom,hvm-timer";
+        interrupts = <12 0>;
+    };

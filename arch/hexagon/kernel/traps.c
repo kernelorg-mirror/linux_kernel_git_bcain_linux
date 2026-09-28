@@ -21,6 +21,7 @@
 #include <asm/registers.h>
 #include <asm/unistd.h>
 #include <asm/sections.h>
+#include <asm/notify.h>
 #ifdef CONFIG_KGDB
 # include <linux/kgdb.h>
 #endif
@@ -61,10 +62,21 @@ static const char *ex_name(int ex)
 	case HVM_GE_C_INVI:
 	case HVM_GE_C_PRIVI:
 		return "Illegal instruction";
+	case HVM_GE_C_COPROC:
+	case HVM_GE_C_COPROC2:
+		return "Coprocessor not enabled";
 	case HVM_GE_C_BUS:
 		return "Precise bus error";
 	case HVM_GE_C_CACHE:
 		return "Cache error";
+	case HVM_GE_C_TLBMISSX_0:
+	case HVM_GE_C_TLBMISSX_1:
+	case HVM_GE_C_TLBMISSX_ICINVA:
+		return "TLB miss execute";
+	case HVM_GE_C_TLBMISSR:
+		return "TLB miss read";
+	case HVM_GE_C_TLBMISSW:
+		return "TLB miss write";
 
 	case 0xdb:
 		return "Debugger trap";
@@ -281,11 +293,48 @@ static void cache_error(struct pt_regs *regs)
 }
 
 /*
+ * A coprocessor-unavailable fault (HVX/HMX) is how lazy vector-context
+ * allocation is triggered: the first coprocessor instruction a thread
+ * executes traps here because the extension is not enabled for it.  Offer the
+ * fault to the coprocessor context managers via the thread-event notifier;
+ * one of them claims it (coproc_fault_claim()) and allocates a context,
+ * after which the instruction is retried.  If nothing claims it -- no
+ * coprocessor support is built in, or the thread is genuinely misusing the
+ * coprocessor -- deliver SIGFPE.
+ */
+static void coproc_fault(struct pt_regs *regs)
+{
+	coproc_fault_reset();
+
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_FAULT_COPROC);
+
+	if (!coproc_fault_claimed())
+		force_sig(SIGFPE);
+}
+
+/*
  * General exception handler
  */
 void do_genex(struct pt_regs *regs);
 void do_genex(struct pt_regs *regs)
 {
+	/*
+	 * The VM disables guest interrupts on event delivery; the IE
+	 * cache must be cleared before anything reads or updates it,
+	 * or a later local_irq_enable() becomes a silent no-op.
+	 */
+	clear_ie_cached();
+
+	/*
+	 * Tell the coprocessor context managers that we have entered the
+	 * kernel, so that any live vector state of this thread is saved and its
+	 * hardware context released before we run.  This is needed on every
+	 * kernel entry -- exception, syscall and interrupt -- or a thread's
+	 * vector registers can be lost across a context switch taken from an
+	 * exception or a syscall.
+	 */
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
+
 	/*
 	 * Decode Cause and Dispatch
 	 */
@@ -327,6 +376,21 @@ void do_genex(struct pt_regs *regs)
 	case HVM_GE_C_CACHE:
 		cache_error(regs);
 		break;
+	case HVM_GE_C_TLBMISSX_0:
+	case HVM_GE_C_TLBMISSX_1:
+	case HVM_GE_C_TLBMISSX_ICINVA:
+		execute_protection_fault(regs);
+		break;
+	case HVM_GE_C_TLBMISSR:
+		read_protection_fault(regs);
+		break;
+	case HVM_GE_C_TLBMISSW:
+		write_protection_fault(regs);
+		break;
+	case HVM_GE_C_COPROC:
+	case HVM_GE_C_COPROC2:
+		coproc_fault(regs);
+		break;
 	default:
 		/* Halt and catch fire */
 		panic("Unrecognized exception 0x%lx\n", pt_cause(regs));
@@ -339,6 +403,17 @@ void do_trap0(struct pt_regs *regs)
 {
 	syscall_fn syscall;
 
+	/*
+	 * The VM disabled guest interrupts to deliver this event; without
+	 * this, the cache still says "enabled" and the VM_INT_ENABLE below
+	 * is treated as no change, so the whole syscall runs with guest
+	 * interrupts disabled at the hypervisor.
+	 */
+	clear_ie_cached();
+
+	/* Save and release any live coprocessor context on syscall entry. */
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
+
 	switch (pt_cause(regs)) {
 	case TRAP_SYSCALL:
 		/* System call is trap0 #1 */
@@ -349,7 +424,7 @@ void do_trap0(struct pt_regs *regs)
 			return;  /*  return -ENOSYS somewhere?  */
 
 		/* Interrupts should be re-enabled for syscall processing */
-		__vmsetie(VM_INT_ENABLE);
+		vmsetie_cached(VM_INT_ENABLE);
 
 		/*
 		 * System call number is in r6, arguments in r0..r5.
@@ -372,10 +447,17 @@ void do_trap0(struct pt_regs *regs)
 		regs->restart_r0 = regs->r00;
 
 		if ((unsigned long) regs->syscall_nr >= __NR_syscalls) {
-			regs->r00 = -1;
+			regs->r00 = -ENOSYS;
 		} else {
 			syscall = (syscall_fn)
 				  (sys_call_table[regs->syscall_nr]);
+
+			/* Check for unimplemented syscall (NULL entry in table) */
+			if (!syscall) {
+				regs->r00 = -ENOSYS;
+				break;
+			}
+
 			regs->r00 = syscall(regs->r00, regs->r01,
 				   regs->r02, regs->r03,
 				   regs->r04, regs->r05);
@@ -415,8 +497,11 @@ void do_trap0(struct pt_regs *regs)
 void do_machcheck(struct pt_regs *regs);
 void do_machcheck(struct pt_regs *regs)
 {
+	clear_ie_cached();
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
+
 	/* Halt and catch fire */
-	__vmstop();
+	__vmstop(machinecheck);
 }
 
 /*
@@ -426,6 +511,8 @@ void do_machcheck(struct pt_regs *regs)
 void do_debug_exception(struct pt_regs *regs);
 void do_debug_exception(struct pt_regs *regs)
 {
+	clear_ie_cached();
+
 	regs->hvmer.vmest &= ~HVM_VMEST_CAUSE_MSK;
 	regs->hvmer.vmest |= (TRAP_DEBUG << HVM_VMEST_CAUSE_SFT);
 	do_trap0(regs);

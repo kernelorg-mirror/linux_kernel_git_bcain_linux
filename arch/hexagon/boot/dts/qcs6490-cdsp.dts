@@ -1,0 +1,137 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Qualcomm QCS6490 compute DSP, as a guest of the H2 hypervisor.
+ *
+ * H2's loader passes the address of this tree in r1:r0; on the RubikPi 3
+ * it is 0xa1001200, inside the first page of the kernel image, which
+ * head.S leaves free.  The kernel takes its RAM size from mem= rather
+ * than the memory node, and the initrd, if any, is placed by the loader
+ * (fill in linux,initrd-start/-end, e.g. with fdtput).
+ */
+/dts-v1/;
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <1>;
+	model = "Qualcomm QCS6490 CDSP";
+	compatible = "qcom,qcs6490-cdsp";
+
+	chosen {
+		bootargs = "mem=240M lpj=89124080 rdinit=/init";
+	};
+
+	memory@a1000000 {
+		device_type = "memory";
+		reg = <0 0xa1000000 0x0f000000>;
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			reg = <0>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			reg = <1>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			reg = <2>;
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			reg = <3>;
+		};
+
+		cpu@4 {
+			device_type = "cpu";
+			reg = <4>;
+		};
+
+		cpu@5 {
+			device_type = "cpu";
+			reg = <5>;
+		};
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges;
+		interrupt-parent = <&pic>;
+
+		/*
+		 * H2 virtualizes the first-level interrupt controller.  Guest
+		 * interrupts 0-31 are H2's own; L2VIC line N is 32 + N.
+		 */
+		pic: interrupt-controller@a390000 {
+			compatible = "qcom,h2-pic", "hvm-pic";
+			reg = <0 0x0a390000 0x1000>;
+			interrupt-controller;
+			#address-cells = <0>;
+			#interrupt-cells = <2>;
+		};
+
+		/* The timer is H2's virtual one; only its interrupt matters. */
+		gpt@ab000000 {
+			compatible = "qcom,h2-timer", "hvm-timer";
+			reg = <0 0xab000000 0x1000>;
+			interrupts = <12 0>;
+		};
+
+		/* The core clock of the DSP: PLL and core clock select. */
+		q6cc: clock-controller@a340000 {
+			compatible = "qcom,qcs6490-cdsp-q6cc";
+			reg = <0 0x0a340000 0x10000>;
+			#clock-cells = <0>;
+			qcom,pll-l-val = <0x31>;
+			qcom,pll-cal-l-val = <0x44>;
+		};
+
+		/*
+		 * GLINK to the application processor, over two 64K windows of
+		 * shared memory (the one we read, then the one we write) and
+		 * the IPC doorbells between the two.  This side starts first,
+		 * so it initializes the windows.  The application processor
+		 * opens no channels, so we open the one for IP.
+		 */
+		glink-edge@d7c00000 {
+			compatible = "qcom,glink-shmem-edge";
+			reg = <0 0xd7c00000 0x10000>,
+			      <0 0xd7c10000 0x10000>,
+			      <0 0x0a380000 0x10000>;
+			interrupts = <91 0>;
+			qcom,ipc-offset = <0x8000>;
+			qcom,ipc-bits = <0x20>;
+			qcom,shmem-init;
+			qcom,intentless;
+
+			ip-bridge {
+				qcom,glink-channels = "IP_BRIDGE";
+				qcom,glink-auto-open;
+			};
+		};
+
+		vtcm@9c00000 {
+			compatible = "qcom,hexagon_vtcm";
+			reg = <0 0x09c00000 0x200000>;
+		};
+
+		hvx {
+			compatible = "qcom,hexagon-hvx";
+			qcom,hvx-max-ctxts = <2>;
+			qcom,hvx-vlength = <7>;
+		};
+
+		hmx {
+			compatible = "qcom,hexagon-hmx";
+		};
+	};
+};

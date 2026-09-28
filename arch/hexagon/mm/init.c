@@ -8,6 +8,9 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/memblock.h>
+#include <linux/of_fdt.h>
+#include <linux/libfdt.h>
+#include <linux/sizes.h>
 #include <asm/atomic.h>
 #include <linux/highmem.h>
 #include <asm/tlb.h>
@@ -21,8 +24,10 @@
  */
 #define bootmem_startpg (PFN_UP(((unsigned long) _end) - PAGE_OFFSET + PHYS_OFFSET))
 
-unsigned long bootmem_lastpg;	/*  Should be set by platform code  */
 unsigned long __phys_offset;	/*  physical kernel offset >> 12  */
+
+/*  Default RAM size; the "mem=" parameter overrides it.  */
+unsigned long bootmem_lastpg = PFN_DOWN(SZ_256M);
 
 /*  Set as variable to limit PMD copies  */
 int max_kernel_seg = 0x303;
@@ -34,14 +39,14 @@ unsigned long highstart_pfn, highend_pfn;
 unsigned long _dflt_cache_att = CACHEDEF;
 
 /*
- * The current "generation" of kernel map, which should not roll
- * over until Hell freezes over.  Actual bound in years needs to be
- * calculated to confirm.
+ * The current "generation" of kernel map.  A single word so that
+ * reads are atomic on a 32-bit machine; switch_mm() compares
+ * generations for inequality, so wrapping is harmless.
  */
 DEFINE_SPINLOCK(kmap_gen_lock);
 
 /*  checkpatch says don't init this to 0.  */
-unsigned long long kmap_generation;
+unsigned long kmap_generation;
 
 void sync_icache_dcache(pte_t pte)
 {
@@ -76,10 +81,10 @@ static void __init paging_init(void)
 }
 
 #ifndef DMA_RESERVE
-#define DMA_RESERVE		(4)
+#define DMA_RESERVE		0
 #endif
 
-#define DMA_CHUNKSIZE		(1<<22)
+#define DMA_CHUNKSIZE		SZ_4M
 #define DMA_RESERVED_BYTES	(DMA_RESERVE * DMA_CHUNKSIZE)
 
 /*
@@ -117,9 +122,11 @@ void __init setup_arch_memory(void)
 	/*  Prior to this, bootmem_lastpg is actually mem size  */
 	bootmem_lastpg += ARCH_PFN_OFFSET;
 
+#if DMA_RESERVE > 0
 	/* Memory size needs to be a multiple of 16M */
 	bootmem_lastpg = PFN_DOWN((bootmem_lastpg << PAGE_SHIFT) &
 		~((BIG_KERNEL_PAGE_SIZE) - 1));
+#endif
 
 	memblock_add(PHYS_OFFSET,
 		     (bootmem_lastpg - ARCH_PFN_OFFSET) << PAGE_SHIFT);
@@ -127,6 +134,14 @@ void __init setup_arch_memory(void)
 	/* Reserve kernel text/data/bss */
 	memblock_reserve(PHYS_OFFSET,
 			 (bootmem_startpg - ARCH_PFN_OFFSET) << PAGE_SHIFT);
+
+	/*
+	 * A bootloader-provided DTB sits in our RAM until it is
+	 * unflattened; keep the allocator away from it.
+	 */
+	if (boot_dtb_phys && initial_boot_params)
+		memblock_reserve(boot_dtb_phys,
+				 fdt_totalsize(initial_boot_params));
 	/*
 	 * Reserve the top DMA_RESERVE bytes of RAM for DMA (uncached)
 	 * memory allocation
@@ -148,8 +163,6 @@ void __init setup_arch_memory(void)
 
 	/*  this is pointer arithmetic; each entry covers 4MB  */
 	segtable = segtable + (PAGE_OFFSET >> 22);
-
-	/*  this actually only goes to the end of the first gig  */
 	segtable_end = segtable + (1<<(30-22));
 
 	/*
@@ -177,15 +190,6 @@ void __init setup_arch_memory(void)
 	printk(KERN_INFO "segtable = %p (should be equal to _K_io_map)\n",
 		segtable);
 
-#if 0
-	/*  Other half of the early device table from vm_init_segtable. */
-	printk(KERN_INFO "&_K_init_devicetable = 0x%08x\n",
-		(unsigned long) _K_init_devicetable-PAGE_OFFSET);
-	*segtable = ((u32) (unsigned long) _K_init_devicetable-PAGE_OFFSET) |
-		__HVM_PDE_S_4KB;
-	printk(KERN_INFO "*segtable = 0x%08x\n", *segtable);
-#endif
-
 	/*
 	 *  The bootmem allocator seemingly just lives to feed memory
 	 *  to the paging system
@@ -202,43 +206,42 @@ void __init setup_arch_memory(void)
 }
 
 static const pgprot_t protection_map[16] = {
-	[VM_NONE]					= __pgprot(_PAGE_PRESENT | _PAGE_USER |
+	[VM_NONE]					= __pgprot(_NO_PERM | CACHEDEF),
+	[VM_READ]					= __pgprot(_PAGE_USER | _PAGE_READ |
 								   CACHEDEF),
-	[VM_READ]					= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | CACHEDEF),
-	[VM_WRITE]					= __pgprot(_PAGE_PRESENT | _PAGE_USER |
+	[VM_WRITE]					= __pgprot(_NO_PERM | CACHEDEF),
+	[VM_WRITE | VM_READ]				= __pgprot(_PAGE_USER | _PAGE_READ |
 								   CACHEDEF),
-	[VM_WRITE | VM_READ]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | CACHEDEF),
-	[VM_EXEC]					= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | CACHEDEF),
-	[VM_EXEC | VM_READ]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | _PAGE_READ |
+	[VM_EXEC]					= __pgprot(_PAGE_USER | _PAGE_READ |
+								   _PAGE_EXECUTE |
 								   CACHEDEF),
-	[VM_EXEC | VM_WRITE]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | CACHEDEF),
-	[VM_EXEC | VM_WRITE | VM_READ]			= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | _PAGE_READ |
+	[VM_EXEC | VM_READ]				= __pgprot(_PAGE_USER | _PAGE_READ |
+								   _PAGE_EXECUTE |
 								   CACHEDEF),
-	[VM_SHARED]                                     = __pgprot(_PAGE_PRESENT | _PAGE_USER |
+	[VM_EXEC | VM_WRITE]				= __pgprot(_PAGE_USER | _PAGE_READ |
+								   _PAGE_EXECUTE |
 								   CACHEDEF),
-	[VM_SHARED | VM_READ]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | CACHEDEF),
-	[VM_SHARED | VM_WRITE]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
+	[VM_EXEC | VM_WRITE | VM_READ]			= __pgprot(_PAGE_USER | _PAGE_READ |
+								   _PAGE_EXECUTE |
+								   CACHEDEF),
+	[VM_SHARED]					= __pgprot(_NO_PERM | CACHEDEF),
+	[VM_SHARED | VM_READ]				= __pgprot(_PAGE_USER | _PAGE_READ |
+								   CACHEDEF),
+	[VM_SHARED | VM_WRITE]				= __pgprot(_PAGE_USER | _PAGE_WRITE |
+								   CACHEDEF),
+	[VM_SHARED | VM_WRITE | VM_READ]		= __pgprot(_PAGE_USER | _PAGE_READ |
 								   _PAGE_WRITE | CACHEDEF),
-	[VM_SHARED | VM_WRITE | VM_READ]		= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | _PAGE_WRITE |
+	[VM_SHARED | VM_EXEC]				= __pgprot(_PAGE_USER | _PAGE_READ |
+								   _PAGE_EXECUTE |
 								   CACHEDEF),
-	[VM_SHARED | VM_EXEC]				= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | CACHEDEF),
-	[VM_SHARED | VM_EXEC | VM_READ]			= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | _PAGE_READ |
+	[VM_SHARED | VM_EXEC | VM_READ]			= __pgprot(_PAGE_USER | _PAGE_READ |
+								   _PAGE_EXECUTE |
 								   CACHEDEF),
-	[VM_SHARED | VM_EXEC | VM_WRITE]		= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_EXECUTE | _PAGE_WRITE |
+	[VM_SHARED | VM_EXEC | VM_WRITE]		= __pgprot(_PAGE_USER | _PAGE_WRITE |
+								   _PAGE_EXECUTE |
 								   CACHEDEF),
-	[VM_SHARED | VM_EXEC | VM_WRITE | VM_READ]	= __pgprot(_PAGE_PRESENT | _PAGE_USER |
-								   _PAGE_READ | _PAGE_EXECUTE |
+	[VM_SHARED | VM_EXEC | VM_WRITE | VM_READ]	= __pgprot(_PAGE_USER | _PAGE_READ |
+								   _PAGE_EXECUTE |
 								   _PAGE_WRITE | CACHEDEF)
 };
 DECLARE_VM_GET_PAGE_PROT

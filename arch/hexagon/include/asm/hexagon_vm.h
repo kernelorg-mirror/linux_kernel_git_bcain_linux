@@ -38,6 +38,11 @@
 #define HVM_TRAP1_VMSETREGS		21
 #define HVM_TRAP1_VMGETREGS		22
 #define HVM_TRAP1_VMTIMEROP		24
+#define HVM_TRAP1_VMPMUCONFIG		25
+#define HVM_TRAP1_VMGETINFO		26
+
+/* The info codes of the H2 hypervisor that the kernel uses. */
+#define HVM_INFO_HTHREADS		19	/* mask of the running hardware threads */
 
 #ifndef __ASSEMBLY__
 
@@ -65,23 +70,74 @@ enum VM_INT_OPS {
 	hvmi_clear
 };
 
+enum VM_TIMER_OPS {
+	getfreq,
+	getres,
+	gettime,
+	gettimeout,
+	settimeout,
+	deltatimeout
+};
+
+enum VM_STOP_STATUS {
+	none,
+	poweroff,
+	halt,
+	restart,
+	machinecheck
+};
+
+/* The operations of the hypervisor's hwconfig call. */
+typedef enum {
+	HWCONFIG_L2CACHE,
+	HWCONFIG_PARTITIONS,
+	HWCONFIG_PREFETCH,
+	HWCONFIG_EXTBITS,
+	HWCONFIG_VLENGTH,
+	HWCONFIG_EXTPOWER,
+	HWCONFIG_GETL2REG,
+	HWCONFIG_SETL2REG,
+	HWCONFIG_L2LOCKA,
+	HWCONFIG_L2UNLOCK,
+	HWCONFIG_HWINTOP,
+	HWCONFIG_GETCLADEREG,
+	HWCONFIG_SETCLADEREG,
+	HWCONFIG_HWTHREADS_NUM,
+	HWCONFIG_HWTHREADS_MASK,
+	HWCONFIG_ECC,
+	HWCONFIG_HMXBITS,
+} hwconfig_type_t;
+
 extern void _K_VM_event_vector(void);
 
+long __vmversion(void);
 void __vmrte(void);
 long __vmsetvec(void *);
-long __vmsetie(long);
+
+void load_ie_cache(void);
+long vmgetie_cached(void);
+long vmsetie_cached(long);
+long __vmsetie_cached(long, long *);
+void clear_ie_cached(void);
+
 long __vmgetie(void);
 long __vmintop(enum VM_INT_OPS, long, long, long, long);
 long __vmclrmap(void *, unsigned long);
-long __vmnewmap(void *);
+long __vmnewmap(void *, unsigned long type, unsigned long tlb_flush_flag);
 long __vmcache(enum VM_CACHE_OPS op, unsigned long addr, unsigned long len);
 unsigned long long __vmgettime(void);
 long __vmsettime(unsigned long long);
-long __vmstart(void *, void *);
-void __vmstop(void);
+long __vmstart(void *, void *, int relprio);
+void __vmstop(enum VM_STOP_STATUS);
 long __vmwait(void);
 void __vmyield(void);
 long __vmvpid(void);
+#ifdef CONFIG_HEXAGON_H2
+unsigned long long __vmtimerop(enum VM_TIMER_OPS op, unsigned long dummy, unsigned long long timeout);
+unsigned long __vmgetinfo(unsigned long op, unsigned long unit, unsigned long entry);
+unsigned long __vmpmucfg(unsigned long op, unsigned long unused, long reg, unsigned long val);
+long __vmhwconfig(hwconfig_type_t op, unsigned long a, unsigned long b, unsigned long c);
+#endif
 
 static inline long __vmcache_ickill(void)
 {
@@ -166,9 +222,9 @@ static inline long __vmintop_status(long i)
 	return __vmintop(hvmi_status, i, 0, 0, 0);
 }
 
-static inline long __vmintop_post(long i)
+static inline long __vmintop_post(long i, long cpu)
 {
-	return __vmintop(hvmi_post, i, 0, 0, 0);
+	return __vmintop(hvmi_post, i, cpu, 0, 0);
 }
 
 static inline long __vmintop_clear(long i)
@@ -249,8 +305,10 @@ static inline long __vmintop_clear(long i)
 
 #define HVM_GE_C_BUS	0x01
 #define HVM_GE_C_XPROT	0x11
-#define HVM_GE_C_XUSER	0x14
+#define HVM_GE_C_XUSER	0x12
 #define HVM_GE_C_INVI	0x15
+#define HVM_GE_C_COPROC 0x16
+#define HVM_GE_C_COPROC2 0x18
 #define HVM_GE_C_PRIVI	0x1B
 #define HVM_GE_C_XMAL	0x1C
 #define HVM_GE_C_WREG	0x1D
@@ -262,6 +320,13 @@ static inline long __vmintop_clear(long i)
 #define HVM_GE_C_RUSER	0x24
 #define HVM_GE_C_WUSER	0x25
 #define HVM_GE_C_CACHE	0x28
+
+/* Extended TLB miss cause codes; earlier ones might be deprecated */
+#define HVM_GE_C_TLBMISSX_0		0x60
+#define HVM_GE_C_TLBMISSX_1		0x61
+#define HVM_GE_C_TLBMISSX_ICINVA	0x62
+#define HVM_GE_C_TLBMISSR		0x70
+#define HVM_GE_C_TLBMISSW		0x71
 
 /*
  * Cause codes for Machine Check

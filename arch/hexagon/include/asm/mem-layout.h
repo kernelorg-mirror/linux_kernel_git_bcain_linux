@@ -18,6 +18,10 @@
 
 #define PAGE_OFFSET			_AC(0xc0000000, UL)
 
+#ifndef ELF_LOAD_ADDRESS
+#define ELF_LOAD_ADDRESS			_AC(0x00000000, UL)
+#endif
+
 /*
  * Compiling for a platform that needs a crazy physical offset
  * (like if the memory starts at 1GB and up) means we need
@@ -59,7 +63,7 @@ extern int max_kernel_seg;
  * supposed to be based on the amount of physical memory available
  */
 
-#define VMALLOC_START ((unsigned long) __va(high_memory + VMALLOC_OFFSET))
+#define VMALLOC_START ((unsigned long) high_memory + VMALLOC_OFFSET)
 
 /* Gap between physical ram and vmalloc space for guard purposes. */
 #define VMALLOC_OFFSET PAGE_SIZE
@@ -72,7 +76,17 @@ extern int max_kernel_seg;
  * Hypervisor occupies the last 16MB page at 0xffxxxxxx
  */
 
-#define FIXADDR_TOP     0xfe000000
+/*
+ * FIXADDR_TOP is *inclusive*: the generic __fix_to_virt() maps index 0 to
+ * FIXADDR_TOP itself, so the fixmap occupies [FIXADDR_START, FIXADDR_TOP].
+ * It therefore has to sit one page below 0xfe000000 rather than at it --
+ * otherwise index 0 lands in the permanent IO mapping region, and, because
+ * 0xfe000000 is PGDIR_SIZE-aligned, in a different PGD entry than
+ * FIXADDR_START. early_fixmap_init() only populates the PGD entry covering
+ * FIXADDR_START, so an index-0 fixmap (FIX_EARLYCON_MEM_BASE, i.e. any
+ * "earlycon" boot) would fault on an unmapped kernel VA.
+ */
+#define FIXADDR_TOP     (0xfe000000UL - PAGE_SIZE)
 #define FIXADDR_SIZE    (__end_of_fixed_addresses << PAGE_SHIFT)
 #define FIXADDR_START   (FIXADDR_TOP - FIXADDR_SIZE)
 

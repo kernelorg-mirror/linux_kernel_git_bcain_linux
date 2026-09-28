@@ -55,6 +55,15 @@ enum {
  *
  */
 
+/*
+ * Aligned to 8 so that consumers walking call_single_queue may load
+ * llist.next and u_flags together: every node on the queue is cast to
+ * call_single_data_t, whose declared over-alignment entitles the
+ * compiler to emit a naturally-aligned double-word access.  Without
+ * this, embedders like task_struct::wake_entry (CSD_TYPE_TTWU) only
+ * guarantee pointer alignment, which faults on strict-alignment
+ * architectures.
+ */
 struct __call_single_node {
 	struct llist_node	llist;
 	union {
@@ -64,6 +73,6 @@ struct __call_single_node {
 #ifdef CONFIG_64BIT
 	u16 src, dst;
 #endif
-};
+} __aligned(8);
 
 #endif /* __LINUX_SMP_TYPES_H */

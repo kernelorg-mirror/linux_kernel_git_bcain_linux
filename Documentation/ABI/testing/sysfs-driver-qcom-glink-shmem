@@ -1,0 +1,16 @@
+What:		/sys/bus/platform/drivers/qcom_glink_shmem/<dev>/{rx_head,rx_tail,tx_head,tx_tail}
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		The head and tail of the FIFO this side of a GLINK link over
+		shared memory reads from (rx) and writes to (tx).  A tail
+		that is not at the head is data that its reader has not taken.
+
+What:		/sys/bus/platform/drivers/qcom_glink_shmem/<dev>/{irqs,kicks}
+Date:		September 2026
+KernelVersion:	7.3
+Contact:	Brian Cain <brian.cain@oss.qualcomm.com>
+Description:
+		How many interrupts the peer has raised, and how many doorbells
+		this side has rung.
