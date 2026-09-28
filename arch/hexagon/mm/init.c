@@ -16,7 +16,6 @@
 #include <asm/tlb.h>
 #include <asm/sections.h>
 #include <asm/kasan.h>
-#include <asm/platform.h>
 #include <asm/setup.h>
 #include <asm/vm_mmu.h>
 
