@@ -55,7 +55,7 @@ static const s8 bpf2hex[][2] = {
 	[BPF_REG_FP] = {STACK_OFFSET(BPF_FP_HI), STACK_OFFSET(BPF_FP_LO)},
 	[BPF_REG_AX] = {HEX_REG_R11, HEX_REG_R10},
 	[TMP_REG_1]  = {HEX_REG_R13, HEX_REG_R12},
-	[TMP_REG_2]  = {HEX_REG_R15, HEX_REG_R14},
+	[TMP_REG_2]  = {HEX_REG_R15, HEX_REG_R18},
 };
 
 static s8 hi(const s8 *r) { return r[0]; }
