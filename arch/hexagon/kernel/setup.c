@@ -13,7 +13,6 @@
 #include <linux/seq_file.h>
 #include <linux/initrd.h>
 #include <linux/of_fdt.h>
-#include <linux/of_clk.h>
 #include <linux/libfdt.h>
 #include <asm/io.h>
 #include <asm/sections.h>
@@ -80,7 +79,6 @@ void __init setup_arch(char **cmdline_p)
 	 * names and values, so move the blob out of the way first.
 	 */
 	unflatten_and_copy_device_tree();
-	of_clk_init(NULL);
 
 #ifdef CONFIG_SMP
 	smp_start_cpus();

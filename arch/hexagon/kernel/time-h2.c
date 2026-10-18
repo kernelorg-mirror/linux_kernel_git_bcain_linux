@@ -7,6 +7,7 @@
 
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/of_clk.h>
 #include <linux/clockchips.h>
 #include <linux/clocksource.h>
 #include <linux/interrupt.h>
@@ -142,6 +143,9 @@ void __init time_init(void)
 {
 	struct clock_event_device *ce_dev = &hexagon_clockevent_dev;
 	struct device_node *dn;
+
+	/* The allocator is up by now, which the clock providers need. */
+	of_clk_init(NULL);
 
 	hvm_timer_freq = (cycles_t)__vmtimerop(getfreq, 0, 0);
 
