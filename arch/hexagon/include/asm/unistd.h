@@ -8,3 +8,5 @@
 #define __ARCH_BROKEN_SYS_CLONE3
 
 #include <uapi/asm/unistd.h>
+
+#define NR_syscalls (__NR_syscalls)

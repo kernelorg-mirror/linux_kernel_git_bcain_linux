@@ -23,6 +23,9 @@
 #include <asm/unistd.h>
 #include <asm/sections.h>
 #include <asm/notify.h>
+
+#define CREATE_TRACE_POINTS
+#include <trace/events/syscalls.h>
 #ifdef CONFIG_KGDB
 # include <linux/kgdb.h>
 #endif
@@ -446,6 +449,9 @@ void do_trap0(struct pt_regs *regs)
 		/* Interrupts should be re-enabled for syscall processing */
 		vmsetie_cached(VM_INT_ENABLE);
 
+		if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
+			trace_sys_enter(regs, syscall_get_nr(current, regs));
+
 		/*
 		 * System call number is in r6, arguments in r0..r5.
 		 * Fortunately, no Linux syscall has more than 6 arguments,
@@ -479,6 +485,9 @@ void do_trap0(struct pt_regs *regs)
 
 			regs->r00 = syscall(regs);
 		}
+
+		if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
+			trace_sys_exit(regs, syscall_get_return_value(current, regs));
 
 		/* allow strace to get the syscall return state  */
 		if (unlikely(test_thread_flag(TIF_SYSCALL_TRACE)))
