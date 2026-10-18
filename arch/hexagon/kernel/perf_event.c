@@ -10,10 +10,17 @@
  *
  * So this is a PMU of the whole core, like an uncore PMU: it counts, on
  * behalf of CPU 0, what the core does, whichever CPU or task does it, and it
- * cannot sample.  The driver folds what the counters have counted into the
- * events before it changes what they count and clears them.  The counters are
- * 32 bits wide, so a timer reads them often enough that they do not wrap
- * unseen.
+ * raise an interrupt when they overflow.  The driver folds what the counters
+ * have counted into the events before it changes what they count and clears
+ * them.  The counters are 32 bits wide, so a timer reads them often enough
+ * that they do not wrap unseen.
+ *
+ * Sampling is done by that same timer, which takes a sample for each event
+ * that has counted a sample period since the last one.  The sample is taken
+ * where the timer interrupted CPU 0, so it is only a rough statistical
+ * profile of the core: it skids by up to a timer period, shows CPU 0's
+ * context whichever thread caused the count, and takes at most one sample per
+ * event per timer period.
  *
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
@@ -38,6 +45,8 @@
 
 /* The counters must be read at least this often: a 32 bit counter at 1 GHz. */
 #define PMU_POLL_MS		1000
+/* While events sample, the counters are checked this often. */
+#define PMU_SAMPLE_POLL_US	1000
 
 struct hexagon_pmu {
 	struct pmu pmu;
@@ -46,6 +55,7 @@ struct hexagon_pmu {
 	struct perf_event *events[PMU_COUNTERS];
 	u32 evtcfg;
 	int nr_active;
+	int nr_sampling;
 };
 
 static struct hexagon_pmu hexagon_pmu;
@@ -89,8 +99,33 @@ static void pmu_update(struct perf_event *event)
 	struct hw_perf_event *hwc = &event->hw;
 	u32 now = pmu_read_counter(hwc->idx);
 	u64 prev = local64_xchg(&hwc->prev_count, now);
+	u32 delta = now - prev;
 
-	local64_add((u32)(now - prev), &event->count);
+	local64_add(delta, &event->count);
+	if (is_sampling_event(event))
+		local64_sub(delta, &hwc->period_left);
+}
+
+/* Start a new sample period, keeping the part of the last one that overran. */
+static void pmu_set_period(struct perf_event *event)
+{
+	struct hw_perf_event *hwc = &event->hw;
+	s64 period = hwc->sample_period;
+	s64 left = local64_read(&hwc->period_left);
+
+	if (left <= -period)
+		left = period;
+	else if (left <= 0)
+		left += period;
+	hwc->last_period = period;
+	local64_set(&hwc->period_left, left);
+}
+
+static ktime_t pmu_poll_interval(struct hexagon_pmu *pmu)
+{
+	if (pmu->nr_sampling)
+		return ns_to_ktime(PMU_SAMPLE_POLL_US * NSEC_PER_USEC);
+	return ms_to_ktime(PMU_POLL_MS);
 }
 
 static void pmu_update_all(struct hexagon_pmu *pmu)
@@ -132,13 +167,33 @@ static void pmu_program(struct hexagon_pmu *pmu)
 static enum hrtimer_restart pmu_timer(struct hrtimer *timer)
 {
 	struct hexagon_pmu *pmu = container_of(timer, struct hexagon_pmu, timer);
+	struct perf_event *overflowed[PMU_COUNTERS];
+	struct pt_regs *regs = get_irq_regs();
 	unsigned long flags;
+	int i, n = 0;
 
 	raw_spin_lock_irqsave(&pmu->lock, flags);
 	pmu_update_all(pmu);
+	for (i = 0; i < PMU_COUNTERS; i++) {
+		struct perf_event *event = pmu->events[i];
+
+		if (event && event->hw.state == 0 && is_sampling_event(event) &&
+		    local64_read(&event->hw.period_left) <= 0) {
+			pmu_set_period(event);
+			overflowed[n++] = event;
+		}
+	}
 	raw_spin_unlock_irqrestore(&pmu->lock, flags);
 
-	hrtimer_forward_now(timer, ms_to_ktime(PMU_POLL_MS));
+	/* The overflow handling can stop the event, which takes the lock. */
+	while (n--) {
+		struct perf_sample_data data;
+
+		perf_sample_data_init(&data, 0, overflowed[n]->hw.last_period);
+		perf_event_overflow(overflowed[n], &data, regs);
+	}
+
+	hrtimer_forward_now(timer, pmu_poll_interval(pmu));
 
 	return HRTIMER_RESTART;
 }
@@ -150,6 +205,10 @@ static void pmu_start(struct perf_event *event, int flags)
 
 	raw_spin_lock_irqsave(&pmu->lock, irqflags);
 	pmu_update_all(pmu);
+	if (flags & PERF_EF_RELOAD) {
+		local64_set(&event->hw.period_left, 0);
+		pmu_set_period(event);
+	}
 	event->hw.state = 0;
 	pmu_program(pmu);
 	raw_spin_unlock_irqrestore(&pmu->lock, irqflags);
@@ -183,8 +242,11 @@ static int pmu_add(struct perf_event *event, int flags)
 		pmu->events[i] = event;
 		event->hw.idx = i;
 		event->hw.state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
-		if (!pmu->nr_active++)
-			hrtimer_start(&pmu->timer, ms_to_ktime(PMU_POLL_MS),
+		if (is_sampling_event(event))
+			pmu->nr_sampling++;
+		if (!pmu->nr_active++ || (is_sampling_event(event) &&
+					  pmu->nr_sampling == 1))
+			hrtimer_start(&pmu->timer, pmu_poll_interval(pmu),
 				      HRTIMER_MODE_REL_PINNED);
 		ret = 0;
 		break;
@@ -206,6 +268,8 @@ static void pmu_del(struct perf_event *event, int flags)
 
 	raw_spin_lock_irqsave(&pmu->lock, irqflags);
 	pmu->events[event->hw.idx] = NULL;
+	if (is_sampling_event(event))
+		pmu->nr_sampling--;
 	if (!--pmu->nr_active)
 		hrtimer_try_to_cancel(&pmu->timer);
 	raw_spin_unlock_irqrestore(&pmu->lock, irqflags);
@@ -229,9 +293,9 @@ static int pmu_event_init(struct perf_event *event)
 	if (event->attr.type != event->pmu->type)
 		return -ENOENT;
 
-	/* The counters are the core's, and do not interrupt. */
-	if (is_sampling_event(event))
-		return -EINVAL;
+	/* The sample is where the timer interrupted, not where the event was. */
+	if (event->attr.precise_ip)
+		return -EOPNOTSUPP;
 	if (event->attach_state & PERF_ATTACH_TASK)
 		return -EINVAL;
 	if (event->cpu < 0)
@@ -321,8 +385,7 @@ static int __init hexagon_pmu_init(void)
 
 	pmu->pmu = (struct pmu) {
 		.task_ctx_nr	= perf_invalid_context,
-		.capabilities	= PERF_PMU_CAP_NO_INTERRUPT |
-				  PERF_PMU_CAP_NO_EXCLUDE,
+		.capabilities	= PERF_PMU_CAP_NO_EXCLUDE,
 		.attr_groups	= pmu_attr_groups,
 		.event_init	= pmu_event_init,
 		.add		= pmu_add,
