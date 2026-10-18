@@ -194,13 +194,56 @@ static void emit_imm64(const s8 *rd, s32 imm_hi, s32 imm_lo,
 /* ------------------------------------------------------------------ */
 
 /*
+ * What a call to a div/mod helper clobbers, which BPF expects to be intact
+ * after the div/mod: R0-R9 are the BPF registers 1-5 and R10-R11 are the BPF
+ * auxiliary register, and they are all caller-saved.  The TCC, in R14, is
+ * saved too.
+ */
+#define DIVMOD_SAVED_REGS	12
+#define DIVMOD_TCC_SLOT		DIVMOD_SAVED_REGS
+#define DIVMOD_FRAME		((DIVMOD_SAVED_REGS + 1 + 1) / 2 * 8)
+
+static void divmod_save(struct hexagon_jit_context *ctx)
+{
+	int i;
+
+	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, -DIVMOD_FRAME), ctx);
+	for (i = 0; i < DIVMOD_SAVED_REGS; i++)
+		emit(hex_s2_storeri_io(HEX_REG_SP, i, i), ctx);
+	emit(hex_s2_storeri_io(HEX_REG_SP, DIVMOD_TCC_SLOT, HEX_REG_TCC), ctx);
+}
+
+/* Restore all but the registers that hold the result, and drop the frame. */
+static void divmod_restore(int res_lo, int res_hi,
+			   struct hexagon_jit_context *ctx)
+{
+	int i;
+
+	for (i = 0; i < DIVMOD_SAVED_REGS; i++)
+		if (i != res_lo && i != res_hi)
+			emit(hex_l2_loadri_io(i, HEX_REG_SP, i), ctx);
+	emit(hex_l2_loadri_io(HEX_REG_TCC, HEX_REG_SP, DIVMOD_TCC_SLOT), ctx);
+	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, DIVMOD_FRAME), ctx);
+}
+
+/*
+ * Move a register to an argument register.  If it was one of the registers
+ * that were just saved, an earlier move into an argument register may have
+ * overwritten it, so load it from the save area.
+ */
+static void divmod_move(u8 to, u8 from, struct hexagon_jit_context *ctx)
+{
+	if (from < DIVMOD_SAVED_REGS)
+		emit(hex_l2_loadri_io(to, HEX_REG_SP, from), ctx);
+	else
+		emit(hex_a2_tfr(to, from), ctx);
+}
+
+/*
  * Emit a call to a 64-bit div/mod helper.
  *
  * The helpers take (u64 dividend, u64 divisor) in R1:R0, R3:R2
  * and return a 64-bit result in R1:R0.
- *
- * We must save/restore R0-R5 since they overlap BPF_REG_1 through BPF_REG_3.
- * Also save TCC (R14, caller-saved) so it survives the call.
  */
 static void emit_divmod64(const s8 *dst, const s8 *src, const s8 *tmp,
 			   struct hexagon_jit_context *ctx,
@@ -209,34 +252,13 @@ static void emit_divmod64(const s8 *dst, const s8 *src, const s8 *tmp,
 	const s8 *rd = bpf_get_reg64(dst, tmp, ctx);
 	u32 addr;
 
-	/* Save R0-R5 and TCC on the stack */
-	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, -32), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 0, HEX_REG_R0), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 1, HEX_REG_R1), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 2, HEX_REG_R2), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 3, HEX_REG_R3), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 4, HEX_REG_R4), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 5, HEX_REG_R5), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 6, HEX_REG_TCC), ctx);
+	divmod_save(ctx);
 
-	/*
-	 * Move dividend (dst) into R1:R0, divisor (src) into R3:R2.
-	 * If a source register is in R0-R5, it was just saved to the stack
-	 * and may be clobbered by a preceding move -- load from save area.
-	 */
-#define MOVE_OR_LOAD(to, from) do {					\
-	if ((u8)(from) <= HEX_REG_R5)					\
-		emit(hex_l2_loadri_io((to), HEX_REG_SP, (from)), ctx);	\
-	else								\
-		emit(hex_a2_tfr((to), (from)), ctx);			\
-} while (0)
-
-	MOVE_OR_LOAD(HEX_REG_R0, lo(rd));
-	MOVE_OR_LOAD(HEX_REG_R1, hi(rd));
-	MOVE_OR_LOAD(HEX_REG_R2, lo(src));
-	MOVE_OR_LOAD(HEX_REG_R3, hi(src));
-
-#undef MOVE_OR_LOAD
+	/* Move dividend (dst) into R1:R0, divisor (src) into R3:R2. */
+	divmod_move(HEX_REG_R0, lo(rd), ctx);
+	divmod_move(HEX_REG_R1, hi(rd), ctx);
+	divmod_move(HEX_REG_R2, lo(src), ctx);
+	divmod_move(HEX_REG_R3, hi(src), ctx);
 
 	/* Select helper */
 	if (is_mod)
@@ -253,15 +275,7 @@ static void emit_divmod64(const s8 *dst, const s8 *src, const s8 *tmp,
 	emit(hex_a2_tfr(lo(rd), HEX_REG_R0), ctx);
 	emit(hex_a2_tfr(hi(rd), HEX_REG_R1), ctx);
 
-	/* Restore R0-R5 and TCC */
-	emit(hex_l2_loadri_io(HEX_REG_R0, HEX_REG_SP, 0), ctx);
-	emit(hex_l2_loadri_io(HEX_REG_R1, HEX_REG_SP, 1), ctx);
-	emit(hex_l2_loadri_io(HEX_REG_R2, HEX_REG_SP, 2), ctx);
-	emit(hex_l2_loadri_io(HEX_REG_R3, HEX_REG_SP, 3), ctx);
-	emit(hex_l2_loadri_io(HEX_REG_R4, HEX_REG_SP, 4), ctx);
-	emit(hex_l2_loadri_io(HEX_REG_R5, HEX_REG_SP, 5), ctx);
-	emit(hex_l2_loadri_io(HEX_REG_TCC, HEX_REG_SP, 6), ctx);
-	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, 32), ctx);
+	divmod_restore(lo(rd), hi(rd), ctx);
 
 	bpf_put_reg64(dst, rd, ctx);
 }
@@ -283,28 +297,11 @@ static void emit_divmod32(const s8 *dst, const s8 *src, const s8 *tmp,
 	const s8 *rd = bpf_get_reg32(dst, tmp, ctx);
 	u32 addr;
 
-	/* Save R0-R1 and TCC on the stack */
-	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, -16), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 0, HEX_REG_R0), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 1, HEX_REG_R1), ctx);
-	emit(hex_s2_storeri_io(HEX_REG_SP, 2, HEX_REG_TCC), ctx);
+	divmod_save(ctx);
 
-	/*
-	 * Move dividend (dst) into R0, divisor (src) into R1.
-	 * If a source register is R0 or R1, it was just saved to the stack
-	 * and may be clobbered by the preceding move -- load from save area.
-	 */
-#define MOVE_OR_LOAD(to, from) do {					\
-	if ((u8)(from) <= HEX_REG_R1)					\
-		emit(hex_l2_loadri_io((to), HEX_REG_SP, (from)), ctx);	\
-	else								\
-		emit(hex_a2_tfr((to), (from)), ctx);			\
-} while (0)
-
-	MOVE_OR_LOAD(HEX_REG_R0, lo(rd));
-	MOVE_OR_LOAD(HEX_REG_R1, lo(src));
-
-#undef MOVE_OR_LOAD
+	/* Move dividend (dst) into R0, divisor (src) into R1. */
+	divmod_move(HEX_REG_R0, lo(rd), ctx);
+	divmod_move(HEX_REG_R1, lo(src), ctx);
 
 	/* Select helper */
 	if (is_mod)
@@ -320,11 +317,7 @@ static void emit_divmod32(const s8 *dst, const s8 *src, const s8 *tmp,
 	/* Move result R0 into dst */
 	emit(hex_a2_tfr(lo(rd), HEX_REG_R0), ctx);
 
-	/* Restore R0-R1 and TCC */
-	emit(hex_l2_loadri_io(HEX_REG_R0, HEX_REG_SP, 0), ctx);
-	emit(hex_l2_loadri_io(HEX_REG_R1, HEX_REG_SP, 1), ctx);
-	emit(hex_l2_loadri_io(HEX_REG_TCC, HEX_REG_SP, 2), ctx);
-	emit(hex_a2_addi(HEX_REG_SP, HEX_REG_SP, 16), ctx);
+	divmod_restore(lo(rd), -1, ctx);
 
 	bpf_put_reg32(dst, rd, ctx);
 }
