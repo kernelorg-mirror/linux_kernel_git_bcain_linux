@@ -23,6 +23,7 @@
 #include <asm/unistd.h>
 #include <asm/sections.h>
 #include <asm/notify.h>
+#include <asm/kprobes.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/syscalls.h>
@@ -421,6 +422,18 @@ void do_genex(struct pt_regs *regs)
 	}
 }
 
+static bool kprobe_trap_handler(struct pt_regs *regs)
+{
+	switch (pt_cause(regs)) {
+	case KPROBE_TRAP_BREAK:
+		return kprobe_breakpoint_handler(regs);
+	case KPROBE_TRAP_STEP_DONE:
+		return kprobe_step_done_handler(regs);
+	default:
+		return kretprobe_trampoline_trap_handler(regs);
+	}
+}
+
 void do_trap0(struct pt_regs *regs);
 void do_trap0(struct pt_regs *regs)
 {
@@ -494,6 +507,17 @@ void do_trap0(struct pt_regs *regs)
 			ptrace_report_syscall_exit(regs, 0);
 
 		break;
+	case KPROBE_TRAP_BREAK:
+	case KPROBE_TRAP_STEP_DONE:
+	case KPROBE_TRAP_KRETPROBE:
+		if (user_mode(regs)) {
+			force_sig_fault(SIGTRAP, TRAP_BRKPT,
+					(void __user *) pt_elr(regs));
+			break;
+		}
+		if (!kprobe_trap_handler(regs))
+			die("Unexpected kprobe trap", regs, SIGTRAP);
+		break;
 	case TRAP_DEBUG:
 		/* Trap0 0xdb is debug breakpoint */
 		if (user_mode(regs)) {
@@ -543,3 +567,6 @@ void do_debug_exception(struct pt_regs *regs)
 	regs->hvmer.vmest |= (TRAP_DEBUG << HVM_VMEST_CAUSE_SFT);
 	do_trap0(regs);
 }
+NOKPROBE_SYMBOL(do_trap0);
+NOKPROBE_SYMBOL(do_genex);
+NOKPROBE_SYMBOL(do_debug_exception);

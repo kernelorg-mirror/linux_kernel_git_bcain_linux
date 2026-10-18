@@ -19,6 +19,7 @@
 #include <linux/sched/signal.h>
 #include <linux/signal.h>
 #include <linux/extable.h>
+#include <linux/kprobes.h>
 #include <linux/hardirq.h>
 #include <linux/perf_event.h>
 
@@ -63,6 +64,9 @@ static void do_page_fault(unsigned long address, long cause, struct pt_regs *reg
 	vm_fault_t fault;
 	const struct exception_table_entry *fixup;
 	unsigned int flags = FAULT_FLAG_DEFAULT;
+
+	if (kprobe_page_fault(regs, cause))
+		return;
 
 	if (unlikely(!user_mode(regs) && address >= VMALLOC_START)) {
 		if (vmalloc_fault(address) == 0)
