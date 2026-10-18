@@ -180,12 +180,12 @@ config SMP
 
 config NR_CPUS
 	int "Maximum number of CPUs" if SMP
-	range 2 6 if SMP
+	range 2 16 if SMP
 	default "1" if !SMP
 	default "6" if SMP
 	help
 	  This allows you to specify the maximum number of CPUs which this
-	  kernel will support.  The maximum supported value is 6 and the
+	  kernel will support.  The maximum supported value is 16 and the
 	  minimum value which makes sense is 2.
 
 	  This is purely to save memory - each supported CPU adds
@@ -193,15 +193,14 @@ config NR_CPUS
 
 config BASE_IPI_IRQ
 	int "Base IPI IRQ" if SMP
+	range 0 11 if HEXAGON_H2
 	default 0
 	help
-	  The base IRQ used for IPI calls.  Each CPU increments by one,
-	  although the newer hypervisor API specifies the lower range of
-	  interrupts to be percpu anyways.
+	  The IRQ used for IPI calls. H2 uses the same per-CPU IRQ on
+	  every CPU; other hypervisors increment the base for each CPU.
 
-	  The range BASE..BASE+NR_CPUS-1 must not overlap interrupts
-	  claimed by devices; the H2 timer guest interrupt is 12, which
-	  the previous default of 8 aliased once five CPUs were enabled.
+	  The IRQs used by IPIs must not overlap interrupts claimed by
+	  devices. For H2, interrupt 12 is reserved for the timer.
 
 	  Todo:  Maybe make this a devtree thing instead?
 
@@ -210,5 +209,13 @@ source "kernel/Kconfig.hz"
 source "arch/hexagon/kernel/hvx/Kconfig"
 
 source "arch/hexagon/kernel/hmx/Kconfig"
+
+config HEXAGON_HLX
+	bool "Userspace HLX context management"
+	depends on HEXAGON_H2
+	select HAVE_EXIT_THREAD
+	help
+	  Allocate HLX contexts on demand and preserve their register state
+	  across task switches.
 
 endmenu

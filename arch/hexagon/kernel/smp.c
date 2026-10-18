@@ -40,6 +40,16 @@ struct ipi_data {
 
 static DEFINE_PER_CPU(struct ipi_data, ipi_data);
 
+static unsigned int ipi_hwirq(unsigned int cpu)
+{
+#ifdef CONFIG_HEXAGON_H2
+	/* H2's first 16 interrupts are local to each vCPU. */
+	return CONFIG_BASE_IPI_IRQ;
+#else
+	return CONFIG_BASE_IPI_IRQ + cpu;
+#endif
+}
+
 static inline void __handle_ipi(unsigned long *ops, struct ipi_data *ipi,
 				int cpu)
 {
@@ -111,11 +121,10 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
 
 		/*  This is somewhat unsafe, but VPID's pretty much don't change  */
 		/*  Also, what's passed is the hardware IRQ.  */
-		retval = __vmintop_post(CONFIG_BASE_IPI_IRQ+cpu, per_cpu(vpid, cpu));
+		retval = __vmintop_post(ipi_hwirq(cpu), per_cpu(vpid, cpu));
 
 		if (retval != 0) {
-			printk(KERN_ERR "interrupt %ld not configured?\n",
-				CONFIG_BASE_IPI_IRQ+cpu);
+			pr_err("interrupt %u not configured?\n", ipi_hwirq(cpu));
 		}
 	}
 
@@ -181,11 +190,17 @@ static void __noscs start_secondary(void)
 		__vmintop_locdis(irq);
 
 	/* Enable and register IPI interrupt */
-	irq = CONFIG_BASE_IPI_IRQ + cpu;
+	irq = ipi_hwirq(cpu);
+#ifdef CONFIG_HEXAGON_H2
+	/* H2 enables local interrupts with GLOBEN on the current vCPU. */
+	__vmintop_globen(irq);
+	enable_percpu_irq(irq_find_mapping(hexagon_irq_domain, irq), 0);
+#else
 	__vmintop_globen(irq);
 	if (request_irq(irq_find_mapping(hexagon_irq_domain, irq), handle_ipi,
 			IRQF_TRIGGER_RISING, "ipi_handler", NULL))
 		pr_err("Failed to request hwirq %u (ipi_handler)\n", irq);
+#endif
 
 	/*  Register the clock_event dummy  */
 	setup_percpu_clockdev();
@@ -233,7 +248,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int i, irq = CONFIG_BASE_IPI_IRQ;
+	int i, irq = ipi_hwirq(0);
 
 	/*
 	 * should eventually have some sort of machine
@@ -247,11 +262,22 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 	/*  Also need to register the interrupts for IPI  */
 	if (num_possible_cpus() > 1 && max_cpus > 1) {
+		int virq = irq_find_mapping(hexagon_irq_domain, irq);
+
 		__vmintop_globen(irq);
-		if (request_irq(irq_find_mapping(hexagon_irq_domain, irq),
+#ifdef CONFIG_HEXAGON_H2
+		if (irq_set_percpu_devid(virq))
+			panic("Failed to configure IPI hwirq %d\n", irq);
+		irq_set_handler(virq, handle_percpu_devid_irq);
+		if (request_percpu_irq(virq, handle_ipi, "ipi_handler", &ipi_data))
+			panic("Failed to request IPI hwirq %d\n", irq);
+		enable_percpu_irq(virq, 0);
+#else
+		if (request_irq(virq,
 				handle_ipi, IRQF_TRIGGER_RISING,
 				"ipi_handler", NULL))
 			pr_err("Failed to request hwirq %d (ipi_handler)\n", irq);
+#endif
 	}
 
 #ifdef CONFIG_HEXAGON_H2
