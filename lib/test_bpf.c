@@ -8623,6 +8623,132 @@ static struct bpf_test tests[] = {
 		{ { 32, 0 } },
 		.stack_depth = 0,
 	},
+	/* BPF_LDX_PROBE_MEM: a faulting load clears its destination */
+	{
+		"BPF_LDX_PROBE_MEM | BPF_B: fault",
+		.u.insns_int = {
+			BPF_ALU64_IMM(BPF_MOV, R0, -1),
+			BPF_ALU64_IMM(BPF_MOV, R1, 0x10),
+			BPF_RAW_INSN(BPF_LDX | BPF_PROBE_MEM | BPF_B, R0, R1, 0, 0),
+			BPF_JMP_IMM(BPF_JNE, R0, 0, 1),
+			BPF_ALU64_IMM(BPF_MOV, R0, 0),
+			BPF_EXIT_INSN(),
+		},
+		INTERNAL,
+		{ },
+		{ { 0, 0 } },
+		.stack_depth = 0,
+	},
+	{
+		"BPF_LDX_PROBE_MEM | BPF_H: fault",
+		.u.insns_int = {
+			BPF_ALU64_IMM(BPF_MOV, R0, -1),
+			BPF_ALU64_IMM(BPF_MOV, R1, 0x10),
+			BPF_RAW_INSN(BPF_LDX | BPF_PROBE_MEM | BPF_H, R0, R1, 0, 0),
+			BPF_JMP_IMM(BPF_JNE, R0, 0, 1),
+			BPF_ALU64_IMM(BPF_MOV, R0, 0),
+			BPF_EXIT_INSN(),
+		},
+		INTERNAL,
+		{ },
+		{ { 0, 0 } },
+		.stack_depth = 0,
+	},
+	{
+		"BPF_LDX_PROBE_MEM | BPF_W: fault",
+		.u.insns_int = {
+			BPF_ALU64_IMM(BPF_MOV, R0, -1),
+			BPF_ALU64_IMM(BPF_MOV, R1, 0x10),
+			BPF_RAW_INSN(BPF_LDX | BPF_PROBE_MEM | BPF_W, R0, R1, 0, 0),
+			BPF_JMP_IMM(BPF_JNE, R0, 0, 1),
+			BPF_ALU64_IMM(BPF_MOV, R0, 0),
+			BPF_EXIT_INSN(),
+		},
+		INTERNAL,
+		{ },
+		{ { 0, 0 } },
+		.stack_depth = 0,
+	},
+	{
+		"BPF_LDX_PROBE_MEM | BPF_DW: fault",
+		.u.insns_int = {
+			BPF_ALU64_IMM(BPF_MOV, R0, -1),
+			BPF_ALU64_IMM(BPF_MOV, R1, 0x10),
+			BPF_RAW_INSN(BPF_LDX | BPF_PROBE_MEM | BPF_DW, R0, R1, 0, 0),
+			BPF_JMP_IMM(BPF_JNE, R0, 0, 1),
+			BPF_ALU64_IMM(BPF_MOV, R0, 0),
+			BPF_EXIT_INSN(),
+		},
+		INTERNAL,
+		{ },
+		{ { 0, 0 } },
+		.stack_depth = 0,
+	},
+	{
+		"BPF_LDX_PROBE_MEM | BPF_DW: fault, 64-bit dst",
+		.u.insns_int = {
+			BPF_LD_IMM64(R0, 0xffffffffffffffffULL),
+			BPF_ALU64_IMM(BPF_MOV, R1, 0x10),
+			BPF_RAW_INSN(BPF_LDX | BPF_PROBE_MEM | BPF_DW, R0, R1, 0, 0),
+			BPF_JMP_IMM(BPF_JEQ, R0, 0, 2),
+			BPF_ALU64_IMM(BPF_MOV, R0, 1),
+			BPF_EXIT_INSN(),
+			BPF_EXIT_INSN(),
+		},
+		INTERNAL,
+		{ },
+		{ { 0, 0 } },
+		.stack_depth = 0,
+	},
+	{
+		"BPF_LDX_PROBE_MEMSX | BPF_W: fault",
+		.u.insns_int = {
+			BPF_LD_IMM64(R0, 0xffffffffffffffffULL),
+			BPF_ALU64_IMM(BPF_MOV, R1, 0x10),
+			BPF_RAW_INSN(BPF_LDX | BPF_PROBE_MEMSX | BPF_W, R0, R1, 0, 0),
+			BPF_JMP_IMM(BPF_JEQ, R0, 0, 2),
+			BPF_ALU64_IMM(BPF_MOV, R0, 1),
+			BPF_EXIT_INSN(),
+			BPF_EXIT_INSN(),
+		},
+		INTERNAL,
+		{ },
+		{ { 0, 0 } },
+		.stack_depth = 0,
+	},
+	{
+		"BPF_LDX_PROBE_MEM | BPF_DW: no fault",
+		.u.insns_int = {
+			BPF_LD_IMM64(R1, 0x0123456789abcdefULL),
+			BPF_STX_MEM(BPF_DW, R10, R1, -8),
+			BPF_ALU64_REG(BPF_MOV, R3, R10),
+			BPF_RAW_INSN(BPF_LDX | BPF_PROBE_MEM | BPF_DW, R0, R3, -8, 0),
+			BPF_JMP_REG(BPF_JNE, R0, R1, 1),
+			BPF_ALU64_IMM(BPF_MOV, R0, 0),
+			BPF_EXIT_INSN(),
+		},
+		INTERNAL,
+		{ },
+		{ { 0, 0 } },
+		.stack_depth = 8,
+	},
+	{
+		"BPF_LDX_PROBE_MEMSX | BPF_B: no fault",
+		.u.insns_int = {
+			BPF_ALU64_IMM(BPF_MOV, R1, 0x80),
+			BPF_STX_MEM(BPF_DW, R10, R1, -8),
+			BPF_ALU64_REG(BPF_MOV, R3, R10),
+			BPF_RAW_INSN(BPF_LDX | BPF_PROBE_MEMSX | BPF_B, R0, R3, -8, 0),
+			BPF_ALU64_IMM(BPF_MOV, R2, -128),
+			BPF_JMP_REG(BPF_JNE, R0, R2, 1),
+			BPF_ALU64_IMM(BPF_MOV, R0, 0),
+			BPF_EXIT_INSN(),
+		},
+		INTERNAL,
+		{ },
+		{ { 0, 0 } },
+		.stack_depth = 8,
+	},
 	/* BPF_LDX_MEMSX B/H/W */
 	{
 		"BPF_LDX_MEMSX | BPF_B",
@@ -15005,6 +15131,7 @@ static struct bpf_prog *generate_filter(int which, int *err)
 	void *fptr = filter_pointer(which);
 	struct sock_fprog_kern fprog;
 	struct bpf_prog *fp;
+	int i;
 
 	switch (test_type) {
 	case CLASSIC:
@@ -15049,6 +15176,11 @@ static struct bpf_prog *generate_filter(int which, int *err)
 		fp->aux->stack_depth = tests[which].stack_depth;
 		fp->aux->verifier_zext = !!(tests[which].aux &
 					    FLAG_VERIFIER_ZEXT);
+		for (i = 0; i < fp->len; i++)
+			if (BPF_CLASS(fp->insnsi[i].code) == BPF_LDX &&
+			    (BPF_MODE(fp->insnsi[i].code) == BPF_PROBE_MEM ||
+			     BPF_MODE(fp->insnsi[i].code) == BPF_PROBE_MEMSX))
+				fp->aux->num_exentries++;
 
 		/* We cannot error here as we don't need type compatibility
 		 * checks.
@@ -15058,6 +15190,9 @@ static struct bpf_prog *generate_filter(int which, int *err)
 			pr_cont("FAIL to select_runtime err=%d\n", *err);
 			return NULL;
 		}
+		/* Faults of probed loads find their fixup through the ksym. */
+		if (fp->aux->num_exentries)
+			bpf_prog_kallsyms_add(fp);
 		break;
 	}
 
@@ -15074,6 +15209,8 @@ static void release_filter(struct bpf_prog *fp, int which)
 		bpf_prog_destroy(fp);
 		break;
 	case INTERNAL:
+		if (fp->aux->num_exentries)
+			bpf_prog_kallsyms_del(fp);
 		bpf_prog_free(fp);
 		break;
 	}

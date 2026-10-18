@@ -696,6 +696,7 @@ void bpf_prog_kallsyms_add(struct bpf_prog *fp)
 	bpf_ksym_add(&fp->aux->ksym_prefix);
 #endif
 }
+EXPORT_SYMBOL_GPL(bpf_prog_kallsyms_add);
 
 void bpf_prog_kallsyms_del(struct bpf_prog *fp)
 {
@@ -709,6 +710,7 @@ void bpf_prog_kallsyms_del(struct bpf_prog *fp)
 	bpf_ksym_del(&fp->aux->ksym_prefix);
 #endif
 }
+EXPORT_SYMBOL_GPL(bpf_prog_kallsyms_del);
 
 static struct bpf_ksym *bpf_ksym_find(unsigned long addr)
 {
