@@ -1200,13 +1200,22 @@ static int emit_bpf_tail_call(int insn, struct hexagon_jit_context *ctx)
 /* Load / Store                                                        */
 /* ------------------------------------------------------------------ */
 
+/*
+ * A load through a pointer that may fault gets an exception table entry.  If
+ * it faults, execution resumes at a stub, placed right after the load, that
+ * zeroes the destination.
+ */
 static int emit_load_r64(const s8 *dst, const s8 *src, s16 off,
-			  struct hexagon_jit_context *ctx, const u8 size)
+			  struct hexagon_jit_context *ctx, const u8 size,
+			  const u8 mode)
 {
 	const s8 *tmp1 = bpf2hex[TMP_REG_1];
 	const s8 *tmp2 = bpf2hex[TMP_REG_2];
 	const s8 *rd = bpf_get_reg64(dst, tmp1, ctx);
 	const s8 *rs = bpf_get_reg64(src, tmp2, ctx);
+	const bool probe = mode == BPF_PROBE_MEM || mode == BPF_PROBE_MEMSX;
+	const bool sx = mode == BPF_MEMSX || mode == BPF_PROBE_MEMSX;
+	int faulting[2], nfaulting = 0, stub, i;
 
 	if (off) {
 		emit_imm(HEX_REG_R28, off, ctx);
@@ -1217,24 +1226,53 @@ static int emit_load_r64(const s8 *dst, const s8 *src, s16 off,
 
 	switch (size) {
 	case BPF_B:
-		emit(hex_l2_loadrub_io(lo(rd), HEX_REG_R28, 0), ctx);
-		if (!ctx->prog->aux->verifier_zext)
-			emit(hex_a2_tfrsi(hi(rd), 0), ctx);
+		emit(sx ? hex_l2_loadrb_io(lo(rd), HEX_REG_R28, 0) :
+			  hex_l2_loadrub_io(lo(rd), HEX_REG_R28, 0), ctx);
+		faulting[nfaulting++] = ctx->ninsns - 1;
 		break;
 	case BPF_H:
-		emit(hex_l2_loadruh_io(lo(rd), HEX_REG_R28, 0), ctx);
-		if (!ctx->prog->aux->verifier_zext)
-			emit(hex_a2_tfrsi(hi(rd), 0), ctx);
+		emit(sx ? hex_l2_loadrh_io(lo(rd), HEX_REG_R28, 0) :
+			  hex_l2_loadruh_io(lo(rd), HEX_REG_R28, 0), ctx);
+		faulting[nfaulting++] = ctx->ninsns - 1;
 		break;
 	case BPF_W:
 		emit(hex_l2_loadri_io(lo(rd), HEX_REG_R28, 0), ctx);
-		if (!ctx->prog->aux->verifier_zext)
-			emit(hex_a2_tfrsi(hi(rd), 0), ctx);
+		faulting[nfaulting++] = ctx->ninsns - 1;
 		break;
 	case BPF_DW:
 		emit(hex_l2_loadri_io(lo(rd), HEX_REG_R28, 0), ctx);
+		faulting[nfaulting++] = ctx->ninsns - 1;
 		emit(hex_l2_loadri_io(hi(rd), HEX_REG_R28, 1), ctx);
+		faulting[nfaulting++] = ctx->ninsns - 1;
 		break;
+	}
+
+	if (size != BPF_DW) {
+		if (sx)
+			emit(hex_s2_asr_i_r(hi(rd), lo(rd), 31), ctx);
+		else if (!ctx->prog->aux->verifier_zext)
+			emit(hex_a2_tfrsi(hi(rd), 0), ctx);
+	}
+
+	if (probe) {
+		/* Jump over the stub that a faulting load resumes at. */
+		emit(hex_j2_jump(3 * 4), ctx);
+		stub = ctx->ninsns;
+		emit(hex_a2_tfrsi(lo(rd), 0), ctx);
+		emit(hex_a2_tfrsi(hi(rd), 0), ctx);
+
+		for (i = 0; i < nfaulting; i++) {
+			struct exception_table_entry *ex;
+
+			if (ctx->insns) {
+				if (ctx->ex_idx >= ctx->ex_cap)
+					return -EINVAL;
+				ex = &ctx->prog->aux->extable[ctx->ex_idx];
+				ex->insn = (unsigned long)&ctx->insns[faulting[i]];
+				ex->fixup = (unsigned long)&ctx->insns[stub];
+			}
+			ctx->ex_idx++;
+		}
 	}
 
 	bpf_put_reg64(dst, rd, ctx);
@@ -1706,7 +1744,18 @@ int bpf_jit_emit_insn(const struct bpf_insn *insn,
 	case BPF_LDX | BPF_MEM | BPF_H:
 	case BPF_LDX | BPF_MEM | BPF_W:
 	case BPF_LDX | BPF_MEM | BPF_DW:
-		if (emit_load_r64(dst, src, off, ctx, BPF_SIZE(code)))
+	case BPF_LDX | BPF_MEMSX | BPF_B:
+	case BPF_LDX | BPF_MEMSX | BPF_H:
+	case BPF_LDX | BPF_MEMSX | BPF_W:
+	case BPF_LDX | BPF_PROBE_MEM | BPF_B:
+	case BPF_LDX | BPF_PROBE_MEM | BPF_H:
+	case BPF_LDX | BPF_PROBE_MEM | BPF_W:
+	case BPF_LDX | BPF_PROBE_MEM | BPF_DW:
+	case BPF_LDX | BPF_PROBE_MEMSX | BPF_B:
+	case BPF_LDX | BPF_PROBE_MEMSX | BPF_H:
+	case BPF_LDX | BPF_PROBE_MEMSX | BPF_W:
+		if (emit_load_r64(dst, src, off, ctx, BPF_SIZE(code),
+				  BPF_MODE(code)))
 			return -1;
 		break;
 
@@ -1843,6 +1892,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_verifier_env *env,
 	for (i = 0; i < NR_JIT_ITERATIONS; i++) {
 		pass++;
 		ctx->ninsns = 0;
+		ctx->ex_idx = 0;
 
 		bpf_jit_build_prologue(ctx, bpf_is_subprog(prog));
 		ctx->prologue_len = ctx->ninsns;
@@ -1860,8 +1910,10 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_verifier_env *env,
 				break;
 
 			prog_size = sizeof(*ctx->insns) * ctx->ninsns;
+			ctx->ex_cap = prog->aux->num_exentries * 2;
 			jit_data->header =
-				bpf_jit_binary_alloc(prog_size,
+				bpf_jit_binary_alloc(prog_size + ctx->ex_cap *
+						     sizeof(struct exception_table_entry),
 						     &jit_data->image,
 						     sizeof(u32),
 						     bpf_fill_ill_insns);
@@ -1870,6 +1922,9 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_verifier_env *env,
 				goto out_offset;
 			}
 			ctx->insns = (u32 *)jit_data->image;
+			if (ctx->ex_cap)
+				prog->aux->extable = (void *)(jit_data->image +
+							      prog_size);
 		}
 		prev_ninsns = ctx->ninsns;
 	}
@@ -1883,6 +1938,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_verifier_env *env,
 skip_init_ctx:
 	pass++;
 	ctx->ninsns = 0;
+	ctx->ex_idx = 0;
 
 	bpf_jit_build_prologue(ctx, bpf_is_subprog(prog));
 	if (build_body(ctx, extra_pass, NULL)) {
@@ -1890,6 +1946,7 @@ skip_init_ctx:
 		goto out_free_hdr;
 	}
 	bpf_jit_build_epilogue(ctx);
+	prog->aux->num_exentries = ctx->ex_idx;
 
 	if (bpf_jit_enable > 1)
 		bpf_jit_dump(prog->len, prog_size, pass, ctx->insns);

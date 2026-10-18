@@ -71,6 +71,8 @@ struct hexagon_jit_context {
 	int epilogue_offset;	/* epilogue start in instructions */
 	int *offset;		/* BPF insn index -> Hexagon insn offset */
 	int stack_size;		/* total stack frame size */
+	int ex_idx;		/* next exception table entry to fill */
+	int ex_cap;		/* exception table entries in the image */
 };
 
 struct hexagon_jit_data {
@@ -366,6 +368,36 @@ static inline u32 hex_s2_lsr_r_r(u8 rd, u8 rs, u8 rt)
 static inline u32 hex_s2_asr_r_r(u8 rd, u8 rs, u8 rt)
 {
 	return 0xc6400000 | ((rs & 0x1f) << 16) | ((rt & 0x1f) << 8) |
+	       (rd & 0x1f);
+}
+
+/*
+ * Rd = memb(Rs + #s11) -- load signed byte
+ * Encoding: 10010ii1 000sssss PPiiiiii iiiddddd
+ */
+static inline u32 hex_l2_loadrb_io(u8 rd, u8 rs, s16 imm)
+{
+	u32 u = (u16)(imm & 0x7ff);
+
+	return 0x91000000 |
+	       ((u & 0x0600) << (25 - 9))  |
+	       ((rs & 0x1f) << 16)         |
+	       ((u & 0x01ff) << 5)         |
+	       (rd & 0x1f);
+}
+
+/*
+ * Rd = memh(Rs + #s11:1) -- load signed halfword
+ * Encoding: 10010ii1 010sssss PPiiiiii iiiddddd
+ */
+static inline u32 hex_l2_loadrh_io(u8 rd, u8 rs, s16 imm)
+{
+	u32 u = (u16)(imm & 0x7ff);
+
+	return 0x91400000 |
+	       ((u & 0x0600) << (25 - 9))  |
+	       ((rs & 0x1f) << 16)         |
+	       ((u & 0x01ff) << 5)         |
 	       (rd & 0x1f);
 }
 
