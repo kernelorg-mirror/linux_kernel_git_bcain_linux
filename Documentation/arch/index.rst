@@ -12,6 +12,7 @@ implementation.
    arc/index
    arm/index
    arm64/index
+   hexagon/sm8975-nsp
    loongarch/index
    m68k/index
    mips/index

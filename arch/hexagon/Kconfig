@@ -125,6 +125,17 @@ config HEXAGON_QCS6490_CDSP
 	  PL011 that QEMU's qcs6490-cdsp machine adds for this purpose; the
 	  hardware has no UART.
 
+config HEXAGON_SM8975_NSP
+	bool "Qualcomm SM8975 NSP"
+	select HEXAGON_PHYS_OFFSET
+	select ARM_AMBA
+	select COMMON_CLK
+	select HEXAGON_H2
+	help
+	  Support for the SM8975 NSP running under the H2 hypervisor.
+	  The supplied device tree describes QEMU's sm8975-nsp machine,
+	  including its emulated PL011 console.
+
 config HEXAGON_COMET
 	bool "Comet Board"
 	help
@@ -209,14 +220,6 @@ source "kernel/Kconfig.hz"
 source "arch/hexagon/kernel/hvx/Kconfig"
 
 source "arch/hexagon/kernel/hmx/Kconfig"
-
-config HEXAGON_HLX
-	bool "Userspace HLX context management"
-	depends on HEXAGON_H2
-	select HAVE_EXIT_THREAD
-	help
-	  Allocate HLX contexts on demand and preserve their register state
-	  across task switches.
 
 config HEXAGON_HLX
 	bool "Userspace HLX context management"

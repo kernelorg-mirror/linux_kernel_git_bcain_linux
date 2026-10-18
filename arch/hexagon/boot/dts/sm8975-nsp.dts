@@ -1,0 +1,130 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/* QEMU SM8975 NSP, running Linux as an H2 guest with 1 GiB of DDR. */
+/dts-v1/;
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <1>;
+	model = "Qualcomm SM8975 NSP (QEMU)";
+	compatible = "qcom,sm8975-nsp";
+
+	aliases { serial0 = &uart0; };
+	chosen { stdout-path = "serial0"; };
+
+	memory@a0000000 {
+		device_type = "memory";
+		reg = <0 0xa0000000 0x1e000000>;
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		cpu@0 { device_type = "cpu"; reg = <0>; };
+		cpu@1 { device_type = "cpu"; reg = <1>; };
+		cpu@2 { device_type = "cpu"; reg = <2>; };
+		cpu@3 { device_type = "cpu"; reg = <3>; };
+		cpu@4 { device_type = "cpu"; reg = <4>; };
+		cpu@5 { device_type = "cpu"; reg = <5>; };
+		cpu@6 { device_type = "cpu"; reg = <6>; };
+		cpu@7 { device_type = "cpu"; reg = <7>; };
+		cpu@8 { device_type = "cpu"; reg = <8>; };
+		cpu@9 { device_type = "cpu"; reg = <9>; };
+		cpu@a { device_type = "cpu"; reg = <10>; };
+		cpu@b { device_type = "cpu"; reg = <11>; };
+	};
+
+	apb_pclk: clock {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+	};
+
+	uart0: serial@37000000 {
+		compatible = "arm,pl011", "arm,primecell";
+		reg = <0 0x37000000 0x1000>;
+		interrupt-parent = <&pic>;
+		interrupts = <47 0>;
+		clocks = <&apb_pclk>, <&apb_pclk>;
+		clock-names = "uartclk", "apb_pclk";
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges;
+		interrupt-parent = <&pic>;
+
+		pic: interrupt-controller@26390000 {
+			compatible = "qcom,h2-pic", "hvm-pic";
+			reg = <0 0x26390000 0x1000>;
+			interrupt-controller;
+			#address-cells = <0>;
+			#interrupt-cells = <2>;
+		};
+
+		timer@ab000000 {
+			compatible = "qcom,h2-timer", "hvm-timer";
+			reg = <0 0xab000000 0x1000>;
+			interrupts = <12 0>;
+		};
+
+		virtio_mmio@37010000 {
+			compatible = "virtio,mmio";
+			reg = <0 0x37010000 0x1000>;
+			interrupts = <128 0>;
+		};
+		virtio_mmio@37011000 {
+			compatible = "virtio,mmio";
+			reg = <0 0x37011000 0x1000>;
+			interrupts = <129 0>;
+		};
+		virtio_mmio@37012000 {
+			compatible = "virtio,mmio";
+			reg = <0 0x37012000 0x1000>;
+			interrupts = <130 0>;
+		};
+		virtio_mmio@37013000 {
+			compatible = "virtio,mmio";
+			reg = <0 0x37013000 0x1000>;
+			interrupts = <131 0>;
+		};
+		virtio_mmio@37014000 {
+			compatible = "virtio,mmio";
+			reg = <0 0x37014000 0x1000>;
+			interrupts = <132 0>;
+		};
+		virtio_mmio@37015000 {
+			compatible = "virtio,mmio";
+			reg = <0 0x37015000 0x1000>;
+			interrupts = <133 0>;
+		};
+		virtio_mmio@37016000 {
+			compatible = "virtio,mmio";
+			reg = <0 0x37016000 0x1000>;
+			interrupts = <134 0>;
+		};
+		virtio_mmio@37017000 {
+			compatible = "virtio,mmio";
+			reg = <0 0x37017000 0x1000>;
+			interrupts = <135 0>;
+		};
+
+		vtcm@25000000 {
+			compatible = "qcom,hexagon_vtcm";
+			reg = <0 0x25000000 0xbf0000>;
+		};
+
+		hvx {
+			compatible = "qcom,hexagon-hvx";
+			qcom,hvx-max-ctxts = <8>;
+			qcom,hvx-vlength = <7>;
+		};
+
+		hmx { compatible = "qcom,hexagon-hmx"; };
+		hlx@25bf0000 {
+			compatible = "qcom,hexagon-hlx";
+			reg = <0 0x25bf0000 0x10000>;
+		};
+	};
+};
