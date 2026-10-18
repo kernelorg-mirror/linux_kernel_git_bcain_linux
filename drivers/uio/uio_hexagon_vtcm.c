@@ -17,8 +17,8 @@ static int hexagon_vtcm_open(struct uio_info *info, struct inode *inode)
 {
 	struct extinfo *ext = &current_thread_info()->extensions;
 
-	/* Disallow access if neither HVX nor HMX was ever powered up */
-	if (!ext->hvx && !ext->hmx)
+	/* The caller must hold a coprocessor context. */
+	if (!ext->hvx && !ext->hmx && !ext->hlx)
 		return -EIO;
 
 	return 0;

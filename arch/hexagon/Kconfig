@@ -218,4 +218,12 @@ config HEXAGON_HLX
 	  Allocate HLX contexts on demand and preserve their register state
 	  across task switches.
 
+config HEXAGON_HLX
+	bool "Userspace HLX context management"
+	depends on HEXAGON_H2
+	select HAVE_EXIT_THREAD
+	help
+	  Allocate HLX contexts on demand and preserve their register state
+	  across task switches.
+
 endmenu

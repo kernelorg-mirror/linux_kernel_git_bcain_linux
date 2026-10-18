@@ -43,6 +43,7 @@
 
 /* The info codes of the H2 hypervisor that the kernel uses. */
 #define HVM_INFO_HTHREADS		19	/* mask of the running hardware threads */
+#define HVM_INFO_HLX_CONTEXTS		37
 
 #ifndef __ASSEMBLY__
 
@@ -106,6 +107,7 @@ typedef enum {
 	HWCONFIG_HWTHREADS_MASK,
 	HWCONFIG_ECC,
 	HWCONFIG_HMXBITS,
+	HWCONFIG_HLXBITS = 32,
 } hwconfig_type_t;
 
 extern void _K_VM_event_vector(void);
@@ -309,6 +311,7 @@ static inline long __vmintop_clear(long i)
 #define HVM_GE_C_INVI	0x15
 #define HVM_GE_C_COPROC 0x16
 #define HVM_GE_C_COPROC2 0x18
+#define HVM_GE_C_COPROC3 0x19
 #define HVM_GE_C_PRIVI	0x1B
 #define HVM_GE_C_XMAL	0x1C
 #define HVM_GE_C_WREG	0x1D

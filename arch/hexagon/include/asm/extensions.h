@@ -10,11 +10,13 @@
 
 struct hvx_threadinfo;
 struct hmx_threadinfo;
+struct hlx_threadinfo;
 
 /* The state of a thread's coprocessors, if it uses them. */
 struct extinfo {
 	struct hvx_threadinfo *hvx;
 	struct hmx_threadinfo *hmx;
+	struct hlx_threadinfo *hlx;
 };
 
 #endif /* _ASM_EXTENSIONS_H */

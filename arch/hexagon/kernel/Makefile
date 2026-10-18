@@ -29,6 +29,7 @@ obj-$(CONFIG_HAS_DMA) += dma.o
 
 obj-y += hvx/
 obj-y += hmx/
+obj-$(CONFIG_HEXAGON_HLX) += hlx.o
 
 obj-$(CONFIG_STACKTRACE) += stacktrace.o
 

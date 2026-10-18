@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/resume_user_mode.h>
 #include <asm/hexagon_vm.h>
+#include <asm/hlx.h>
 #include <asm/notify.h>
 
 /*
@@ -131,7 +132,17 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
  */
 void flush_thread(void)
 {
+	hexagon_hlx_flush_thread();
 }
+
+#ifdef CONFIG_HEXAGON_HLX
+void exit_thread(struct task_struct *tsk)
+{
+	/* A failed fork can invoke this hook for a task other than current. */
+	if (tsk == current)
+		hexagon_hlx_flush_thread();
+}
+#endif
 
 /*
  * The last arch hook for a task that is going away.

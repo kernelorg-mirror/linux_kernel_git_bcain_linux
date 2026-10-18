@@ -310,20 +310,20 @@ static void cache_error(struct pt_regs *regs)
 }
 
 /*
- * A coprocessor-unavailable fault (HVX/HMX) is how lazy vector-context
+ * A coprocessor-unavailable fault (HVX/HMX or HLX) is how lazy vector-context
  * allocation is triggered: the first coprocessor instruction a thread
  * executes traps here because the extension is not enabled for it.  Offer the
- * fault to the coprocessor context managers via the thread-event notifier;
+ * fault to the appropriate coprocessor context managers via the notifier;
  * one of them claims it (coproc_fault_claim()) and allocates a context,
  * after which the instruction is retried.  If nothing claims it -- no
  * coprocessor support is built in, or the thread is genuinely misusing the
  * coprocessor -- deliver SIGFPE.
  */
-static void coproc_fault(struct pt_regs *regs)
+static void coproc_fault(struct pt_regs *regs, unsigned long event)
 {
 	coproc_fault_reset();
 
-	atomic_thread_notify(current_thread_info(), THREAD_EVENT_FAULT_COPROC);
+	atomic_thread_notify(current_thread_info(), event);
 
 	if (!coproc_fault_claimed())
 		force_sig(SIGFPE);
@@ -406,7 +406,10 @@ void do_genex(struct pt_regs *regs)
 		break;
 	case HVM_GE_C_COPROC:
 	case HVM_GE_C_COPROC2:
-		coproc_fault(regs);
+		coproc_fault(regs, THREAD_EVENT_FAULT_COPROC);
+		break;
+	case HVM_GE_C_COPROC3:
+		coproc_fault(regs, THREAD_EVENT_FAULT_HLX);
 		break;
 	default:
 		/* Halt and catch fire */
