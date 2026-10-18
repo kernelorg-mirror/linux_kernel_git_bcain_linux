@@ -19,6 +19,69 @@
 #include <asm/user.h>
 #include <asm/hvx.h>
 
+struct pt_regs_offset {
+	const char *name;
+	int offset;
+};
+
+#define REG_OFFSET_NAME(r, member) \
+	{ .name = #r, .offset = offsetof(struct pt_regs, member) }
+#define GPR_OFFSET_NAME(n) REG_OFFSET_NAME(r##n, r##n)
+#define REG_OFFSET_END { .name = NULL, .offset = 0 }
+
+static const struct pt_regs_offset regoffset_table[] = {
+	GPR_OFFSET_NAME(00), GPR_OFFSET_NAME(01), GPR_OFFSET_NAME(02),
+	GPR_OFFSET_NAME(03), GPR_OFFSET_NAME(04), GPR_OFFSET_NAME(05),
+	GPR_OFFSET_NAME(06), GPR_OFFSET_NAME(07), GPR_OFFSET_NAME(08),
+	GPR_OFFSET_NAME(09), GPR_OFFSET_NAME(10), GPR_OFFSET_NAME(11),
+	GPR_OFFSET_NAME(12), GPR_OFFSET_NAME(13), GPR_OFFSET_NAME(14),
+	GPR_OFFSET_NAME(15), GPR_OFFSET_NAME(16), GPR_OFFSET_NAME(17),
+	GPR_OFFSET_NAME(18), GPR_OFFSET_NAME(19), GPR_OFFSET_NAME(20),
+	GPR_OFFSET_NAME(21), GPR_OFFSET_NAME(22), GPR_OFFSET_NAME(23),
+	GPR_OFFSET_NAME(24), GPR_OFFSET_NAME(25), GPR_OFFSET_NAME(26),
+	GPR_OFFSET_NAME(27), GPR_OFFSET_NAME(28), GPR_OFFSET_NAME(29),
+	GPR_OFFSET_NAME(30), GPR_OFFSET_NAME(31),
+	REG_OFFSET_NAME(sp, r29),
+	REG_OFFSET_NAME(fp, r30),
+	REG_OFFSET_NAME(lr, r31),
+	REG_OFFSET_NAME(pc, hvmer.vmel),
+	REG_OFFSET_NAME(usr, usr),
+	REG_OFFSET_NAME(p3_0, preds),
+	REG_OFFSET_NAME(m0, m0),
+	REG_OFFSET_NAME(m1, m1),
+	REG_OFFSET_NAME(sa0, sa0),
+	REG_OFFSET_NAME(lc0, lc0),
+	REG_OFFSET_NAME(sa1, sa1),
+	REG_OFFSET_NAME(lc1, lc1),
+	REG_OFFSET_NAME(gp, gp),
+	REG_OFFSET_NAME(ugp, ugp),
+	REG_OFFSET_NAME(cs0, cs0),
+	REG_OFFSET_NAME(cs1, cs1),
+	REG_OFFSET_END,
+};
+
+/* Offset of the register of this name in pt_regs, or -EINVAL. */
+int regs_query_register_offset(const char *name)
+{
+	const struct pt_regs_offset *roff;
+
+	for (roff = regoffset_table; roff->name; roff++)
+		if (!strcmp(roff->name, name))
+			return roff->offset;
+	return -EINVAL;
+}
+
+/* Name of the register at this offset in pt_regs, or NULL. */
+const char *regs_query_register_name(unsigned int offset)
+{
+	const struct pt_regs_offset *roff;
+
+	for (roff = regoffset_table; roff->name; roff++)
+		if (roff->offset == offset)
+			return roff->name;
+	return NULL;
+}
+
 #if arch_has_single_step()
 /*  Both called from ptrace_resume  */
 void user_enable_single_step(struct task_struct *child)
