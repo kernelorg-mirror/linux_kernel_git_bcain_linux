@@ -53,10 +53,11 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
  *  If hardware or VM offer wait termination even though interrupts
  *  are disabled.
  */
-void arch_cpu_idle(void)
+void notrace arch_cpu_idle(void)
 {
 	__vmwait();
-	/*  interrupts wake us up, but irqs are still disabled */
+	/* VM wait returns with IRQs disabled; the generic idle loop needs them on. */
+	local_irq_enable();
 }
 
 /*

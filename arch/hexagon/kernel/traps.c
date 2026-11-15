@@ -336,8 +336,8 @@ static void coproc_fault(struct pt_regs *regs, unsigned long event)
 /*
  * General exception handler
  */
-void do_genex(struct pt_regs *regs);
-void do_genex(struct pt_regs *regs)
+void notrace do_genex(struct pt_regs *regs);
+void notrace do_genex(struct pt_regs *regs)
 {
 	/*
 	 * The VM disables guest interrupts on event delivery; the IE
@@ -434,8 +434,8 @@ static bool kprobe_trap_handler(struct pt_regs *regs)
 	}
 }
 
-void do_trap0(struct pt_regs *regs);
-void do_trap0(struct pt_regs *regs)
+void notrace do_trap0(struct pt_regs *regs);
+void notrace do_trap0(struct pt_regs *regs)
 {
 	syscall_fn syscall;
 
@@ -544,8 +544,8 @@ void do_trap0(struct pt_regs *regs)
 /*
  * Machine check exception handler
  */
-void do_machcheck(struct pt_regs *regs);
-void do_machcheck(struct pt_regs *regs)
+void notrace do_machcheck(struct pt_regs *regs);
+void notrace do_machcheck(struct pt_regs *regs)
 {
 	clear_ie_cached();
 	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
@@ -558,8 +558,8 @@ void do_machcheck(struct pt_regs *regs)
  * Treat this like the old 0xdb trap.
  */
 
-void do_debug_exception(struct pt_regs *regs);
-void do_debug_exception(struct pt_regs *regs)
+void notrace do_debug_exception(struct pt_regs *regs);
+void notrace do_debug_exception(struct pt_regs *regs)
 {
 	clear_ie_cached();
 

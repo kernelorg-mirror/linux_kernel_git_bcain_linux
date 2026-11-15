@@ -352,9 +352,12 @@ check_work_pending:
 
 restore_all:
 	/*
-	 * Disable interrupts, if they weren't already, before reg restore.
+	 * Keep the IRQ cache at the actual disabled state while calling the
+	 * restore notifiers. Their tracing callbacks can save/restore IRQs.
+	 * Publishing the return state before them would let such a callback
+	 * enable interrupts in the middle of restoring the event frame.
 	 */
-	callr R17
+	call vmsetie_disable
 	/*  let the coprocessor managers set up for the thread we return to  */
 	{
 		R17 = ##(atomic_thread_notify);
@@ -364,6 +367,9 @@ restore_all:
 		callr R17;
 		R1 = ##(THREAD_EVENT_RESTOREALL);
 	}
+	/* Publish the saved return IRQ state only after the last traceable call. */
+	R17 = ##vmsetie_rte_disable;
+	callr R17
 	/*  do the setregs here for VM 0.5  */
 	/*  R29 here should already be pointing at pt_regs  */
 	{

@@ -137,7 +137,8 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
  * to point to current thread info
  */
 
-static void __noscs start_secondary(void)
+/* Neither profiling nor SCS may run before the per-CPU pointers are loaded. */
+static void notrace __noscs start_secondary(void)
 {
 	unsigned long thread_ptr;
 	unsigned int cpu, irq;

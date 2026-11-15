@@ -9,6 +9,9 @@
 #include <linux/export.h>
 #include <linux/notifier.h>
 #include <linux/percpu.h>
+#include <linux/context_tracking_irq.h>
+#include <linux/irqflags.h>
+#include <linux/kprobes.h>
 #include <asm/notify.h>
 
 static ATOMIC_NOTIFIER_HEAD(atomic_thread_notifier_list);
@@ -44,11 +47,20 @@ int atomic_thread_unregister_notify(struct notifier_block *nb)
 						nb);
 }
 
-int atomic_thread_notify(void *arg, unsigned long action)
+int notrace atomic_thread_notify(void *arg, unsigned long action)
 {
-	return atomic_notifier_call_chain(&atomic_thread_notifier_list, action,
-					  arg);
+	unsigned long flags;
+	int ret;
+
+	/* Restore notifications can run after irq_exit() has returned to idle. */
+	local_irq_save(flags);
+	ct_irq_enter();
+	ret = atomic_notifier_call_chain(&atomic_thread_notifier_list, action, arg);
+	ct_irq_exit();
+	local_irq_restore(flags);
+	return ret;
 }
+NOKPROBE_SYMBOL(atomic_thread_notify);
 
 int blocking_thread_register_notify(struct notifier_block *nb)
 {

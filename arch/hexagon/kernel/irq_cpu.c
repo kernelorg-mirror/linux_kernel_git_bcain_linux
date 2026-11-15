@@ -11,16 +11,24 @@
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/percpu.h>
+#include <linux/preempt.h>
 #include <asm/irq.h>
 #include <asm/hexagon_vm.h>
 
+/* These helpers are also used by tracing itself and before IRQ entry. */
 DEFINE_PER_CPU(long, ie_cached);
 
 /*  caching replacement for the old __vmsetie()  */
 
-long vmsetie_cached(long val)
+long notrace vmsetie_cached(long val)
 {
-	return __vmsetie_cached(val, this_cpu_ptr(&ie_cached));
+	long old;
+
+	/* The pointer and hypercall must refer to the same CPU. */
+	preempt_disable_notrace();
+	old = __vmsetie_cached(val, this_cpu_ptr(&ie_cached));
+	preempt_enable_notrace();
+	return old;
 }
 
 /*
@@ -28,31 +36,38 @@ long vmsetie_cached(long val)
  * vmrte can still change ie on us; see vm_entry.S
  */
 
-void vmsetie_rte_disable(void)
+void notrace vmsetie_rte_disable(void)
 {
 	/*  the preempt_enable/disable doesn't help us  */
 	__vmsetie_cached(VM_INT_DISABLE, this_cpu_ptr(&ie_cached));
-	__this_cpu_write(ie_cached, ints_enabled(current_thread_info()->regs));
+	raw_cpu_write(ie_cached, ints_enabled(current_thread_info()->regs));
 }
 
-void vmsetie_disable(void)
+void notrace vmsetie_disable(void)
 {
-	__vmsetie_cached(VM_INT_DISABLE, this_cpu_ptr(&ie_cached));
+	vmsetie_cached(VM_INT_DISABLE);
 }
 
-long vmgetie_cached(void)
+long notrace vmgetie_cached(void)
 {
-	return __this_cpu_read(ie_cached);
+	long flags;
+
+	/* Reading flags must not itself schedule or migrate between CPU and load. */
+	preempt_disable_notrace();
+	flags = raw_cpu_read(ie_cached);
+	preempt_enable_no_resched_notrace();
+	return flags;
 }
 
-void load_ie_cache(void)
+void notrace load_ie_cache(void)
 {
-	__this_cpu_write(ie_cached, __vmgetie());
+	raw_cpu_write(ie_cached, __vmgetie());
 }
 
-void clear_ie_cached(void)
+void notrace clear_ie_cached(void)
 {
-	__this_cpu_write(ie_cached, 0);
+	/* The VM disabled IRQs, although the cached flags still say otherwise. */
+	raw_cpu_write(ie_cached, 0);
 }
 
 void __init init_IRQ(void)

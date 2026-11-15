@@ -75,16 +75,18 @@ void show_regs(struct pt_regs *regs)
 		pt_psp(regs), pt_badva(regs), ints_enabled(regs));
 }
 
-void arch_do_IRQ(struct pt_regs *regs)
+void notrace arch_do_IRQ(struct pt_regs *regs)
 {
 	int irq = pt_cause(regs);
 	int virq;
-	struct pt_regs *old_regs = set_irq_regs(regs);
+	struct pt_regs *old_regs;
 
 	clear_ie_cached();
-	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
+	old_regs = set_irq_regs(regs);
 
 	irq_enter();
+	/* Notifier chains and their tracing callbacks need RCU watching. */
+	atomic_thread_notify(current_thread_info(), THREAD_EVENT_ENTRY);
 	/*  return of zero here is an error btw  */
 	virq = irq_find_mapping(NULL, irq);
 	generic_handle_irq(virq);
