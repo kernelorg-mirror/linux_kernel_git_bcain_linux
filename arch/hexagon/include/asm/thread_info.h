@@ -121,6 +121,7 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_SYSCALL_TRACEPOINT  5       /* syscall tracepoint for ftrace */
 #define TIF_RESTORE_SIGMASK     6       /* restore sig mask in do_signal() */
 #define TIF_NOTIFY_SIGNAL	7       /* signal notifications exist */
+#define TIF_UPROBE		8       /* uprobe breakpoint or completion */
 /* true if poll_idle() is polling TIF_NEED_RESCHED */
 #define TIF_MEMDIE              17      /* OOM killer killed process */
 
@@ -131,6 +132,7 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_SINGLESTEP         (1 << TIF_SINGLESTEP)
 #define _TIF_SYSCALL_TRACEPOINT (1 << TIF_SYSCALL_TRACEPOINT)
 #define _TIF_NOTIFY_SIGNAL	(1 << TIF_NOTIFY_SIGNAL)
+#define _TIF_UPROBE		(1 << TIF_UPROBE)
 
 /* work to do on interrupt/exception return - All but the syscall tracing */
 #define _TIF_WORK_MASK          (0x0000FFFF & ~_TIF_SYSCALL_TRACE & \

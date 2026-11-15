@@ -22,6 +22,7 @@
 #include <linux/kprobes.h>
 #include <linux/hardirq.h>
 #include <linux/perf_event.h>
+#include <asm/uprobes.h>
 
 /*
  * Decode of hardware exception sends us to one of several
@@ -157,6 +158,7 @@ retry:
 		si_signo = SIGSEGV;
 		si_code  = SEGV_ACCERR;
 	}
+	hexagon_uprobe_exception(regs);
 	force_sig_fault(si_signo, si_code, (void __user *)address);
 	return;
 
@@ -165,6 +167,7 @@ bad_area:
 
 bad_area_nosemaphore:
 	if (user_mode(regs)) {
+		hexagon_uprobe_exception(regs);
 		force_sig_fault(SIGSEGV, si_code, (void __user *)address);
 		return;
 	}

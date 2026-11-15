@@ -24,6 +24,7 @@
 #include <asm/sections.h>
 #include <asm/notify.h>
 #include <asm/kprobes.h>
+#include <asm/uprobes.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/syscalls.h>
@@ -250,6 +251,7 @@ int die_if_kernel(char *str, struct pt_regs *regs, long err)
  */
 static void misaligned_instruction(struct pt_regs *regs)
 {
+	hexagon_uprobe_exception(regs);
 	die_if_kernel("Misaligned Instruction", regs, 0);
 	force_sig(SIGBUS);
 }
@@ -261,6 +263,7 @@ static void misaligned_instruction(struct pt_regs *regs)
  */
 static void misaligned_data_load(struct pt_regs *regs)
 {
+	hexagon_uprobe_exception(regs);
 	/*
 	 * A failed KCFI check lands here: clang traps it with a deliberately
 	 * misaligned doubleword load, so check the __kcfi_traps table before
@@ -283,12 +286,14 @@ static void misaligned_data_load(struct pt_regs *regs)
 
 static void misaligned_data_store(struct pt_regs *regs)
 {
+	hexagon_uprobe_exception(regs);
 	die_if_kernel("Misaligned Data Store", regs, 0);
 	force_sig(SIGBUS);
 }
 
 static void illegal_instruction(struct pt_regs *regs)
 {
+	hexagon_uprobe_exception(regs);
 	die_if_kernel("Illegal Instruction", regs, 0);
 	force_sig(SIGILL);
 }
@@ -299,6 +304,7 @@ static void illegal_instruction(struct pt_regs *regs)
  */
 static void precise_bus_error(struct pt_regs *regs)
 {
+	hexagon_uprobe_exception(regs);
 	die_if_kernel("Precise Bus Error", regs, 0);
 	force_sig(SIGBUS);
 }
@@ -325,6 +331,8 @@ static void cache_error(struct pt_regs *regs)
  */
 static void coproc_fault(struct pt_regs *regs, unsigned long event)
 {
+	/* A failed lazy allocation can deliver SIGFPE, including on user return. */
+	hexagon_uprobe_exception(regs);
 	coproc_fault_reset();
 
 	atomic_thread_notify(current_thread_info(), event);
@@ -506,6 +514,20 @@ void notrace do_trap0(struct pt_regs *regs)
 		if (unlikely(test_thread_flag(TIF_SYSCALL_TRACE)))
 			ptrace_report_syscall_exit(regs, 0);
 
+		break;
+	case UPROBE_TRAP_BREAK:
+		if (hexagon_uprobe_breakpoint(regs))
+			break;
+		goto unhandled_uprobe;
+	case UPROBE_TRAP_STEP:
+		if (hexagon_uprobe_step(regs))
+			break;
+unhandled_uprobe:
+		if (user_mode(regs))
+			force_sig_fault(SIGTRAP, TRAP_BRKPT,
+					(void __user *)pt_elr(regs));
+		else
+			die("Unexpected uprobe trap", regs, SIGTRAP);
 		break;
 	case KPROBE_TRAP_BREAK:
 	case KPROBE_TRAP_STEP_DONE:

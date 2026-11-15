@@ -11,7 +11,7 @@
     |         arm: |  ok  |
     |       arm64: |  ok  |
     |        csky: |  ok  |
-    |     hexagon: | TODO |
+    |     hexagon: |  ok  |
     |   loongarch: |  ok  |
     |        m68k: | TODO |
     |  microblaze: | TODO |

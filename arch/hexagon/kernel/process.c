@@ -16,6 +16,7 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/resume_user_mode.h>
+#include <linux/uprobes.h>
 #include <linux/ftrace.h>
 #include <asm/hexagon_vm.h>
 #include <asm/hlx.h>
@@ -194,6 +195,12 @@ int do_work_pending(struct pt_regs *regs, u32 thread_info_flags);
 int do_work_pending(struct pt_regs *regs, u32 thread_info_flags)
 {
 	local_irq_enable();
+
+	/* Resolve out-of-line execution before signal delivery or user work. */
+	if (thread_info_flags & _TIF_UPROBE) {
+		uprobe_notify_resume(regs);
+		return 1;
+	}
 
 	if (thread_info_flags & _TIF_NEED_RESCHED) {
 		schedule();

@@ -18,6 +18,7 @@ endif
 obj-$(CONFIG_CFI)     += cfi.o
 obj-$(CONFIG_KGDB)    += kgdb.o
 obj-$(CONFIG_KPROBES) += kprobes.o
+obj-$(CONFIG_UPROBES) += uprobes.o
 obj-$(CONFIG_FUNCTION_TRACER) += mcount.o ftrace.o
 
 # The profiling hook must never instrument itself.
