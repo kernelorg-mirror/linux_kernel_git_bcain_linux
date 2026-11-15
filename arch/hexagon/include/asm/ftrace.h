@@ -2,8 +2,20 @@
 #ifndef _ASM_HEXAGON_FTRACE_H
 #define _ASM_HEXAGON_FTRACE_H
 
+/* -mlong-calls emits an extender followed by the call instruction. */
+#define MCOUNT_INSN_SIZE 8
+#define ARCH_SUPPORTS_FTRACE_OPS 1
+
 #ifndef __ASSEMBLY__
 #include <linux/string.h>
+
+#ifdef CONFIG_FUNCTION_TRACER
+struct ftrace_ops;
+extern struct ftrace_ops *function_trace_op;
+void mcount(void);
+void hexagon_ftrace_caller(unsigned long ip, unsigned long parent_ip,
+			  unsigned long *parent);
+#endif
 
 #ifdef CONFIG_FTRACE_SYSCALLS
 /*

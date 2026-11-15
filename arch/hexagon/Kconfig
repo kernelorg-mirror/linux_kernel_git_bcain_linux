@@ -44,6 +44,9 @@ config HEXAGON
 	select HAVE_SYSCALL_TRACEPOINTS
 	select HAVE_KPROBES
 	select HAVE_KRETPROBES
+	select HAVE_FUNCTION_TRACER
+	# Trace records containing u64 fields need doubleword alignment.
+	select HAVE_64BIT_ALIGNED_ACCESS
 	select NEED_SG_DMA_LENGTH
 	select GENERIC_IOREMAP
 	select GENERIC_SMP_IDLE_THREAD

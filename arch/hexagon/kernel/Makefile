@@ -18,6 +18,13 @@ endif
 obj-$(CONFIG_CFI)     += cfi.o
 obj-$(CONFIG_KGDB)    += kgdb.o
 obj-$(CONFIG_KPROBES) += kprobes.o
+obj-$(CONFIG_FUNCTION_TRACER) += mcount.o ftrace.o
+
+# The profiling hook must never instrument itself.
+CFLAGS_REMOVE_ftrace.o = $(CC_FLAGS_FTRACE)
+KASAN_SANITIZE_ftrace.o := n
+KCSAN_SANITIZE_ftrace.o := n
+KCOV_INSTRUMENT_ftrace.o := n
 # IRQ-cache helpers run before IRQ/RCU entry and after return-state publication.
 KASAN_SANITIZE_irq_cpu.o := n
 KCSAN_SANITIZE_irq_cpu.o := n
