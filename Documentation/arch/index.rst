@@ -13,6 +13,8 @@ implementation.
    arm/index
    arm64/index
    hexagon/sm8975-nsp
+   hexagon/tracing
+   hexagon/memory
    loongarch/index
    m68k/index
    mips/index
