@@ -22,6 +22,7 @@
 #include <asm/hexagon_vm.h>
 
 #include <asm/ptrace.h>
+#include <asm/text-patching.h>
 
 DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
 DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
@@ -87,9 +88,7 @@ static int probed_packet_words(const kprobe_opcode_t *addr)
 
 static void patch_insn(kprobe_opcode_t *addr, kprobe_opcode_t insn)
 {
-	WRITE_ONCE(*addr, insn);
-	flush_icache_range((unsigned long)addr,
-			   (unsigned long)addr + sizeof(insn));
+	BUG_ON(hexagon_patch_text(addr, &insn, sizeof(insn)));
 }
 
 int __kprobes arch_prepare_kprobe(struct kprobe *p)

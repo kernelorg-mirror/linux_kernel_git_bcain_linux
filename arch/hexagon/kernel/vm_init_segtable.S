@@ -39,6 +39,8 @@
 
 #define X __HVM_PDE_S_INVALID
 
+	/* The kernel updates its page directory after text becomes read-only. */
+	.data
 	.p2align 12
 	.globl swapper_pg_dir
 	.globl _K_init_segtable

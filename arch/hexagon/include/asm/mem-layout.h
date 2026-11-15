@@ -52,6 +52,7 @@ extern unsigned long	__phys_offset;
 enum fixed_addresses {
 	FIX_KMAP_BEGIN,
 	FIX_KMAP_END,  /*  check for per-cpuism  */
+	FIX_TEXT_POKE,
 	__end_of_fixed_addresses
 };
 
@@ -118,8 +119,11 @@ extern int max_kernel_seg;
  * below the fixmap, so vmalloc has to stop below it instead.
  */
 #ifdef CONFIG_KASAN
-#define VMALLOC_END (KASAN_SHADOW_START-PAGE_SIZE*2)
+/* The fixmap overlaps the shadow; reserve a separate segment for text writes. */
+#define HEXAGON_TEXT_POKE_ADDR (KASAN_SHADOW_START - PGDIR_SIZE)
+#define VMALLOC_END (HEXAGON_TEXT_POKE_ADDR-PAGE_SIZE*2)
 #else
+#define HEXAGON_TEXT_POKE_ADDR fix_to_virt(FIX_TEXT_POKE)
 #define VMALLOC_END (PKMAP_BASE-PAGE_SIZE*2)
 #endif
 #endif /*  !__ASSEMBLY__  */

@@ -70,9 +70,10 @@ SECTIONS
 	_sdata = .;
 		RW_DATA(32,PAGE_SIZE,_THREAD_SIZE)
 		RO_DATA(PAGE_SIZE)
+		EXCEPTION_TABLE(16)
+		. = ALIGN(PAGE_SIZE);
+		__hexagon_rodata_end = .;
 	_edata = .;
-
-	EXCEPTION_TABLE(16)
 
 	BSS_SECTION(_PAGE_SIZE, _PAGE_SIZE, _PAGE_SIZE)
 

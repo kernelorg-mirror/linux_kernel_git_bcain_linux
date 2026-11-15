@@ -18,6 +18,7 @@
 #include <asm/kasan.h>
 #include <asm/setup.h>
 #include <asm/vm_mmu.h>
+#include <asm/text-patching.h>
 
 /*
  * Define a startpg just past the end of the kernel image and a lastpg
@@ -238,6 +239,7 @@ void __init setup_arch_memory(void)
 	kasan_init();
 
 	paging_init();  /*  See Gorman Book, 2.3  */
+	hexagon_init_kernel_mapping();
 
 	/*
 	 *  At this point, the page allocator is kind of initialized, but

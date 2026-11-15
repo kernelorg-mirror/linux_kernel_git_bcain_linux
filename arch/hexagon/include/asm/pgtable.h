@@ -99,8 +99,15 @@ extern unsigned long _dflt_cache_att;
 
 /*  PROT_NONE still should show up as present but !pte_none */
 #define PAGE_NONE	__pgprot(_NO_PERM | _dflt_cache_att)
-#define PAGE_KERNEL	__pgprot(_PAGE_READ | \
-				_PAGE_WRITE | _PAGE_EXECUTE | _dflt_cache_att)
+#define PAGE_KERNEL_EXEC __pgprot(_PAGE_READ | _PAGE_WRITE | \
+				 _PAGE_EXECUTE | _dflt_cache_att)
+#ifdef CONFIG_STRICT_KERNEL_RWX
+#define PAGE_KERNEL __pgprot(_PAGE_READ | _PAGE_WRITE | _dflt_cache_att)
+#else
+#define PAGE_KERNEL PAGE_KERNEL_EXEC
+#endif
+#define PAGE_KERNEL_RO __pgprot(_PAGE_READ | _dflt_cache_att)
+#define PAGE_KERNEL_ROX __pgprot(_PAGE_READ | _PAGE_EXECUTE | _dflt_cache_att)
 
 /*
  * Aliases for mapping mmap() protection bits to page protections.
