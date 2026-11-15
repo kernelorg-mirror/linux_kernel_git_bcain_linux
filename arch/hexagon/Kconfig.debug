@@ -1,2 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-only
-# dummy file, do not delete
+config HEXAGON_ARCH_SELFTEST
+	tristate "Hexagon protection and preemption test module"
+	depends on DEBUG_KERNEL && STRICT_KERNEL_RWX && STRICT_MODULE_RWX
+	depends on PREEMPTION && KPROBES && m
+	help
+	  Build a module which checks protected text/rodata, non-executable
+	  module data, permission transitions, and interrupt-return preemption.
+	  Loading the module runs the tests and fails if an invariant is broken.
+	  Enable this only for architecture validation; normal kernels do not need it.

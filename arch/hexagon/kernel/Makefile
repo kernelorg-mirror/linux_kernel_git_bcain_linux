@@ -20,6 +20,8 @@ obj-$(CONFIG_KGDB)    += kgdb.o
 obj-$(CONFIG_KPROBES) += kprobes.o
 obj-$(CONFIG_FUNCTION_TRACER) += mcount.o ftrace.o
 obj-$(CONFIG_UPROBES) += uprobes.o
+obj-$(CONFIG_HEXAGON_ARCH_SELFTEST) += hexagon_arch_test.o
+hexagon_arch_test-y := selftest.o selftest-asm.o
 
 # The profiling hook must never instrument itself.
 CFLAGS_REMOVE_ftrace.o = $(CC_FLAGS_FTRACE)
