@@ -7,7 +7,8 @@ config HEXAGON
 	select ARCH_32BIT_OFF_T
 	select ARCH_HAS_DELAY_TIMER
 	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
-	select ARCH_NO_PREEMPT
+	# Retain the original model until KASAN's preemptible-RCU stalls are fixed.
+	select ARCH_NO_PREEMPT if KASAN
 	select ARCH_HAS_SET_MEMORY
 	select ARCH_HAS_STRICT_KERNEL_RWX
 	select ARCH_HAS_STRICT_MODULE_RWX

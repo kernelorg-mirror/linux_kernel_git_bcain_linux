@@ -22,6 +22,7 @@
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
+#include <linux/preempt.h>
 #include <asm/page.h>
 #include <asm/hexagon_vm.h>
 #include <asm/pgalloc.h>
@@ -59,6 +60,8 @@ static void ipi_flush_tlb_kernel_range(void *info)
 void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			unsigned long end)
 {
+	guard(preempt)();
+
 	struct mm_struct *mm = vma->vm_mm;
 
 	if (mm->context.ptbase == current->active_mm->context.ptbase)
@@ -80,6 +83,8 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
  */
 void flush_tlb_one(unsigned long vaddr)
 {
+	guard(preempt)();
+
 	__vmclrmap((void *)(vaddr & ~(PAGE_SIZE - 1)), PAGE_SIZE);
 }
 
@@ -90,6 +95,8 @@ void flush_tlb_one(unsigned long vaddr)
  */
 void tlb_flush_all(void)
 {
+	guard(preempt)();
+
 	/*  should probably use that fixaddr end or whateve label  */
 	__vmclrmap(0, 0xffff0000);
 }
@@ -99,6 +106,8 @@ void tlb_flush_all(void)
  */
 void flush_tlb_mm(struct mm_struct *mm)
 {
+	guard(preempt)();
+
 	if (current->active_mm->context.ptbase == mm->context.ptbase)
 		tlb_flush_all();
 	else
@@ -113,6 +122,8 @@ void flush_tlb_mm(struct mm_struct *mm)
  */
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long vaddr)
 {
+	guard(preempt)();
+
 	struct mm_struct *mm = vma->vm_mm;
 
 	vaddr &= ~(PAGE_SIZE - 1);
@@ -137,6 +148,8 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long vaddr)
  */
 void flush_tlb_kernel_range(unsigned long start, unsigned long end)
 {
+	guard(preempt)();
+
 	extern spinlock_t kmap_gen_lock;
 
 	/*

@@ -61,6 +61,7 @@ struct thread_struct {
 #define KSTK_ESP(tsk) (pt_psp(task_pt_regs(tsk)))
 
 extern unsigned long __get_wchan(struct task_struct *p);
+void hexagon_preempt_irq(struct pt_regs *regs);
 
 /*  The following stuff is pretty HEXAGON specific.  */
 

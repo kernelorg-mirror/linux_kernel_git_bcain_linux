@@ -192,6 +192,17 @@ unsigned long __get_wchan(struct task_struct *p)
  */
 
 int do_work_pending(struct pt_regs *regs, u32 thread_info_flags);
+/* Called with the IRQ cache synchronized and interrupts disabled. */
+void notrace hexagon_preempt_irq(struct pt_regs *regs)
+{
+#ifdef CONFIG_PREEMPTION
+	if (!user_mode(regs) && ints_enabled(regs) && !preempt_count()) {
+		while (need_resched())
+			preempt_schedule_irq();
+	}
+#endif
+}
+
 int do_work_pending(struct pt_regs *regs, u32 thread_info_flags)
 {
 	local_irq_enable();

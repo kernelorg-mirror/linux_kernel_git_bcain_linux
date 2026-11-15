@@ -95,7 +95,7 @@ static int fault_coproc(struct thread_info *ti)
 
 	if (!ti->extensions.hvx) {
 		atomic_inc(&hvx_refcount);
-		ti->extensions.hvx = kmalloc_obj(*ti->extensions.hvx, GFP_KERNEL);
+		ti->extensions.hvx = kmalloc_obj(*ti->extensions.hvx, GFP_ATOMIC);
 		if (!ti->extensions.hvx)
 			goto out_err;
 		ti->extensions.hvx->vregs = kmem_cache_alloc(vregs_cachep,

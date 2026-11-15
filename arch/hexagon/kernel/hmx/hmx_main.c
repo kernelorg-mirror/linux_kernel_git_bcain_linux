@@ -62,7 +62,7 @@ static int fault_coproc(struct thread_info *ti)
 
 	if (!ti->extensions.hmx) {
 		ti->extensions.hmx = kmalloc_obj(*ti->extensions.hmx,
-					       GFP_KERNEL);
+					       GFP_ATOMIC);
 		if (!ti->extensions.hmx) {
 			up_read(&drv_enabled);
 			force_sig(SIGFPE);

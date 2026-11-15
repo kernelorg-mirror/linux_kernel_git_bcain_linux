@@ -293,20 +293,11 @@ event_dispatch:
 		R17.H = #HI(vmsetie_rte_disable);
 	}
 
-	/*
-	 * Coming back from the C-world, our thread info pointer
-	 * should be in the designated register (usually R19)
-	 *
-	 * If we were in kernel mode, we don't need to check scheduler
-	 * or signals if CONFIG_PREEMPTION is not set.  If set, then it has
-	 * to jump to a need_resched kind of block.
-	 * BTW, CONFIG_PREEMPTION is not supported yet.
-	 */
-
 #ifdef CONFIG_PREEMPTION
-	R16.L = #LO(vmsetie_disable);
-	R16.H = #HI(vmsetie_disable);
-	callr R16
+	/* Finish kernel-mode IRQ returns with the normal preemption rules. */
+	call vmsetie_disable
+	R0 = R29;
+	call hexagon_preempt_irq
 #endif
 
 	/*  "Nested control path" -- if the previous mode was kernel  */
