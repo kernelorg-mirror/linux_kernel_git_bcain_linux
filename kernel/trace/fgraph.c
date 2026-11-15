@@ -24,7 +24,14 @@
  * FGRAPH_FRAME_OFFSET:	Size in long words of the meta data frame
  */
 #define FGRAPH_FRAME_SIZE	sizeof(struct ftrace_ret_stack)
-#define FGRAPH_FRAME_OFFSET	DIV_ROUND_UP(FGRAPH_FRAME_SIZE, sizeof(long))
+/* Include the trailing metadata word when aligning the next allocation. */
+#ifdef CONFIG_HAVE_64BIT_ALIGNED_ACCESS
+#define FGRAPH_DATA_ALIGN	8
+#else
+#define FGRAPH_DATA_ALIGN	sizeof(long)
+#endif
+#define FGRAPH_FRAME_OFFSET \
+	(ALIGN(FGRAPH_FRAME_SIZE + sizeof(long), FGRAPH_DATA_ALIGN) / sizeof(long) - 1)
 
 /*
  * On entry to a function (via function_graph_enter()), a new fgraph frame
@@ -137,7 +144,8 @@ enum {
 #define FGRAPH_DATA_BITS	5
 #define FGRAPH_DATA_MASK	GENMASK(FGRAPH_DATA_BITS - 1, 0)
 #define FGRAPH_DATA_SHIFT	(FGRAPH_TYPE_SHIFT + FGRAPH_TYPE_BITS)
-#define FGRAPH_MAX_DATA_SIZE (sizeof(long) * (1 << FGRAPH_DATA_BITS))
+#define FGRAPH_MAX_DATA_SIZE \
+	(sizeof(long) * (1 << FGRAPH_DATA_BITS) - (FGRAPH_DATA_ALIGN - sizeof(long)))
 
 #define FGRAPH_DATA_INDEX_BITS	4
 #define FGRAPH_DATA_INDEX_MASK	GENMASK(FGRAPH_DATA_INDEX_BITS - 1, 0)
@@ -351,7 +359,10 @@ void *fgraph_reserve_data(int idx, int size_bytes)
 		return NULL;
 
 	/* Convert the data size to number of longs. */
-	data_size = (size_bytes + sizeof(long) - 1) >> (sizeof(long) == 4 ? 2 : 3);
+	data_size = DIV_ROUND_UP(size_bytes, sizeof(long));
+	/* Keep data and subsequent frames aligned, including the metadata word. */
+	data_size = ALIGN((data_size + 1) * sizeof(long), FGRAPH_DATA_ALIGN) /
+		    sizeof(long) - 1;
 
 	val = get_fgraph_entry(current, curr_ret_stack - 1);
 	data = &current->ret_stack[curr_ret_stack];
