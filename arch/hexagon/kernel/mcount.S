@@ -75,4 +75,5 @@ SYM_FUNC_START(mcount)
 	call hexagon_ftrace_caller
 	trace_restore
 SYM_FUNC_END(mcount)
+SYM_FUNC_ALIAS(ftrace_caller, mcount)
 EXPORT_SYMBOL(mcount)

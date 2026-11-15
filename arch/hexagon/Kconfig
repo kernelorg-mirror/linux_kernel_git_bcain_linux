@@ -45,6 +45,8 @@ config HEXAGON
 	select HAVE_KPROBES
 	select HAVE_KRETPROBES
 	select HAVE_FUNCTION_TRACER
+	select HAVE_DYNAMIC_FTRACE
+	select HAVE_C_RECORDMCOUNT
 	# Trace records containing u64 fields need doubleword alignment.
 	select HAVE_64BIT_ALIGNED_ACCESS
 	select NEED_SG_DMA_LENGTH

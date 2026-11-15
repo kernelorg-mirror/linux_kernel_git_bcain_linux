@@ -52,6 +52,12 @@
 
 #define R_AARCH64_CALL26	283
 
+#ifndef EM_HEXAGON
+#define EM_HEXAGON 164
+#endif
+#define R_HEXAGON_32 6
+#define R_HEXAGON_B32_PCREL_X 16
+
 static int fd_map;	/* File descriptor for file being modified. */
 static int mmap_failed; /* Boolean flag. */
 static char gpfx;	/* prefix for global symbol name (sometimes '_') */
@@ -453,6 +459,12 @@ static int arm64_is_fake_mcount(Elf64_Rel const *rp)
 	return ELF64_R_TYPE(w8(rp->r_info)) != R_AARCH64_CALL26;
 }
 
+/* A Hexagon extended call has two relocations; record the extender only. */
+static int hexagon_is_fake_mcount(Elf32_Rel const *rp)
+{
+	return ELF32_R_TYPE(w(rp->r_info)) != R_HEXAGON_B32_PCREL_X;
+}
+
 static int LARCH32_is_fake_mcount(Elf32_Rel const *rp)
 {
 	switch (ELF64_R_TYPE(w(rp->r_info))) {
@@ -591,6 +603,11 @@ static int do_file(char const *const fname)
 		is_fake_mcount64 = arm64_is_fake_mcount;
 		break;
 	case EM_MIPS:	/* reltype: e_class    */ break;
+	case EM_HEXAGON:
+		reltype = R_HEXAGON_32;
+		is_fake_mcount32 = hexagon_is_fake_mcount;
+		gpfx = 0;
+		break;
 	case EM_LOONGARCH:	/* reltype: e_class    */ break;
 	case EM_PPC:	reltype = R_PPC_ADDR32; break;
 	case EM_PPC64:	reltype = R_PPC64_ADDR64; break;

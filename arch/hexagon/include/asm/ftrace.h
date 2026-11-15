@@ -5,6 +5,7 @@
 /* -mlong-calls emits an extender followed by the call instruction. */
 #define MCOUNT_INSN_SIZE 8
 #define ARCH_SUPPORTS_FTRACE_OPS 1
+#define MCOUNT_ADDR ((unsigned long)mcount)
 
 #ifndef __ASSEMBLY__
 #include <linux/string.h>
@@ -15,6 +16,14 @@ extern struct ftrace_ops *function_trace_op;
 void mcount(void);
 void hexagon_ftrace_caller(unsigned long ip, unsigned long parent_ip,
 			  unsigned long *parent);
+#ifdef CONFIG_DYNAMIC_FTRACE
+struct dyn_arch_ftrace {};
+
+static inline unsigned long ftrace_call_adjust(unsigned long addr)
+{
+	return addr;
+}
+#endif
 #endif
 
 #ifdef CONFIG_FTRACE_SYSCALLS
