@@ -31,6 +31,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 {
 	int l1;
 	unsigned long tlb_inv = VM_TLB_INVALIDATE_FALSE;
+	unsigned long generation = smp_load_acquire(&kmap_generation);
 
 	/*
 	 * For virtual machine, we have to update system map if it's been
@@ -38,11 +39,11 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	 * word bumped under kmap_gen_lock, possibly on another CPU, so
 	 * ordering can't be assumed and wrapping must stay harmless.
 	 */
-	if (next->context.generation != prev->context.generation) {
+	if (next->context.generation != generation) {
 		for (l1 = MIN_KERNEL_SEG; l1 <= max_kernel_seg; l1++)
 			next->pgd[l1] = init_mm.pgd[l1];
 
-		next->context.generation = prev->context.generation;
+		next->context.generation = generation;
 		tlb_inv = VM_TLB_INVALIDATE_TRUE;
 	}
 

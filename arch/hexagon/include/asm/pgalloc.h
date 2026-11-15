@@ -24,6 +24,7 @@ extern unsigned long kmap_generation;
 static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd;
+	unsigned long generation = smp_load_acquire(&kmap_generation);
 
 	pgd = __pgd_alloc(mm, 0);
 
@@ -36,7 +37,7 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	 */
 
 	memcpy(pgd, swapper_pg_dir, PTRS_PER_PGD*sizeof(pgd_t));
-	mm->context.generation = kmap_generation;
+	mm->context.generation = generation;
 
 	/* Physical version is what is passed to virtual machine on switch */
 	mm->context.ptbase = __pa(pgd);
@@ -121,11 +122,6 @@ static inline void pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd,
 	int pmdindex;
 
 	spin_lock(&kmap_gen_lock);
-	kmap_generation++;
-	mm->context.generation = kmap_generation;
-	current->active_mm->context.generation = kmap_generation;
-	spin_unlock(&kmap_gen_lock);
-
 	set_pmd(pmd, __pmd(((unsigned long)__pa(pte)) | HEXAGON_L1_PTE_SIZE));
 
 	/*
@@ -137,6 +133,11 @@ static inline void pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd,
 	set_pmd(ppmd, __pmd(((unsigned long)__pa(pte)) | HEXAGON_L1_PTE_SIZE));
 	if (pmdindex > max_kernel_seg)
 		max_kernel_seg = pmdindex;
+	/* Publish the completed mapping before its generation. */
+	smp_store_release(&kmap_generation, kmap_generation + 1);
+	mm->context.generation = kmap_generation;
+	current->active_mm->context.generation = kmap_generation;
+	spin_unlock(&kmap_gen_lock);
 }
 
 #define __pte_free_tlb(tlb, pte, addr)	\
