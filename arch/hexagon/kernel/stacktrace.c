@@ -10,6 +10,7 @@
 #include <linux/stacktrace.h>
 #include <linux/thread_info.h>
 #include <linux/module.h>
+#include <linux/ftrace.h>
 
 struct stackframe {
 	unsigned long fp;
@@ -25,6 +26,7 @@ void save_stack_trace(struct stack_trace *trace)
 	unsigned long fp;
 	struct stackframe *frame;
 	int skip = trace->skip;
+	int graph = 0;
 
 	low = (unsigned long)task_stack_page(current);
 	high = low + THREAD_SIZE;
@@ -36,7 +38,9 @@ void save_stack_trace(struct stack_trace *trace)
 		if (skip) {
 			skip--;
 		} else {
-			trace->entries[trace->nr_entries++] = frame->rets;
+			trace->entries[trace->nr_entries++] =
+				ftrace_graph_ret_addr(current, &graph, frame->rets,
+						      &frame->rets);
 			if (trace->nr_entries >= trace->max_entries)
 				break;
 		}

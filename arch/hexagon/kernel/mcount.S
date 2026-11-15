@@ -4,7 +4,7 @@
  * call share a packet. The caller's original LR is at FP+4. Preserve the
  * argument/scratch registers and control state across the tracing callback.
  * Callee-saved registers (including the thread-info and SCS pointers) follow
- * the ordinary C ABI.
+ * the ordinary C ABI. Graph tracing redirects the saved frame return address.
  */
 #include <linux/linkage.h>
 #include <linux/export.h>
@@ -77,3 +77,14 @@ SYM_FUNC_START(mcount)
 SYM_FUNC_END(mcount)
 SYM_FUNC_ALIAS(ftrace_caller, mcount)
 EXPORT_SYMBOL(mcount)
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+SYM_FUNC_START(return_to_handler)
+	trace_save
+	/* allocframe reused the just-popped traced function's frame. */
+	r0 = r30
+	call ftrace_return_to_handler
+	memw(r30 + #4) = r0
+	trace_restore
+SYM_FUNC_END(return_to_handler)
+#endif

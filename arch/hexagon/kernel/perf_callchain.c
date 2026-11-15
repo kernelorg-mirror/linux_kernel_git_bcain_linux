@@ -7,6 +7,7 @@
  */
 
 #include <linux/perf_event.h>
+#include <linux/ftrace.h>
 #include <linux/sched/task_stack.h>
 #include <linux/uaccess.h>
 #include <asm/ptrace.h>
@@ -45,6 +46,7 @@ void perf_callchain_kernel(struct perf_callchain_entry_ctx *entry,
 	unsigned long low = (unsigned long)task_stack_page(current);
 	unsigned long high = low + THREAD_SIZE - sizeof(struct stackframe);
 	unsigned long fp = regs->r30;
+	int graph = 0;
 
 	low += sizeof(struct thread_info);
 	perf_callchain_store(entry, instruction_pointer(regs));
@@ -56,7 +58,8 @@ void perf_callchain_kernel(struct perf_callchain_entry_ctx *entry,
 		if (fp & 0x3 || fp < low || fp > high)
 			break;
 		next = frame->fp;
-		lr = frame->lr;
+		lr = ftrace_graph_ret_addr(current, &graph, frame->lr,
+					  (unsigned long *)&frame->lr);
 
 		/*
 		 * A zero frame pointer is the bottom of the frames of one

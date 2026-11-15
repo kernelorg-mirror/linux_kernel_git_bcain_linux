@@ -16,6 +16,7 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/resume_user_mode.h>
+#include <linux/ftrace.h>
 #include <asm/hexagon_vm.h>
 #include <asm/hlx.h>
 #include <asm/notify.h>
@@ -163,6 +164,7 @@ unsigned long __get_wchan(struct task_struct *p)
 	unsigned long fp, pc;
 	unsigned long stack_page;
 	int count = 0;
+	int graph = 0;
 
 	stack_page = (unsigned long)task_stack_page(p);
 	fp = ((struct hexagon_switch_stack *)p->thread.switch_sp)->fp;
@@ -170,7 +172,8 @@ unsigned long __get_wchan(struct task_struct *p)
 		if (fp < (stack_page + sizeof(struct thread_info)) ||
 			fp >= (THREAD_SIZE - 8 + stack_page))
 			return 0;
-		pc = ((unsigned long *)fp)[1];
+		pc = ftrace_graph_ret_addr(p, &graph, ((unsigned long *)fp)[1],
+					 (unsigned long *)fp + 1);
 		if (!in_sched_functions(pc))
 			return pc;
 		fp = *(unsigned long *) fp;

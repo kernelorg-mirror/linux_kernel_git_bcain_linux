@@ -60,6 +60,15 @@ void notrace ftrace_stub(unsigned long ip, unsigned long parent_ip,
 {
 }
 
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+void notrace ftrace_stub_graph(struct ftrace_graph_ret *trace,
+			       struct fgraph_ops *gops, struct ftrace_regs *fregs)
+{
+}
+NOKPROBE_SYMBOL(ftrace_stub_graph);
+NOKPROBE_SYMBOL(return_to_handler);
+#endif
+
 void notrace hexagon_ftrace_caller(unsigned long ip, unsigned long parent_ip,
 				   unsigned long *parent)
 {
@@ -71,6 +80,14 @@ void notrace hexagon_ftrace_caller(unsigned long ip, unsigned long parent_ip,
 
 	if (func != ftrace_stub)
 		func(ip, parent_ip, READ_ONCE(function_trace_op), NULL);
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	if (READ_ONCE(ftrace_graph_entry) != ftrace_graph_entry_stub &&
+	    !ftrace_graph_is_dead() && !atomic_read(&current->tracing_graph_pause)) {
+		if (!function_graph_enter(*parent, ip, (unsigned long)(parent - 1),
+					  parent))
+			WRITE_ONCE(*parent, (unsigned long)return_to_handler);
+	}
+#endif
 }
 NOKPROBE_SYMBOL(hexagon_ftrace_caller);
 NOKPROBE_SYMBOL(ftrace_stub);
