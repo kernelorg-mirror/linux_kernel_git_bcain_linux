@@ -16,6 +16,8 @@
 #include <linux/extable.h>
 #include <linux/kdebug.h>
 #include <linux/sched.h>
+#include <linux/kallsyms.h>
+#include <linux/uaccess.h>
 #include <asm/cacheflush.h>
 #include <asm/hexagon_vm.h>
 
@@ -52,7 +54,10 @@ static int probed_packet_words(const kprobe_opcode_t *addr)
 	int i;
 
 	for (i = 0; i < MAX_INSN_SIZE - 1; i++) {
-		kprobe_opcode_t insn = addr[i];
+		kprobe_opcode_t insn;
+
+		if (copy_from_kernel_nofault(&insn, addr + i, sizeof(insn)))
+			return -EFAULT;
 
 		if (!(insn & INSN_PARSE_MASK))
 			return DUPLEX_HAS_L2(insn) ? -EINVAL : i + 1;
@@ -90,14 +95,24 @@ static void patch_insn(kprobe_opcode_t *addr, kprobe_opcode_t insn)
 int __kprobes arch_prepare_kprobe(struct kprobe *p)
 {
 	kprobe_opcode_t *slot;
+	kprobe_opcode_t prev;
+	unsigned long size, offset;
 	int nwords;
 
 	if ((unsigned long)p->addr & (sizeof(kprobe_opcode_t) - 1))
 		return -EINVAL;
 
-	/* The word before must end a packet, or this is not a packet's start. */
-	if ((p->addr[-1] & INSN_PARSE_MASK) == INSN_PARSE_MORE)
-		return -EINVAL;
+	/* Function entries are packet boundaries, including at a mapping start. */
+	if (!kallsyms_lookup_size_offset((unsigned long)p->addr, &size, &offset) ||
+	    offset) {
+		if (copy_from_kernel_nofault(&prev, p->addr - 1, sizeof(prev)))
+			return -EINVAL;
+		if ((prev & INSN_PARSE_MASK) != 0 &&
+		    (prev & INSN_PARSE_MASK) != INSN_PARSE_END)
+			return -EINVAL;
+		if (prev == KPROBE_BREAK_INSN)
+			return -EINVAL;
+	}
 
 	nwords = probed_packet_words(p->addr);
 	if (nwords < 0)
